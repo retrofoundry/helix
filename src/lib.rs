@@ -1,4 +1,4 @@
-mod speech_synthesizer;
+mod speech;
 
 use std::sync::Mutex;
 use lazy_static::lazy_static;
@@ -8,13 +8,13 @@ lazy_static! {
 }
 
 pub(crate) struct Helix {
-    speech_synthesizer: speech_synthesizer::SpeechSynthesizer,
+    speech_synthesizer: speech::SpeechSynthesizer,
 }
 
 impl Helix {
     pub(crate) fn new() -> Helix {
         Helix {
-            speech_synthesizer: speech_synthesizer::SpeechSynthesizer::new(),
+            speech_synthesizer: speech::SpeechSynthesizer::new(),
         }
     }
 }
