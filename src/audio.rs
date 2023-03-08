@@ -1,50 +1,73 @@
-mod writer;
-
 use crate::HELIX;
-use crate::audio::writer::Writer;
-use cpal::{
-    SizedSample, FromSample,
-    traits::{DeviceTrait, HostTrait, StreamTrait}
-};
+use cpal::traits::{DeviceTrait, HostTrait};
+use ringbuf::{Producer, RingBuffer};
+
+const SAMPLE_RATE: u32 = 44100;
+const SAMPLES_HIGH: i32 = 752;
 
 pub struct AudioPlayer {
-    config: Option<Config>,
+    backend: Option<Backend>,
 }
 
-pub struct Config {
-    device: cpal::Device,
-    output_format: cpal::SampleFormat,
-    config: cpal::SupportedStreamConfig,
+pub struct Backend {
+    buffer_producer: Producer<f32>,
+    output_stream: cpal::Stream,
 }
+
+unsafe impl Send for AudioPlayer {}
 
 impl AudioPlayer {
     pub fn new() -> Self {
         AudioPlayer {
-            config: Option::None,
+            backend: Option::None,
         }
     }
 
     pub fn init(&mut self) -> bool {
         let host = cpal::default_host();
-
-        let device = host
+        let output_device = host
             .default_output_device()
-            .expect("failed to find a default output device");
+            .expect("failed to get default output audio device");
 
-        let config = device
-            .default_output_config()
-            .expect("failed to get default output config");
+        let config = cpal::StreamConfig {
+            channels: 2,
+            sample_rate: cpal::SampleRate(SAMPLE_RATE),
+            buffer_size: cpal::BufferSize::Default,
+        };
 
-        self.config = Some(Config {
-            device,
-            output_format: config.sample_format(),
-            config,
+        // set the max length to the desired buffered level, plus
+        // 3x the high sample rate, which is what the n64 audio engine
+        // can output at one time, x2 to avoid overflow in case of the
+        // n64 audio engine running faster than audio engine, all multiplied
+        // by 4 because each sample is 4 bytes
+        let max_buffer_length = (self.desired_buffer() + 3 * SAMPLES_HIGH * 2) * 4;
+        let buffer = RingBuffer::new(max_buffer_length as usize);
+        let (buffer_producer, mut buffer_consumer) = buffer.split();
+
+        let output_data_fn = move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+            for sample in data {
+                *sample = buffer_consumer.pop().unwrap_or(0.);
+            }
+        };
+
+        let output_stream = output_device
+            .build_output_stream(&config, output_data_fn, Self::err_fn, None)
+            .expect("failed to build an output audio stream");
+        
+        
+        self.backend = Some(Backend {
+            buffer_producer,
+            output_stream
         });
 
         true
     }
 
     pub fn buffered(&self) -> i32 {
+        if let Some(config) = self.backend.as_ref() {
+            return config.buffer_producer.len() as i32 / 4;
+        }
+
         0
     }
 
@@ -52,51 +75,22 @@ impl AudioPlayer {
         2480
     }
 
-    pub fn play_buffer(&self, buf: &[u8]) {
-        if let Some(config) = &self.config {
-            // take ownership of the buffer
-            let buffer = buf.to_vec();
-
-            match config.output_format {
-                cpal::SampleFormat::F32 => run::<f32>(buffer, &config.device, &config.config),
-                cpal::SampleFormat::I16 => run::<i16>(buffer, &config.device, &config.config),
-                cpal::SampleFormat::U16 => run::<u16>(buffer, &config.device, &config.config),
-                sample_format => panic!("Unsupported sample format '{sample_format}'"),
+    pub fn play_buffer(&mut self, buf: &[u8]) {
+        if let Some(config) = self.backend.as_mut() {
+            let mut samples = Vec::with_capacity(buf.len() / 2);
+            for i in (0..buf.len()).step_by(2) {
+                let sample = i16::from_le_bytes([buf[i], buf[i + 1]]);
+                samples.push(sample as f32 / 32768.0);
             }
+
+            // TODO: write directly to the ring buffer
+            config.buffer_producer.push_slice(&samples);
         }
     }
-}
 
-fn run<T>(buffer: Vec<u8>, device: &cpal::Device, config: &cpal::SupportedStreamConfig)
-where
-    T: SizedSample + FromSample<f32>
-{
-    let config = cpal::StreamConfig {
-        channels: config.channels(),
-        sample_rate: config.sample_rate(),
-        buffer_size: cpal::BufferSize::Default,
-    };
-
-    let mut writer = Writer {
-        buffer,
-        device_sample_rate: config.sample_rate.0,
-        device_channels: config.channels as usize,
-    };
-
-    let stream = device.build_output_stream(
-        &config,
-        move |data: &mut [T], _| {
-            if let Err(e) = writer.write_to(data) {
-                println!("failed to write data: {}", e);
-            }
-        },
-        move |err| {
-            println!("audio output error: {}", err);
-        },
-        None,
-    ).expect("failed to build output stream");
-
-    stream.play().expect("failed to play stream");
+    fn err_fn(err: cpal::StreamError) {
+        eprintln!("an error occurred on audio stream: {}", err);
+    }
 }
 
 // MARK: - C API
