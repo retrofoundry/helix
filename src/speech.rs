@@ -94,14 +94,28 @@ impl SpeechSynthesizer {
 
     fn set_voice(&mut self) {
         if let Some(config) = self.config.as_mut() {
-            // if voices are found, let's try to find one for the given gender
+            // if voices are found, let's try to find one that fits our request
             if let Ok(voices) = config.backend.voices() {
-                let voice = &voices
+                // filter available voices by language
+                let matching_language_voices: Vec<Voice> = voices
                     .iter()
-                    .find(|v| v.gender() == config.gender.to_lib() && v.language() == config.language)
-                    .unwrap();
+                    .filter(|v| v.language() == config.language)
+                    .cloned()
+                    .collect();
 
-                _ = config.backend.set_voice(voice);
+                // filter voices by matching gender
+                let matching_gender_voices: Vec<Voice> = matching_language_voices
+                    .iter()
+                    .filter(|v| v.gender() == config.gender.to_lib())
+                    .cloned()
+                    .collect();
+
+                // if we have a matching voice for both language and gender return it
+                if let Some(voice) = matching_gender_voices.first() {
+                    _ = config.backend.set_voice(voice);
+                } else if let Some(voice) = matching_language_voices.first() {
+                    _ = config.backend.set_voice(voice);
+                }
             }
         }
     }
