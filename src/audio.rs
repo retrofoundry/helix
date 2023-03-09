@@ -1,7 +1,7 @@
 use crate::HELIX;
 use byteorder::{ReadBytesExt, LittleEndian};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use ringbuf::{Producer, RingBuffer};
+use ringbuf::{HeapRb, HeapProducer};
 
 const SAMPLES_HIGH: i32 = 752;
 
@@ -10,7 +10,7 @@ pub struct AudioPlayer {
 }
 
 pub struct Backend {
-    buffer_producer: Producer<f32>,
+    buffer_producer: HeapProducer<f32>,
     output_stream: cpal::Stream,
 }
 
@@ -40,8 +40,7 @@ impl AudioPlayer {
         // The buffer holds only audio for 1/4 second, which is good enough for delays,
         // It can be reduced more, but it might cause noise(?) for slower machines
         // or if any CPU intensive process started while the emulator is running
-        let buffer = RingBuffer::new(sample_rate as usize / 2);
-
+        let buffer = HeapRb::new(sample_rate as usize / 2);
         let (buffer_producer, mut buffer_consumer) = buffer.split();
 
         let output_data_fn = move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
@@ -66,7 +65,6 @@ impl AudioPlayer {
     pub fn deinit(&mut self) {
         if let Some(config) = self.backend.as_mut() {
             config.output_stream.pause().unwrap();
-
             self.backend = None;
         }
     }

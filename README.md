@@ -4,8 +4,7 @@ Provides useful utilities for interfacing with various OS systems. Aimed at N64 
 
 ## Features Provided
 - [x] Speech Synthesis
-- [ ] Audio Playback
-- [ ] Resource Management
+- [x] Audio Playback
 
 ## How to install?
 
