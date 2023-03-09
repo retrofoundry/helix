@@ -1,6 +1,6 @@
 use crate::HELIX;
 use byteorder::{ReadBytesExt, LittleEndian};
-use cpal::traits::{DeviceTrait, HostTrait};
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::{Producer, RingBuffer};
 
 const SAMPLES_HIGH: i32 = 752;
@@ -63,6 +63,14 @@ impl AudioPlayer {
         true
     }
 
+    pub fn deinit(&mut self) {
+        if let Some(config) = self.backend.as_mut() {
+            config.output_stream.pause().unwrap();
+
+            self.backend = None;
+        }
+    }
+
     pub fn buffered(&self) -> i32 {
         if let Some(config) = self.backend.as_ref() {
             return config.buffer_producer.len() as i32 / 4;
@@ -102,6 +110,11 @@ impl AudioPlayer {
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerInit(sample_rate: u32, channels: u16) -> bool {
     return HELIX.lock().unwrap().audio_player.init(sample_rate, channels);
+}
+
+#[no_mangle]
+pub extern "C" fn HLXAudioPlayerDeinit() {
+    HELIX.lock().unwrap().audio_player.deinit();
 }
 
 #[no_mangle]
