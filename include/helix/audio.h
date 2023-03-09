@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-bool HLXAudioPlayerInit(void);
+bool HLXAudioPlayerInit(uint32_t sampleRate, uint16_t channels);
 
 int32_t HLXAudioPlayerGetBuffered(void);
 int32_t HLXAudioPlayerGetDesiredBuffered(void);

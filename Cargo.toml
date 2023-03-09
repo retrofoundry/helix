@@ -10,6 +10,7 @@ crate-type = ["staticlib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+byteorder = "1.4.3"
 cpal = { version = "0.15.0", features = ["jack"] }
 lazy_static = "1.4.0"
 libc = "0.2.139"

@@ -1,8 +1,8 @@
 use crate::HELIX;
+use byteorder::{ReadBytesExt, LittleEndian};
 use cpal::traits::{DeviceTrait, HostTrait};
 use ringbuf::{Producer, RingBuffer};
 
-const SAMPLE_RATE: u32 = 44100;
 const SAMPLES_HIGH: i32 = 752;
 
 pub struct AudioPlayer {
@@ -23,25 +23,25 @@ impl AudioPlayer {
         }
     }
 
-    pub fn init(&mut self) -> bool {
+    pub fn init(&mut self, sample_rate: u32, channels: u16) -> bool {
         let host = cpal::default_host();
         let output_device = host
             .default_output_device()
             .expect("failed to get default output audio device");
-
         let config = cpal::StreamConfig {
-            channels: 2,
-            sample_rate: cpal::SampleRate(SAMPLE_RATE),
+            channels,
+            sample_rate: cpal::SampleRate(sample_rate),
             buffer_size: cpal::BufferSize::Default,
         };
 
-        // set the max length to the desired buffered level, plus
-        // 3x the high sample rate, which is what the n64 audio engine
-        // can output at one time, x2 to avoid overflow in case of the
-        // n64 audio engine running faster than audio engine, all multiplied
-        // by 4 because each sample is 4 bytes
-        let max_buffer_length = (self.desired_buffer() + 3 * SAMPLES_HIGH * 2) * 4;
-        let buffer = RingBuffer::new(max_buffer_length as usize);
+        // Limiting the number of samples in the buffer is better to minimize
+        // audio delay in playback, this is because game speed
+        // does not 100% match audio playing speed (44100Hz).
+        // The buffer holds only audio for 1/4 second, which is good enough for delays,
+        // It can be reduced more, but it might cause noise(?) for slower machines
+        // or if any CPU intensive process started while the emulator is running
+        let buffer = RingBuffer::new(sample_rate as usize / 2);
+
         let (buffer_producer, mut buffer_consumer) = buffer.split();
 
         let output_data_fn = move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
@@ -72,15 +72,19 @@ impl AudioPlayer {
     }
 
     pub fn desired_buffer(&self) -> i32 {
-        2480
+        SAMPLES_HIGH * 4
     }
 
     pub fn play_buffer(&mut self, buf: &[u8]) {
         if let Some(config) = self.backend.as_mut() {
+            let mut cursor = std::io::Cursor::new(buf);
+            
+            // transform the buffer into a vector of f32 samples
+            // buffer data is of 2 channels, 16 bit samples
             let mut samples = Vec::with_capacity(buf.len() / 2);
-            for i in (0..buf.len()).step_by(2) {
-                let sample = i16::from_le_bytes([buf[i], buf[i + 1]]);
-                samples.push(sample as f32 / 32768.0);
+            while cursor.position() < buf.len() as u64 {
+                let sample = cursor.read_i16::<LittleEndian>().unwrap() as f32 / 32768.0;
+                samples.push(sample);
             }
 
             // TODO: write directly to the ring buffer
@@ -96,8 +100,8 @@ impl AudioPlayer {
 // MARK: - C API
 
 #[no_mangle]
-pub extern "C" fn HLXAudioPlayerInit() -> bool {
-    return HELIX.lock().unwrap().audio_player.init();
+pub extern "C" fn HLXAudioPlayerInit(sample_rate: u32, channels: u16) -> bool {
+    return HELIX.lock().unwrap().audio_player.init(sample_rate, channels);
 }
 
 #[no_mangle]
