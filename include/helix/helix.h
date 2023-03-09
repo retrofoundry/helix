@@ -2,5 +2,6 @@
 #define HELIX_LIB
 
 #include "speech.h"
+#include "audio.h"
 
 #endif /* HELIX_LIB */

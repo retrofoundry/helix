@@ -1,6 +1,5 @@
-use tts::*;
-
 use crate::HELIX;
+use tts::*;
 use std::ffi::CStr;
 use std::str;
 
