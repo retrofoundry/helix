@@ -1,7 +1,7 @@
 use crate::helix;
-use byteorder::{ReadBytesExt, LittleEndian};
+use byteorder::{LittleEndian, ReadBytesExt};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use ringbuf::{HeapRb, HeapProducer};
+use ringbuf::{HeapProducer, HeapRb};
 
 const SAMPLES_HIGH: i32 = 752;
 
@@ -52,11 +52,10 @@ impl AudioPlayer {
         let output_stream = output_device
             .build_output_stream(&config, output_data_fn, Self::err_fn, None)
             .expect("failed to build an output audio stream");
-        
-        
+
         self.backend = Some(Backend {
             buffer_producer,
-            output_stream
+            output_stream,
         });
 
         true
@@ -84,7 +83,7 @@ impl AudioPlayer {
     pub fn play_buffer(&mut self, buf: &[u8]) {
         if let Some(config) = self.backend.as_mut() {
             let mut cursor = std::io::Cursor::new(buf);
-            
+
             // transform the buffer into a vector of f32 samples
             // buffer data is of 2 channels, 16 bit samples
             let mut samples = Vec::with_capacity(buf.len() / 2);

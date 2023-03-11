@@ -1,7 +1,7 @@
 use crate::helix;
-use tts::*;
 use std::ffi::CStr;
 use std::str;
+use tts::*;
 
 #[repr(C)]
 pub enum SpeechSynthesizerGender {
@@ -49,7 +49,10 @@ impl SpeechSynthesizer {
                 })
             }
             Err(e) => {
-                println!("[Speech Synthesizer] Error initializing speech synthesizer: {}", e);
+                println!(
+                    "[Speech Synthesizer] Error initializing speech synthesizer: {}",
+                    e
+                );
             }
         }
     }
@@ -74,7 +77,10 @@ impl SpeechSynthesizer {
                 config.language = language.into();
                 self.set_voice();
             } else {
-                println!("[Speech Synthesizer] Error parsing language: {}", language.unwrap_err());
+                println!(
+                    "[Speech Synthesizer] Error parsing language: {}",
+                    language.unwrap_err()
+                );
             }
         }
     }

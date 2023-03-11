@@ -1,10 +1,10 @@
-mod speech;
 mod audio;
-mod network;
 mod macros;
+mod network;
+mod speech;
 
-use std::sync::{Arc, Mutex};
 use lazy_static::lazy_static;
+use std::sync::{Arc, Mutex};
 
 lazy_static! {
     static ref HELIX: Arc<Mutex<Helix>> = Arc::new(Mutex::new(Helix::new()));
