@@ -1,0 +1,36 @@
+name: validate
+on: [push, pull_request]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  rustfmt-check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Run rustfmt
+      run: cargo fmt --all -- --check
+  ubuntu-check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Update apt
+      run: sudo apt update
+    - name: Install alsa
+      run: |
+        sudo apt-get install speech-dispatcher libspeechd-dev
+        sudo apt-get install libasound2-dev
+    - name: Build
+      run: cargo build --verbose
+  macos-check:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: cargo build --verbose
+  windows-check:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: cargo build --verbose
