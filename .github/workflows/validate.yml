@@ -18,7 +18,7 @@ jobs:
       run: sudo apt update
     - name: Install alsa
       run: |
-        sudo apt-get install speech-dispatcher
+        sudo apt-get install speech-dispatcher libspeechd-dev
         sudo apt-get install libasound2-dev
     - name: Build
       run: cargo build --verbose
