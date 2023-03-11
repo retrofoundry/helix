@@ -1,4 +1,4 @@
-use crate::HELIX;
+use crate::helix;
 use byteorder::{ReadBytesExt, LittleEndian};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::{HeapRb, HeapProducer};
@@ -107,26 +107,26 @@ impl AudioPlayer {
 
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerInit(sample_rate: u32, channels: u16) -> bool {
-    return HELIX.lock().unwrap().audio_player.init(sample_rate, channels);
+    return helix!().audio_player.init(sample_rate, channels);
 }
 
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerDeinit() {
-    HELIX.lock().unwrap().audio_player.deinit();
+    helix!().audio_player.deinit();
 }
 
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerGetBuffered() -> i32 {
-    return HELIX.lock().unwrap().audio_player.buffered();
+    return helix!().audio_player.buffered();
 }
 
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerGetDesiredBuffered() -> i32 {
-    return HELIX.lock().unwrap().audio_player.desired_buffer();
+    return helix!().audio_player.desired_buffer();
 }
 
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerPlayBuffer(buf: *const u8, len: usize) {
     let buf = unsafe { std::slice::from_raw_parts(buf, len) };
-    HELIX.lock().unwrap().audio_player.play_buffer(buf);
+    helix!().audio_player.play_buffer(buf);
 }

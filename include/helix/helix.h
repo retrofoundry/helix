@@ -3,5 +3,6 @@
 
 #include "speech.h"
 #include "audio.h"
+#include "network.h"
 
 #endif /* HELIX_LIB */
