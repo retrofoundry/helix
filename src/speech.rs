@@ -50,9 +50,7 @@ impl SpeechSynthesizer {
                 })
             }
             Err(e) => {
-                println!(
-                    "[Speech Synthesizer] Error initializing speech synthesizer: {e}"
-                );
+                println!("[Speech Synthesizer] Error initializing speech synthesizer: {e}");
             }
         }
     }

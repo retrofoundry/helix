@@ -3,8 +3,8 @@ use std::ffi::CStr;
 use std::io::{Read, Write};
 use std::net::TcpStream as Stream;
 use std::str;
-use std::sync::{Arc, Mutex};
 use std::sync::mpsc;
+use std::sync::{Arc, Mutex};
 use tokio::time::Duration;
 
 pub struct TCPStream {
@@ -116,9 +116,9 @@ pub extern "C" fn HLX_TCPConnect(host: *const i8, port: u16, on_message: OnMessa
                 TCPStream::connect(address, is_enabled, rx, move |message| {
                     match std::ffi::CString::new(message) {
                         Ok(message) => unsafe { on_message(message.as_ptr()) },
-                        Err(error) => println!(
-                            "[TCPListener] Failed to convert message to string: {error:?}"
-                        ),
+                        Err(error) => {
+                            println!("[TCPListener] Failed to convert message to string: {error:?}")
+                        }
                     }
                 })
                 .await;
