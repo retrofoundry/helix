@@ -30,7 +30,7 @@ impl AudioPlayer {
         let host = cpal::default_host();
         let output_device = host
             .default_output_device()
-            .expect("failed to get default output audio device");
+            .expect("[Audio] Failed to get default output audio device");
 
         let sample_rate = cpal::SampleRate(sample_rate);
 
@@ -60,7 +60,7 @@ impl AudioPlayer {
             let def_conf = output_device.default_output_config().unwrap();
 
             if def_conf.channels() != 2 || def_conf.sample_format() != cpal::SampleFormat::F32 {
-                eprintln!("No supported configuration found for audio device, please open an issue in github `dcvz/helix`\n\
+                eprintln!("[Audio] No supported configuration found for audio device, please open an issue in github `dcvz/helix`\n\
                       list of supported configurations: {:#?}", conf);
                 return false;
             }
@@ -102,7 +102,7 @@ impl AudioPlayer {
 
         let output_stream = output_device
             .build_output_stream(&config, output_data_fn, Self::err_fn, None)
-            .expect("failed to build an output audio stream");
+            .expect("[Audio] Failed to build an output audio stream");
 
         self.backend = Some(Backend {
             buffer_producer,
@@ -168,7 +168,6 @@ impl AudioPlayer {
             let mut cursor = std::io::Cursor::new(buf);
             let mut samples = Vec::with_capacity(buf.len() / 2);
             while let Ok(sample) = cursor.read_i16::<LittleEndian>() {
-                println!("sample: {}", sample);
                 samples.push(sample as f32 / 32768.0);
             }
 
@@ -198,7 +197,7 @@ impl AudioPlayer {
     }
 
     fn err_fn(err: cpal::StreamError) {
-        eprintln!("an error occurred on audio stream: {}", err);
+        eprintln!("[Audio] an error occurred on audio stream: {}", err);
     }
 }
 
