@@ -104,6 +104,8 @@ impl AudioPlayer {
             .build_output_stream(&config, output_data_fn, Self::err_fn, None)
             .expect("[Audio] Failed to build an output audio stream");
 
+        output_stream.play().unwrap();
+
         self.backend = Some(Backend {
             buffer_producer,
             output_stream,
