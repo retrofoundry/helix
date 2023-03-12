@@ -61,7 +61,7 @@ impl AudioPlayer {
 
             if def_conf.channels() != 2 || def_conf.sample_format() != cpal::SampleFormat::F32 {
                 eprintln!("[Audio] No supported configuration found for audio device, please open an issue in github `dcvz/helix`\n\
-                      list of supported configurations: {:#?}", conf);
+                      list of supported configurations: {conf:#?}");
                 return false;
             }
 
@@ -138,7 +138,7 @@ impl AudioPlayer {
     pub fn play_buffer(&mut self, buf: &[u8]) {
         if let Some(backend) = self.backend.as_mut() {
             // helper method to split channels into separate vectors
-            fn read_frames(inbuffer: &Vec<f32>, n_frames: usize, channels: usize) -> Vec<Vec<f32>> {
+            fn read_frames(inbuffer: &[f32], n_frames: usize, channels: usize) -> Vec<Vec<f32>> {
                 let mut wfs = Vec::with_capacity(channels);
                 for _chan in 0..channels {
                     wfs.push(Vec::with_capacity(n_frames));
@@ -158,9 +158,8 @@ impl AudioPlayer {
             fn write_frames(waves: Vec<Vec<f32>>, outbuffer: &mut Vec<f32>, channels: usize) {
                 let nbr = waves[0].len();
                 for frame in 0..nbr {
-                    for chan in 0..channels {
-                        let value = waves[chan][frame];
-                        outbuffer.push(value);
+                    for wave in waves.iter().take(channels) {
+                        outbuffer.push(wave[frame]);
                     }
                 }
             }
@@ -183,7 +182,7 @@ impl AudioPlayer {
                     }
 
                     // only read the needed frames
-                    let input = read_frames(&mut backend.resample_buffer, frames, 2);
+                    let input = read_frames(&backend.resample_buffer, frames, 2);
                     let output = resampler.process(&input, None).unwrap();
 
                     let mut resampled = Vec::with_capacity(output[0].len() * 2);
@@ -199,7 +198,7 @@ impl AudioPlayer {
     }
 
     fn err_fn(err: cpal::StreamError) {
-        eprintln!("[Audio] an error occurred on audio stream: {}", err);
+        eprintln!("[Audio] an error occurred on audio stream: {err}");
     }
 }
 

@@ -3,8 +3,8 @@ use std::ffi::CStr;
 use std::io::{Read, Write};
 use std::net::TcpStream as Stream;
 use std::str;
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
-use tokio::sync::mpsc;
 use tokio::time::Duration;
 
 pub struct TCPStream {
@@ -27,7 +27,7 @@ impl TCPStream {
     pub async fn connect<D>(
         address: String,
         is_enabled: Arc<Mutex<bool>>,
-        mut receiver: mpsc::Receiver<String>,
+        receiver: mpsc::Receiver<String>,
         on_message: D,
     ) where
         D: Fn(&str) + Send + Copy + 'static,
@@ -78,10 +78,10 @@ impl TCPStream {
         *self.is_enabled.lock().unwrap() = false;
     }
 
-    pub async fn send_message(&self, message: &str) {
+    pub fn send_message(&self, message: &str) {
         if let Some(backend) = &self.backend {
-            if let Err(error) = backend.sender.send(message.to_string()).await {
-                println!("[TCPListener] Failed to send message: {:?}", error);
+            if let Err(error) = backend.sender.send(message.to_string()) {
+                println!("[TCPListener] Failed to send message: {error:?}");
             }
         }
     }
@@ -95,7 +95,7 @@ type OnMessage = unsafe extern "C" fn(data: *const i8);
 pub extern "C" fn HLX_TCPConnect(host: *const i8, port: u16, on_message: OnMessage) {
     let host_str: &CStr = unsafe { CStr::from_ptr(host) };
     let host: &str = str::from_utf8(host_str.to_bytes()).unwrap();
-    let address = format!("{}:{}", host, port);
+    let address = format!("{host}:{port}");
 
     // set enabled to true
     *helix!().tcp_stream.is_enabled.lock().unwrap() = true;
@@ -104,7 +104,7 @@ pub extern "C" fn HLX_TCPConnect(host: *const i8, port: u16, on_message: OnMessa
     let is_enabled = Arc::clone(&helix!().tcp_stream.is_enabled);
 
     // message stream writer and receiver - to be used for sending messages to the server
-    let (tx, rx) = mpsc::channel::<String>(10);
+    let (tx, rx) = mpsc::channel();
     helix!().tcp_stream.backend = Some(Backend { sender: tx });
 
     std::thread::spawn(move || {
@@ -116,10 +116,9 @@ pub extern "C" fn HLX_TCPConnect(host: *const i8, port: u16, on_message: OnMessa
                 TCPStream::connect(address, is_enabled, rx, move |message| {
                     match std::ffi::CString::new(message) {
                         Ok(message) => unsafe { on_message(message.as_ptr()) },
-                        Err(error) => println!(
-                            "[TCPListener] Failed to convert message to string: {:?}",
-                            error
-                        ),
+                        Err(error) => {
+                            println!("[TCPListener] Failed to convert message to string: {error:?}")
+                        }
                     }
                 })
                 .await;
@@ -142,6 +141,6 @@ pub extern "C" fn HLX_TCPSendMessage(message: *const i8) {
         .build()
         .expect("[TCPListener] failed to create async runtime")
         .block_on(async move {
-            helix!().tcp_stream.send_message(message).await;
+            helix!().tcp_stream.send_message(message);
         });
 }

@@ -3,6 +3,7 @@ use std::ffi::CStr;
 use std::str;
 use tts::*;
 
+#[allow(dead_code)]
 #[repr(C)]
 pub enum SpeechSynthesizerGender {
     Male,
@@ -49,16 +50,13 @@ impl SpeechSynthesizer {
                 })
             }
             Err(e) => {
-                println!(
-                    "[Speech Synthesizer] Error initializing speech synthesizer: {}",
-                    e
-                );
+                println!("[Speech Synthesizer] Error initializing speech synthesizer: {e}");
             }
         }
     }
 
     pub fn deinit(&mut self) {
-        if let Some(_) = &self.config {
+        if self.config.is_some() {
             self.config = Option::None;
         }
     }
