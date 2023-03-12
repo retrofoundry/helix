@@ -81,7 +81,7 @@ impl TCPStream {
     pub fn send_message(&self, message: &str) {
         if let Some(backend) = &self.backend {
             if let Err(error) = backend.sender.send(message.to_string()) {
-                println!("[TCPListener] Failed to send message: {error:?}");
+                eprintln!("[TCPStream] Failed to send message: {error}");
             }
         }
     }
@@ -92,7 +92,7 @@ impl TCPStream {
 type OnMessage = unsafe extern "C" fn(data: *const i8);
 
 #[no_mangle]
-pub extern "C" fn HLX_TCPConnect(host: *const i8, port: u16, on_message: OnMessage) {
+pub extern "C" fn HLXTCPConnect(host: *const i8, port: u16, on_message: OnMessage) {
     let host_str: &CStr = unsafe { CStr::from_ptr(host) };
     let host: &str = str::from_utf8(host_str.to_bytes()).unwrap();
     let address = format!("{host}:{port}");
@@ -111,13 +111,13 @@ pub extern "C" fn HLX_TCPConnect(host: *const i8, port: u16, on_message: OnMessa
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .expect("[TCPListener] failed to create async runtime")
+            .expect("[TCPStream] failed to create async runtime")
             .block_on(async move {
                 TCPStream::connect(address, is_enabled, rx, move |message| {
                     match std::ffi::CString::new(message) {
                         Ok(message) => unsafe { on_message(message.as_ptr()) },
                         Err(error) => {
-                            println!("[TCPListener] Failed to convert message to string: {error:?}")
+                            eprintln!("[TCPStream] Failed to convert message to string: {error}")
                         }
                     }
                 })
@@ -127,19 +127,19 @@ pub extern "C" fn HLX_TCPConnect(host: *const i8, port: u16, on_message: OnMessa
 }
 
 #[no_mangle]
-pub extern "C" fn HLX_TCPDisconnect() {
+pub extern "C" fn HLXTCPDisconnect() {
     helix!().tcp_stream.disconnect();
 }
 
 #[no_mangle]
-pub extern "C" fn HLX_TCPSendMessage(message: *const i8) {
+pub extern "C" fn HLXTCPSendMessage(message: *const i8) {
     let message_str: &CStr = unsafe { CStr::from_ptr(message) };
     let message: &str = str::from_utf8(message_str.to_bytes()).unwrap();
 
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .expect("[TCPListener] failed to create async runtime")
+        .expect("[TCPStream] failed to create async runtime")
         .block_on(async move {
             helix!().tcp_stream.send_message(message);
         });

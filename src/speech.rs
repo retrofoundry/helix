@@ -50,7 +50,7 @@ impl SpeechSynthesizer {
                 })
             }
             Err(e) => {
-                println!("[Speech Synthesizer] Error initializing speech synthesizer: {e}");
+                eprintln!("[Speech Synthesizer] Error initializing speech synthesizer: {e}");
             }
         }
     }
@@ -71,14 +71,14 @@ impl SpeechSynthesizer {
         if let Some(config) = self.config.as_mut() {
             let language = LanguageTag::parse(language);
 
-            if let Ok(language) = language {
-                config.language = language.into();
-                self.set_voice();
-            } else {
-                println!(
-                    "[Speech Synthesizer] Error parsing language: {}",
-                    language.unwrap_err()
-                );
+            match language {
+                Ok(language) => {
+                    config.language = language.into();
+                    self.set_voice();
+                }
+                Err(e) => {
+                    eprintln!("[Speech Synthesizer] Error parsing language: {e}",);
+                }
             }
         }
     }
