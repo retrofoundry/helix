@@ -12,6 +12,12 @@ jobs:
       run: cargo fmt --all -- --check
     - name: Run cargo clippy
       run: cargo fmt --all -- --check
+  macos-check:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: cargo build --verbose
   ubuntu-check:
     runs-on: ubuntu-latest
     steps:
@@ -22,12 +28,6 @@ jobs:
       run: |
         sudo apt-get install speech-dispatcher libspeechd-dev
         sudo apt-get install libasound2-dev
-    - name: Build
-      run: cargo build --verbose
-  macos-check:
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v2
     - name: Build
       run: cargo build --verbose
   windows-check:
