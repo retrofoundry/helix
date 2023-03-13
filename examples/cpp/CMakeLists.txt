@@ -10,6 +10,10 @@ project(
     LANGUAGES CXX
 )
 
+if(APPLE)
+    enable_language(OBJCXX)
+endif()
+
 include(cmake/project-is-top-level.cmake)
 include(cmake/variables.cmake)
 
@@ -40,6 +44,14 @@ set_property(TARGET cpp_exe PROPERTY OUTPUT_NAME cpp)
 target_compile_features(cpp_exe PRIVATE cxx_std_17)
 
 target_link_libraries(cpp_exe PRIVATE helix)
+
+if(APPLE)
+    target_link_libraries(cpp_exe PRIVATE "-framework Foundation")
+    target_link_libraries(cpp_exe PRIVATE "-framework AVFoundation")
+    target_link_libraries(cpp_exe PRIVATE "-framework CoreFoundation")
+    target_link_libraries(cpp_exe PRIVATE "-framework CoreAudio")
+    target_link_libraries(cpp_exe PRIVATE "-framework AudioToolbox")
+endif()
 
 # ---- Install rules ----
 
