@@ -59,15 +59,3 @@ if(NOT CMAKE_SKIP_INSTALL_RULES)
   include(cmake/install-rules.cmake)
 endif()
 
-# ---- Developer mode ----
-
-if(NOT cpp_DEVELOPER_MODE)
-  return()
-elseif(NOT PROJECT_IS_TOP_LEVEL)
-  message(
-      AUTHOR_WARNING
-      "Developer mode is intended for developers of cpp"
-  )
-endif()
-
-include(cmake/dev-mode.cmake)

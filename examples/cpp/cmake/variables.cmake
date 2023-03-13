@@ -1,13 +1,3 @@
-# ---- Developer mode ----
-
-# Developer mode enables targets and code paths in the CMake scripts that are
-# only relevant for the developer(s) of cpp
-# Targets necessary to build the project must be provided unconditionally, so
-# consumers can trivially build and package the project
-if(PROJECT_IS_TOP_LEVEL)
-  option(cpp_DEVELOPER_MODE "Enable developer mode" OFF)
-endif()
-
 # ---- Warning guard ----
 
 # target_include_directories with the SYSTEM modifier will request the compiler
