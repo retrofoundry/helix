@@ -53,6 +53,10 @@ if(APPLE)
     target_link_libraries(cpp_exe PRIVATE "-framework AudioToolbox")
 endif()
 
+if(WIN32)
+    target_link_libraries(cpp_exe PRIVATE ntdll)
+endif()
+
 # ---- Install rules ----
 
 if(NOT CMAKE_SKIP_INSTALL_RULES)

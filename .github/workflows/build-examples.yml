@@ -21,9 +21,9 @@ jobs:
     - uses: actions/checkout@v2
     - name: Update apt
       run: sudo apt update
-    - name: Install alsa
+    - name: Install deps
       run: |
-        sudo apt-get install -y ninja-build
+        sudo apt-get install ninja-build
         sudo apt-get install speech-dispatcher libspeechd-dev
         sudo apt-get install libasound2-dev
     - name: Build
