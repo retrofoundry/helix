@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.16)
 
 include(cmake/prelude.cmake)
 
@@ -13,20 +13,22 @@ project(
 include(cmake/project-is-top-level.cmake)
 include(cmake/variables.cmake)
 
-# ---- Declare library ----
+# ---- Import Helix ----
 
-add_library(
-    cpp_lib OBJECT
-    source/lib.cpp
+include(FetchContent)
+
+FetchContent_Declare(
+    Corrosion
+    GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
+    GIT_TAG v0.3 # Optionally specify a commit hash, version tag or branch here
 )
+FetchContent_MakeAvailable(Corrosion)
 
-target_include_directories(
-    cpp_lib ${warning_guard}
-    PUBLIC
-    "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/source>"
-)
+# Import targets defined in a package or workspace manifest `Cargo.toml` file
+corrosion_import_crate(MANIFEST_PATH ../../Cargo.toml)
 
-target_compile_features(cpp_lib PUBLIC cxx_std_17)
+# include headers from the imported crate
+target_include_directories(helix INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 
 # ---- Declare executable ----
 
@@ -37,7 +39,7 @@ set_property(TARGET cpp_exe PROPERTY OUTPUT_NAME cpp)
 
 target_compile_features(cpp_exe PRIVATE cxx_std_17)
 
-target_link_libraries(cpp_exe PRIVATE cpp_lib)
+target_link_libraries(cpp_exe PRIVATE helix)
 
 # ---- Install rules ----
 

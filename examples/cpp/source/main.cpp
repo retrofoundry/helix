@@ -1,12 +1,11 @@
 #include <iostream>
 #include <string>
 
-#include "lib.hpp"
+#include <helix/helix.h>
 
 auto main() -> int
 {
-  auto const lib = library {};
-  auto const message = "Hello from " + lib.name + "!";
+  auto const message = "Hello, world!";
   std::cout << message << '\n';
   return 0;
 }
