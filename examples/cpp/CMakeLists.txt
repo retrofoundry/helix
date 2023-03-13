@@ -53,6 +53,11 @@ if(APPLE)
     target_link_libraries(cpp_exe PRIVATE "-framework AudioToolbox")
 endif()
 
+if(UNIX AND NOT APPLE)
+  find_package(ALSA REQUIRED)
+  target_link_libraries(cpp_exe PRIVATE ALSA::ALSA)
+endif()
+
 if(WIN32)
     target_link_libraries(cpp_exe PRIVATE ntdll)
 endif()
