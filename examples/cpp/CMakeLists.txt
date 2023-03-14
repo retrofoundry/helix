@@ -28,11 +28,11 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Corrosion)
 
-# Import targets defined in a package or workspace manifest `Cargo.toml` file
-corrosion_import_crate(MANIFEST_PATH ../../Cargo.toml)
-
-# include headers from the imported crate
-target_include_directories(helix INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
+if(UNIX AND NOT APPLE)
+    corrosion_import_crate(MANIFEST_PATH ../../Cargo.toml FEATURES network)
+else()
+    corrosion_import_crate(MANIFEST_PATH ../../Cargo.toml FEATURES speech network)
+endif()
 
 # ---- Declare executable ----
 
@@ -44,6 +44,7 @@ set_property(TARGET cpp_exe PROPERTY OUTPUT_NAME cpp)
 target_compile_features(cpp_exe PRIVATE cxx_std_17)
 
 target_link_libraries(cpp_exe PRIVATE helix)
+target_include_directories(cpp_exe PRIVATE ../../include)
 
 if(APPLE)
     target_link_libraries(cpp_exe PRIVATE "-framework Foundation")
@@ -51,11 +52,6 @@ if(APPLE)
     target_link_libraries(cpp_exe PRIVATE "-framework CoreFoundation")
     target_link_libraries(cpp_exe PRIVATE "-framework CoreAudio")
     target_link_libraries(cpp_exe PRIVATE "-framework AudioToolbox")
-endif()
-
-if(UNIX AND NOT APPLE)
-  find_package(ALSA REQUIRED)
-  target_link_libraries(cpp_exe PRIVATE ALSA::ALSA)
 endif()
 
 if(WIN32)
