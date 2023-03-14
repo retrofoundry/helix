@@ -9,9 +9,9 @@
 extern "C" {
 #endif
 
-bool HLXSupportsAudio(void);
-bool HLXSupportsSpeech(void);
-bool HLXSupportsNetwork(void);
+bool HLXAudioFeatureEnabled(void);
+bool HLXSpeechFeatureEnabled(void);
+bool HLXNetworkFeatureEnabled(void);
 
 #ifdef __cplusplus
 }

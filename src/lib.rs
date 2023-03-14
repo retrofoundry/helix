@@ -41,7 +41,7 @@ unsafe impl Sync for Helix {}
 // MARK: - C API
 
 #[no_mangle]
-pub extern "C" fn HLXSupportsAudio() -> bool {
+pub extern "C" fn HLXAudioFeatureEnabled() -> bool {
     #[cfg(feature = "audio")]
     return true;
     #[cfg(not(feature = "audio"))]
@@ -49,7 +49,7 @@ pub extern "C" fn HLXSupportsAudio() -> bool {
 }
 
 #[no_mangle]
-pub extern "C" fn HLXSupportsSpeech() -> bool {
+pub extern "C" fn HLXSpeechFeatureEnabled() -> bool {
     #[cfg(feature = "speech")]
     return true;
     #[cfg(not(feature = "speech"))]
@@ -57,7 +57,7 @@ pub extern "C" fn HLXSupportsSpeech() -> bool {
 }
 
 #[no_mangle]
-pub extern "C" fn HLXSupportsNetwork() -> bool {
+pub extern "C" fn HLXNetworkFeatureEnabled() -> bool {
     #[cfg(feature = "network")]
     return true;
     #[cfg(not(feature = "network"))]
