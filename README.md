@@ -25,6 +25,6 @@ Example:
 corrosion_import_crate(MANIFEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../helix/Cargo.toml FEATURES network)
 # these headers work:
 # include <helix/network.h>, <helix/audio.h>
-# these header won't work:
+# these headers won't work:
 # include <helix/speech.h>
 ```
