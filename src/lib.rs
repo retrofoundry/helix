@@ -56,6 +56,7 @@ pub extern "C" fn HLXSupportsSpeech() -> bool {
     return false;
 }
 
+#[no_mangle]
 pub extern "C" fn HLXSupportsNetwork() -> bool {
     #[cfg(feature = "network")]
     return true;
