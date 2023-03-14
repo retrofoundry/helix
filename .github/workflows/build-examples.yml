@@ -1,0 +1,44 @@
+name: build-examples
+on: [push, pull_request]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  macos-build-examples:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install deps
+      run: brew install ninja
+    - name: Build
+      working-directory: examples/cpp
+      run: |
+        cmake -S . -B build -D CMAKE_BUILD_TYPE=Release -GNinja
+        cmake --build build --config Release
+  ubuntu-build-examples:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Update apt
+      run: sudo apt update
+    - name: Install deps
+      run: |
+        sudo apt-get install ninja-build
+        sudo apt-get install libasound2-dev
+        sudo apt-get install speech-dispatcher libspeechd-dev
+    - name: Build
+      working-directory: examples/cpp
+      run: |
+        cmake -S . -B build -D CMAKE_BUILD_TYPE=Release -GNinja
+        cmake --build build --config Release
+  windows-build-examples:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install deps
+      run: choco install ninja
+    - name: Build
+      working-directory: examples/cpp
+      run: |
+        cmake -S . -B build -D CMAKE_BUILD_TYPE=Release
+        cmake --build build --config Release
