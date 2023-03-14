@@ -14,9 +14,9 @@ If you're using CMake you can install and link this library easily by using [Cor
 
 1. Add this library as a submodule (or copy it) into your project
 2. Enable Corrosion using FetchContent (see their README)
-3. Link against the helix library
-4. Include the include folder of helix so your program can see the available methods
-5. Include the features you want to be built using `FEATURES`. **audio** is always included.
+3. Include the features you want to be built using `FEATURES`. **audio** is always included.
+4. Link against the helix library
+5. Include the include folder of helix so your program can see the available methods
 
 _NOTE: If you get a build error that certain header methods are not implemented, you're likely not building with that feature enabled. _
 
