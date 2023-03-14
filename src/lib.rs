@@ -37,3 +37,28 @@ impl Helix {
 
 unsafe impl Send for Helix {}
 unsafe impl Sync for Helix {}
+
+// MARK: - C API
+
+#[no_mangle]
+pub extern "C" fn HLXSupportsAudio() -> bool {
+    #[cfg(feature = "audio")]
+    return true;
+    #[cfg(not(feature = "audio"))]
+    return false;
+}
+
+#[no_mangle]
+pub extern "C" fn HLXSupportsSpeech() -> bool {
+    #[cfg(feature = "speech")]
+    return true;
+    #[cfg(not(feature = "speech"))]
+    return false;
+}
+
+pub extern "C" fn HLXSupportsNetwork() -> bool {
+    #[cfg(feature = "network")]
+    return true;
+    #[cfg(not(feature = "network"))]
+    return false;
+}
