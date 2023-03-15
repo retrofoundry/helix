@@ -1,4 +1,4 @@
-use crate::helix;
+use crate::tcp_stream;
 use std::ffi::CStr;
 use std::io::{Read, Write};
 use std::net::TcpStream as Stream;
@@ -98,14 +98,14 @@ pub extern "C" fn HLXTCPConnect(host: *const i8, port: u16, on_message: OnMessag
     let address = format!("{host}:{port}");
 
     // set enabled to true
-    *helix!().tcp_stream.is_enabled.lock().unwrap() = true;
+    *tcp_stream!().is_enabled.lock().unwrap() = true;
 
     // make copy of is_enabled to be used in the thread
-    let is_enabled = Arc::clone(&helix!().tcp_stream.is_enabled);
+    let is_enabled = Arc::clone(&tcp_stream!().is_enabled);
 
     // message stream writer and receiver - to be used for sending messages to the server
     let (tx, rx) = mpsc::channel();
-    helix!().tcp_stream.backend = Some(Backend { sender: tx });
+    tcp_stream!().backend = Some(Backend { sender: tx });
 
     std::thread::spawn(move || {
         tokio::runtime::Builder::new_current_thread()
@@ -128,7 +128,7 @@ pub extern "C" fn HLXTCPConnect(host: *const i8, port: u16, on_message: OnMessag
 
 #[no_mangle]
 pub extern "C" fn HLXTCPDisconnect() {
-    helix!().tcp_stream.disconnect();
+    tcp_stream!().disconnect();
 }
 
 #[no_mangle]
@@ -141,6 +141,6 @@ pub extern "C" fn HLXTCPSendMessage(message: *const i8) {
         .build()
         .expect("[TCPStream] failed to create async runtime")
         .block_on(async move {
-            helix!().tcp_stream.send_message(message);
+            tcp_stream!().send_message(message);
         });
 }

@@ -1,4 +1,4 @@
-use crate::helix;
+use crate::speech;
 use std::ffi::CStr;
 use std::str;
 use tts::*;
@@ -129,17 +129,17 @@ impl SpeechSynthesizer {
 
 #[no_mangle]
 pub extern "C" fn HLXSpeechSynthesizerInit() {
-    helix!().speech_synthesizer.init();
+    speech!().init();
 }
 
 #[no_mangle]
 pub extern "C" fn HLXSpeechSynthesizerDeinit() {
-    helix!().speech_synthesizer.deinit();
+    speech!().deinit();
 }
 
 #[no_mangle]
 pub extern "C" fn HLXSpeechSynthesizerSetVolume(volume: f32) {
-    helix!().speech_synthesizer.set_volume(volume);
+    speech!().set_volume(volume);
 }
 
 #[no_mangle]
@@ -147,12 +147,12 @@ pub extern "C" fn HLXSpeechSynthesizerSetLanguage(language_raw: *const i8) {
     let language_str: &CStr = unsafe { CStr::from_ptr(language_raw) };
     let language: &str = str::from_utf8(language_str.to_bytes()).unwrap();
 
-    helix!().speech_synthesizer.set_language(language);
+    speech!().set_language(language);
 }
 
 #[no_mangle]
 pub extern "C" fn HLXSpeechSynthesizerSetGender(gender: SpeechSynthesizerGender) {
-    helix!().speech_synthesizer.set_gender(gender);
+    speech!().set_gender(gender);
 }
 
 #[no_mangle]
@@ -160,5 +160,5 @@ pub extern "C" fn HLXSpeechSynthesizerSpeak(text_raw: *const i8, interrupt: u8) 
     let text_str: &CStr = unsafe { CStr::from_ptr(text_raw) };
     let text: &str = str::from_utf8(text_str.to_bytes()).unwrap();
 
-    helix!().speech_synthesizer.speak(text, interrupt != 0);
+    speech!().speak(text, interrupt != 0);
 }

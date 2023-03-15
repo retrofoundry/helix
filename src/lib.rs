@@ -9,31 +9,12 @@ use lazy_static::lazy_static;
 use std::sync::{Arc, Mutex};
 
 lazy_static! {
-    static ref HELIX: Arc<Mutex<Helix>> = Arc::new(Mutex::new(Helix::new()));
-}
-
-pub(crate) struct Helix {
+    static ref AUDIO_PLAYER : Arc<Mutex<audio::AudioPlayer>> = Arc::new(Mutex::new(audio::AudioPlayer::new()));
     #[cfg(feature = "speech")]
-    speech_synthesizer: speech::SpeechSynthesizer,
-    audio_player: audio::AudioPlayer,
+    static ref SPEECH_SYNTHESIZER : Arc<Mutex<speech::SpeechSynthesizer>> = Arc::new(Mutex::new(speech::SpeechSynthesizer::new()));
     #[cfg(feature = "network")]
-    tcp_stream: network::TCPStream,
+    static ref TCP_STREAM : Arc<Mutex<network::TCPStream>> = Arc::new(Mutex::new(network::TCPStream::new()));
 }
-
-impl Helix {
-    pub(crate) fn new() -> Helix {
-        Helix {
-            #[cfg(feature = "speech")]
-            speech_synthesizer: speech::SpeechSynthesizer::new(),
-            audio_player: audio::AudioPlayer::new(),
-            #[cfg(feature = "network")]
-            tcp_stream: network::TCPStream::new(),
-        }
-    }
-}
-
-unsafe impl Send for Helix {}
-unsafe impl Sync for Helix {}
 
 // MARK: - C API
 
