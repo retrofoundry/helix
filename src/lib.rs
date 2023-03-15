@@ -1,42 +1,39 @@
-mod audio;
+pub mod audio;
+#[cfg(feature = "cpp")]
 mod macros;
 #[cfg(feature = "network")]
-mod network;
+pub mod network;
 #[cfg(feature = "speech")]
-mod speech;
+pub mod speech;
 
+#[cfg(feature = "cpp")]
 use lazy_static::lazy_static;
+#[cfg(feature = "cpp")]
 use std::sync::{Arc, Mutex};
 
+#[cfg(feature = "cpp")]
 lazy_static! {
-    static ref HELIX: Arc<Mutex<Helix>> = Arc::new(Mutex::new(Helix::new()));
+    static ref AUDIO_PLAYER: Arc<Mutex<audio::AudioPlayer>> =
+        Arc::new(Mutex::new(audio::AudioPlayer::new()));
 }
 
-pub(crate) struct Helix {
-    #[cfg(feature = "speech")]
-    speech_synthesizer: speech::SpeechSynthesizer,
-    audio_player: audio::AudioPlayer,
-    #[cfg(feature = "network")]
-    tcp_stream: network::TCPStream,
+#[cfg(feature = "cpp")]
+#[cfg(feature = "speech")]
+lazy_static! {
+    static ref SPEECH_SYNTHESIZER: Arc<Mutex<speech::SpeechSynthesizer>> =
+        Arc::new(Mutex::new(speech::SpeechSynthesizer::new()));
 }
 
-impl Helix {
-    pub(crate) fn new() -> Helix {
-        Helix {
-            #[cfg(feature = "speech")]
-            speech_synthesizer: speech::SpeechSynthesizer::new(),
-            audio_player: audio::AudioPlayer::new(),
-            #[cfg(feature = "network")]
-            tcp_stream: network::TCPStream::new(),
-        }
-    }
+#[cfg(feature = "cpp")]
+#[cfg(feature = "network")]
+lazy_static! {
+    static ref TCP_STREAM: Arc<Mutex<network::TCPStream>> =
+        Arc::new(Mutex::new(network::TCPStream::new()));
 }
-
-unsafe impl Send for Helix {}
-unsafe impl Sync for Helix {}
 
 // MARK: - C API
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXSpeechFeatureEnabled() -> bool {
     #[cfg(feature = "speech")]
@@ -45,6 +42,7 @@ pub extern "C" fn HLXSpeechFeatureEnabled() -> bool {
     return false;
 }
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXNetworkFeatureEnabled() -> bool {
     #[cfg(feature = "network")]

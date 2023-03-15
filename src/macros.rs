@@ -1,6 +1,23 @@
+#[cfg(feature = "cpp")]
 #[macro_export]
-macro_rules! helix {
+macro_rules! audio {
     () => {
-        $crate::HELIX.lock().unwrap()
+        $crate::AUDIO_PLAYER.lock().unwrap()
+    };
+}
+
+#[cfg(feature = "cpp")]
+#[macro_export]
+macro_rules! speech {
+    () => {
+        $crate::SPEECH_SYNTHESIZER.lock().unwrap()
+    };
+}
+
+#[cfg(feature = "cpp")]
+#[macro_export]
+macro_rules! tcp_stream {
+    () => {
+        $crate::TCP_STREAM.lock().unwrap()
     };
 }

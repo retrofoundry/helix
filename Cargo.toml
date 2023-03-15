@@ -5,12 +5,13 @@ edition = "2021"
 
 [lib]
 name = "helix"
-crate-type = ["staticlib"]
+crate-type = ["lib", "staticlib"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
 default = []
+cpp = [] # defines that the lib will be used from C++
 speech = ["dep:tts"]
 network = ["dep:tokio"]
 

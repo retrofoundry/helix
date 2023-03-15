@@ -1,4 +1,6 @@
-use crate::helix;
+#[cfg(feature = "cpp")]
+use crate::tcp_stream;
+#[cfg(feature = "cpp")]
 use std::ffi::CStr;
 use std::io::{Read, Write};
 use std::net::TcpStream as Stream;
@@ -89,8 +91,10 @@ impl TCPStream {
 
 // MARK: - C API
 
+#[cfg(feature = "cpp")]
 type OnMessage = unsafe extern "C" fn(data: *const i8);
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXTCPConnect(host: *const i8, port: u16, on_message: OnMessage) {
     let host_str: &CStr = unsafe { CStr::from_ptr(host) };
@@ -98,14 +102,14 @@ pub extern "C" fn HLXTCPConnect(host: *const i8, port: u16, on_message: OnMessag
     let address = format!("{host}:{port}");
 
     // set enabled to true
-    *helix!().tcp_stream.is_enabled.lock().unwrap() = true;
+    *tcp_stream!().is_enabled.lock().unwrap() = true;
 
     // make copy of is_enabled to be used in the thread
-    let is_enabled = Arc::clone(&helix!().tcp_stream.is_enabled);
+    let is_enabled = Arc::clone(&tcp_stream!().is_enabled);
 
     // message stream writer and receiver - to be used for sending messages to the server
     let (tx, rx) = mpsc::channel();
-    helix!().tcp_stream.backend = Some(Backend { sender: tx });
+    tcp_stream!().backend = Some(Backend { sender: tx });
 
     std::thread::spawn(move || {
         tokio::runtime::Builder::new_current_thread()
@@ -126,11 +130,13 @@ pub extern "C" fn HLXTCPConnect(host: *const i8, port: u16, on_message: OnMessag
     });
 }
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXTCPDisconnect() {
-    helix!().tcp_stream.disconnect();
+    tcp_stream!().disconnect();
 }
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXTCPSendMessage(message: *const i8) {
     let message_str: &CStr = unsafe { CStr::from_ptr(message) };
@@ -141,6 +147,35 @@ pub extern "C" fn HLXTCPSendMessage(message: *const i8) {
         .build()
         .expect("[TCPStream] failed to create async runtime")
         .block_on(async move {
-            helix!().tcp_stream.send_message(message);
+            tcp_stream!().send_message(message);
         });
+}
+
+// MARK: - Tests
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tcp_stream_init() {
+        let tcp_stream = TCPStream::new();
+        assert_eq!(false, *tcp_stream.is_enabled.lock().unwrap());
+    }
+
+    #[test]
+    fn test_tcp_stream_is_enabled() {
+        let tcp_stream = TCPStream::new();
+
+        let is_enabled = Arc::clone(&tcp_stream.is_enabled);
+        let handler = std::thread::spawn(move || {
+            *is_enabled.lock().unwrap() = true;
+            // sleep for a bit to allow the other thread to read the value before thread is done
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        });
+
+        std::thread::sleep(std::time::Duration::from_millis(100)); // small delay to allow thread to spin up
+        assert_eq!(true, *tcp_stream.is_enabled.lock().unwrap());
+        handler.join().unwrap();
+    }
 }

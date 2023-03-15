@@ -1,4 +1,5 @@
-use crate::helix;
+#[cfg(feature = "cpp")]
+use crate::audio;
 use byteorder::{LittleEndian, ReadBytesExt};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::{HeapProducer, HeapRb};
@@ -18,6 +19,12 @@ pub struct Backend {
 }
 
 unsafe impl Send for AudioPlayer {}
+
+impl Default for AudioPlayer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl AudioPlayer {
     pub fn new() -> Self {
@@ -204,28 +211,33 @@ impl AudioPlayer {
 
 // MARK: - C API
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerInit(sample_rate: u32, channels: u16) -> bool {
-    return helix!().audio_player.init(sample_rate, channels);
+    return audio!().init(sample_rate, channels);
 }
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerDeinit() {
-    helix!().audio_player.deinit();
+    audio!().deinit();
 }
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerGetBuffered() -> i32 {
-    return helix!().audio_player.buffered();
+    return audio!().buffered();
 }
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerGetDesiredBuffered() -> i32 {
-    return helix!().audio_player.desired_buffer();
+    return audio!().desired_buffer();
 }
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerPlayBuffer(buf: *const u8, len: usize) {
     let buf = unsafe { std::slice::from_raw_parts(buf, len) };
-    helix!().audio_player.play_buffer(buf);
+    audio!().play_buffer(buf);
 }
