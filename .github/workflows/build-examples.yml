@@ -39,7 +39,6 @@ jobs:
       run: |
         sudo apt-get install ninja-build
         sudo apt-get install libasound2-dev
-        sudo apt-get install speech-dispatcher libspeechd-dev
     - name: Build
       working-directory: examples/cpp
       run: |
@@ -55,7 +54,6 @@ jobs:
       run: |
         sudo apt-get install ninja-build
         sudo apt-get install libasound2-dev
-        sudo apt-get install speech-dispatcher libspeechd-dev
     - name: Build
       working-directory: examples/cpp
       run: |
