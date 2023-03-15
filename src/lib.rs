@@ -4,7 +4,7 @@ mod macros;
 #[cfg(feature = "network")]
 mod network;
 #[cfg(feature = "speech")]
-mod speech;
+pub mod speech;
 
 #[cfg(feature = "cpp")]
 use lazy_static::lazy_static;

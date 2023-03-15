@@ -1,3 +1,4 @@
+#[cfg(feature = "cpp")]
 #[macro_export]
 macro_rules! audio {
     () => {
@@ -5,6 +6,7 @@ macro_rules! audio {
     };
 }
 
+#[cfg(feature = "cpp")]
 #[macro_export]
 macro_rules! speech {
     () => {
@@ -12,6 +14,7 @@ macro_rules! speech {
     };
 }
 
+#[cfg(feature = "cpp")]
 #[macro_export]
 macro_rules! tcp_stream {
     () => {
