@@ -13,11 +13,22 @@ use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "cpp")]
 lazy_static! {
-    static ref AUDIO_PLAYER : Arc<Mutex<audio::AudioPlayer>> = Arc::new(Mutex::new(audio::AudioPlayer::new()));
-    #[cfg(feature = "speech")]
-    static ref SPEECH_SYNTHESIZER : Arc<Mutex<speech::SpeechSynthesizer>> = Arc::new(Mutex::new(speech::SpeechSynthesizer::new()));
-    #[cfg(feature = "network")]
-    static ref TCP_STREAM : Arc<Mutex<network::TCPStream>> = Arc::new(Mutex::new(network::TCPStream::new()));
+    static ref AUDIO_PLAYER: Arc<Mutex<audio::AudioPlayer>> =
+        Arc::new(Mutex::new(audio::AudioPlayer::new()));
+}
+
+#[cfg(feature = "cpp")]
+#[cfg(feature = "speech")]
+lazy_static! {
+    static ref SPEECH_SYNTHESIZER: Arc<Mutex<speech::SpeechSynthesizer>> =
+        Arc::new(Mutex::new(speech::SpeechSynthesizer::new()));
+}
+
+#[cfg(feature = "cpp")]
+#[cfg(feature = "network")]
+lazy_static! {
+    static ref TCP_STREAM: Arc<Mutex<network::TCPStream>> =
+        Arc::new(Mutex::new(network::TCPStream::new()));
 }
 
 // MARK: - C API

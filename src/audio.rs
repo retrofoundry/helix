@@ -20,6 +20,12 @@ pub struct Backend {
 
 unsafe impl Send for AudioPlayer {}
 
+impl Default for AudioPlayer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AudioPlayer {
     pub fn new() -> Self {
         AudioPlayer {
