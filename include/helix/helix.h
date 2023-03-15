@@ -4,6 +4,7 @@
 #include "speech.h"
 #include "audio.h"
 #include "network.h"
+#include "controller.h"
 
 #ifdef __cplusplus
 extern "C" {

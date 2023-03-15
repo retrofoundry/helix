@@ -23,7 +23,6 @@ impl ControllerHub {
 
     pub fn scan(&mut self) {
         self.devices.clear();
-
-        // go through each backend and register the given devices
+        self.devices.append(&mut self.giapi.scan());
     }
 }
