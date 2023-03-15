@@ -1,5 +1,5 @@
 pub mod audio;
-mod controller;
+pub mod controller;
 #[cfg(feature = "cpp")]
 mod macros;
 #[cfg(feature = "network")]
@@ -34,8 +34,8 @@ lazy_static! {
 
 #[cfg(feature = "cpp")]
 lazy_static! {
-    static ref CONTROLLER_HUB: Arc<Mutex<controllers::ControllerHub>> =
-        Arc::new(Mutex::new(controllers::ControllerHub::new()));
+    static ref CONTROLLER_HUB: Arc<Mutex<controller::hub::ControllerHub>> =
+        Arc::new(Mutex::new(controller::hub::ControllerHub::new()));
 }
 
 // MARK: - C API

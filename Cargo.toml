@@ -10,7 +10,7 @@ crate-type = ["lib", "staticlib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = []
+default = ["cpp"]
 cpp = [] # defines that the lib will be used from C++
 speech = ["dep:tts"]
 network = ["dep:tokio"]
