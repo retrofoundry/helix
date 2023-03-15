@@ -1,8 +1,8 @@
-mod audio;
+pub mod audio;
 #[cfg(feature = "cpp")]
 mod macros;
 #[cfg(feature = "network")]
-mod network;
+pub mod network;
 #[cfg(feature = "speech")]
 pub mod speech;
 
