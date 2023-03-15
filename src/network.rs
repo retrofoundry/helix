@@ -150,3 +150,32 @@ pub extern "C" fn HLXTCPSendMessage(message: *const i8) {
             tcp_stream!().send_message(message);
         });
 }
+
+// MARK: - Tests
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tcp_stream_init() {
+        let tcp_stream = TCPStream::new();
+        assert_eq!(false, *tcp_stream.is_enabled.lock().unwrap());
+    }
+
+    #[test]
+    fn test_tcp_stream_is_enabled() {
+        let tcp_stream = TCPStream::new();
+
+        let is_enabled = Arc::clone(&tcp_stream.is_enabled);
+        let handler = std::thread::spawn(move || {
+            *is_enabled.lock().unwrap() = true;
+            // sleep for a bit to allow the other thread to read the value before thread is done
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        });
+
+        std::thread::sleep(std::time::Duration::from_millis(100)); // small delay to allow thread to spin up
+        assert_eq!(true, *tcp_stream.is_enabled.lock().unwrap());
+        handler.join().unwrap();
+    }
+}

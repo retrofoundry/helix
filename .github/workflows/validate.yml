@@ -20,8 +20,8 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Build
-      run: cargo build --verbose
+    - name: Test
+      run: cargo test --features "speech network"
   ubuntu-check:
     runs-on: ubuntu-latest
     steps:
@@ -32,11 +32,11 @@ jobs:
       run: |
         sudo apt-get install speech-dispatcher libspeechd-dev
         sudo apt-get install libasound2-dev
-    - name: Build
-      run: cargo build --verbose
+    - name: Test
+      run: cargo test --features "network"
   windows-check:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Build
-      run: cargo build --verbose
+    - name: Test
+      run: cargo test --features "speech network"

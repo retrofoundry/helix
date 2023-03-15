@@ -241,3 +241,16 @@ pub extern "C" fn HLXAudioPlayerPlayBuffer(buf: *const u8, len: usize) {
     let buf = unsafe { std::slice::from_raw_parts(buf, len) };
     audio!().play_buffer(buf);
 }
+
+// MARK: - Tests
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_audio_init() {
+        let mut audio = AudioPlayer::new();
+        assert!(audio.init(44100, 2));
+    }
+}
