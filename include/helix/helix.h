@@ -11,6 +11,7 @@ extern "C" {
 
 bool HLXSpeechFeatureEnabled(void);
 bool HLXNetworkFeatureEnabled(void);
+bool HLXControllerFeatureEnabled(void);
 
 #ifdef __cplusplus
 }

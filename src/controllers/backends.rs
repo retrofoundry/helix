@@ -1,1 +1,1 @@
-mod gilrs;
+pub(crate) mod gidevice;

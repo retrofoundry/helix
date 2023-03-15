@@ -1,4 +1,4 @@
+pub(crate) mod hub;
 mod device;
-mod hub;
 mod types;
 mod backends;

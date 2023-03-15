@@ -32,6 +32,12 @@ lazy_static! {
         Arc::new(Mutex::new(network::TCPStream::new()));
 }
 
+#[cfg(feature = "cpp")]
+lazy_static! {
+    static ref CONTROLLER_HUB: Arc<Mutex<controllers::ControllerHub>> =
+        Arc::new(Mutex::new(controllers::ControllerHub::new()));
+}
+
 // MARK: - C API
 
 #[cfg(feature = "cpp")]
@@ -49,5 +55,13 @@ pub extern "C" fn HLXNetworkFeatureEnabled() -> bool {
     #[cfg(feature = "network")]
     return true;
     #[cfg(not(feature = "network"))]
+    return false;
+}
+
+#[no_mangle]
+pub extern "C" fn HLXControllerFeatureEnabled() -> bool {
+    #[cfg(feature = "controller")]
+    return true;
+    #[cfg(not(feature = "controller"))]
     return false;
 }
