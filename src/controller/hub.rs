@@ -1,21 +1,20 @@
-use super::{backends::gidevice::GIController, device::ControllerDevice};
+use super::device::ControllerDevice;
 
 pub struct ControllerHub {
+    giapi: super::backends::giapi::GIApi,
     devices: Vec<Box<dyn ControllerDevice>>,
 }
 
 impl ControllerHub {
     pub fn new() -> ControllerHub {
         ControllerHub {
+            giapi: super::backends::giapi::GIApi::new(),
             devices: Vec::new(),
         }
     }
 
     pub fn init(&mut self) {
-        self.devices.push(Box::new(GIController {
-            id: 0,
-            api: Cell::new(Gilrs::new().unwrap()),
-        }));
+        self.devices = self.giapi.scan();
     }
 
     pub fn register(&mut self, device: Box<dyn ControllerDevice>) {
@@ -25,5 +24,6 @@ impl ControllerHub {
     pub fn scan(&mut self) {
         self.devices.clear();
 
+        // go through each backend and register the given devices
     }
 }

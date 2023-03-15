@@ -1,7 +1,7 @@
 pub mod audio;
+mod controller;
 #[cfg(feature = "cpp")]
 mod macros;
-mod controllers;
 #[cfg(feature = "network")]
 pub mod network;
 #[cfg(feature = "speech")]
