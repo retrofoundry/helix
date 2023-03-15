@@ -1,13 +1,17 @@
 mod audio;
+#[cfg(feature = "cpp")]
 mod macros;
 #[cfg(feature = "network")]
 mod network;
 #[cfg(feature = "speech")]
 mod speech;
 
+#[cfg(feature = "cpp")]
 use lazy_static::lazy_static;
+#[cfg(feature = "cpp")]
 use std::sync::{Arc, Mutex};
 
+#[cfg(feature = "cpp")]
 lazy_static! {
     static ref AUDIO_PLAYER : Arc<Mutex<audio::AudioPlayer>> = Arc::new(Mutex::new(audio::AudioPlayer::new()));
     #[cfg(feature = "speech")]
@@ -18,6 +22,7 @@ lazy_static! {
 
 // MARK: - C API
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXSpeechFeatureEnabled() -> bool {
     #[cfg(feature = "speech")]
@@ -26,6 +31,7 @@ pub extern "C" fn HLXSpeechFeatureEnabled() -> bool {
     return false;
 }
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXNetworkFeatureEnabled() -> bool {
     #[cfg(feature = "network")]

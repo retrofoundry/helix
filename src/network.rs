@@ -1,4 +1,6 @@
+#[cfg(feature = "cpp")]
 use crate::tcp_stream;
+#[cfg(feature = "cpp")]
 use std::ffi::CStr;
 use std::io::{Read, Write};
 use std::net::TcpStream as Stream;
@@ -89,8 +91,10 @@ impl TCPStream {
 
 // MARK: - C API
 
+#[cfg(feature = "cpp")]
 type OnMessage = unsafe extern "C" fn(data: *const i8);
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXTCPConnect(host: *const i8, port: u16, on_message: OnMessage) {
     let host_str: &CStr = unsafe { CStr::from_ptr(host) };
@@ -126,11 +130,13 @@ pub extern "C" fn HLXTCPConnect(host: *const i8, port: u16, on_message: OnMessag
     });
 }
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXTCPDisconnect() {
     tcp_stream!().disconnect();
 }
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXTCPSendMessage(message: *const i8) {
     let message_str: &CStr = unsafe { CStr::from_ptr(message) };

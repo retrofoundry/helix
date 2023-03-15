@@ -1,3 +1,4 @@
+#[cfg(feature = "cpp")]
 use crate::audio;
 use byteorder::{LittleEndian, ReadBytesExt};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -204,26 +205,31 @@ impl AudioPlayer {
 
 // MARK: - C API
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerInit(sample_rate: u32, channels: u16) -> bool {
     return audio!().init(sample_rate, channels);
 }
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerDeinit() {
     audio!().deinit();
 }
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerGetBuffered() -> i32 {
     return audio!().buffered();
 }
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerGetDesiredBuffered() -> i32 {
     return audio!().desired_buffer();
 }
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerPlayBuffer(buf: *const u8, len: usize) {
     let buf = unsafe { std::slice::from_raw_parts(buf, len) };

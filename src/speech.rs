@@ -1,4 +1,6 @@
+#[cfg(feature = "cpp")]
 use crate::speech;
+#[cfg(feature = "cpp")]
 use std::ffi::CStr;
 use std::str;
 use tts::*;
@@ -127,21 +129,25 @@ impl SpeechSynthesizer {
 
 // MARK: - C API
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXSpeechSynthesizerInit() {
     speech!().init();
 }
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXSpeechSynthesizerDeinit() {
     speech!().deinit();
 }
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXSpeechSynthesizerSetVolume(volume: f32) {
     speech!().set_volume(volume);
 }
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXSpeechSynthesizerSetLanguage(language_raw: *const i8) {
     let language_str: &CStr = unsafe { CStr::from_ptr(language_raw) };
@@ -150,11 +156,13 @@ pub extern "C" fn HLXSpeechSynthesizerSetLanguage(language_raw: *const i8) {
     speech!().set_language(language);
 }
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXSpeechSynthesizerSetGender(gender: SpeechSynthesizerGender) {
     speech!().set_gender(gender);
 }
 
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXSpeechSynthesizerSpeak(text_raw: *const i8, interrupt: u8) {
     let text_str: &CStr = unsafe { CStr::from_ptr(text_raw) };

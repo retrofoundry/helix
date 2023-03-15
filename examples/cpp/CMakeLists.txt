@@ -29,9 +29,9 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Corrosion)
 
 if(UNIX AND NOT APPLE)
-    corrosion_import_crate(MANIFEST_PATH ../../Cargo.toml FEATURES network)
+    corrosion_import_crate(MANIFEST_PATH ../../Cargo.toml FEATURES cpp network)
 else()
-    corrosion_import_crate(MANIFEST_PATH ../../Cargo.toml FEATURES speech network)
+    corrosion_import_crate(MANIFEST_PATH ../../Cargo.toml FEATURES cpp speech network)
 endif()
 
 # ---- Declare executable ----
