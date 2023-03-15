@@ -1,4 +1,3 @@
-#[cfg(feature = "audio")]
 mod audio;
 mod macros;
 #[cfg(feature = "network")]
@@ -16,7 +15,6 @@ lazy_static! {
 pub(crate) struct Helix {
     #[cfg(feature = "speech")]
     speech_synthesizer: speech::SpeechSynthesizer,
-    #[cfg(feature = "audio")]
     audio_player: audio::AudioPlayer,
     #[cfg(feature = "network")]
     tcp_stream: network::TCPStream,
@@ -27,7 +25,6 @@ impl Helix {
         Helix {
             #[cfg(feature = "speech")]
             speech_synthesizer: speech::SpeechSynthesizer::new(),
-            #[cfg(feature = "audio")]
             audio_player: audio::AudioPlayer::new(),
             #[cfg(feature = "network")]
             tcp_stream: network::TCPStream::new(),
@@ -39,14 +36,6 @@ unsafe impl Send for Helix {}
 unsafe impl Sync for Helix {}
 
 // MARK: - C API
-
-#[no_mangle]
-pub extern "C" fn HLXAudioFeatureEnabled() -> bool {
-    #[cfg(feature = "audio")]
-    return true;
-    #[cfg(not(feature = "audio"))]
-    return false;
-}
 
 #[no_mangle]
 pub extern "C" fn HLXSpeechFeatureEnabled() -> bool {

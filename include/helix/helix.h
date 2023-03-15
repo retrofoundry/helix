@@ -9,7 +9,6 @@
 extern "C" {
 #endif
 
-bool HLXAudioFeatureEnabled(void);
 bool HLXSpeechFeatureEnabled(void);
 bool HLXNetworkFeatureEnabled(void);
 
