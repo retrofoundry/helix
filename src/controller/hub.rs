@@ -1,22 +1,22 @@
-#[cfg(feature = "cpp")]
-use std::ptr;
+use super::types::{ControllerBits, OSContPad, OSContStatus};
+use super::{backends::giapi::GIApi, device::ControllerDevice};
 use std::mem::size_of;
 use std::os::raw::c_void;
-use super::types::{OSContPad, OSContStatus, ControllerBits};
-use super::{device::ControllerDevice, backends::giapi::GIApi};
+#[cfg(feature = "cpp")]
+use std::ptr;
 
 static mut MAX_CONTROLLERS: usize = 4;
 
 pub struct ControllerHub {
     devices: Vec<Box<dyn ControllerDevice>>,
-    bits: Option<ControllerBits>
+    bits: Option<ControllerBits>,
 }
 
 impl ControllerHub {
     pub fn new() -> ControllerHub {
         ControllerHub {
             devices: Vec::new(),
-            bits: None
+            bits: None,
         }
     }
 
@@ -40,7 +40,7 @@ impl ControllerHub {
         // TODO: Register more devices
     }
 
-    pub fn write(&mut self, mut data: Vec::<&mut OSContPad>) {
+    pub fn write(&mut self, mut data: Vec<&mut OSContPad>) {
         for device in self.devices.iter_mut() {
             for pad in data.iter_mut() {
                 device.write(pad);
@@ -60,23 +60,29 @@ pub extern "C" fn HLXCreateControllerHub() -> Box<ControllerHub> {
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-extern "C" fn osContInit(mq: *mut c_void, controllerBits: *mut u8, status: *mut OSContStatus) -> i32 {
-    unsafe { *controllerBits = 0; }
+extern "C" fn osContInit(
+    _mq: *mut c_void,
+    controller_bits: *mut u8,
+    _status: *mut OSContStatus,
+) -> i32 {
+    unsafe {
+        *controller_bits = 0;
+    }
     // controller_hub!().init(Box::new(unsafe { *controllerBits }));
-    return 0;
+    0
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-extern "C" fn osContStartReadData(mq: *mut c_void) -> i32 {
-    return 0;
+extern "C" fn osContStartReadData(_mq: *mut c_void) -> i32 {
+    0
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
 unsafe extern "C" fn osContGetReadData(pad: *mut OSContPad) {
     ptr::write_bytes(pad, 0, size_of::<OSContPad>() * MAX_CONTROLLERS);
-    let data = Vec::<OSContPad>::from_raw_parts(pad, size_of::<OSContPad>(), MAX_CONTROLLERS);
+    let _data = Vec::<OSContPad>::from_raw_parts(pad, size_of::<OSContPad>(), MAX_CONTROLLERS);
     // controller_hub!().write(Box::new(data));
     // ptr::copy_nonoverlapping(data.as_mut_ptr(), pad, data.len());
 }

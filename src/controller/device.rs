@@ -1,4 +1,4 @@
-use super::types::{Profile, OSContPad};
+use super::types::{OSContPad, Profile};
 
 pub trait ControllerDevice {
     fn connected(&self) -> bool;
