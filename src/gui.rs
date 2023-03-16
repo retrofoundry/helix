@@ -1,21 +1,21 @@
 use anyhow::Result;
 use imgui::{Condition, FontSource, MouseCursor};
 use imgui_wgpu::{Renderer, RendererConfig};
-use pollster::block_on;
-use std::time::Instant;
 use imgui_winit_support::winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
     event_loop::EventLoop,
     window::{Window, WindowBuilder},
 };
+use pollster::block_on;
+use std::time::Instant;
 
 pub struct Gui {
     // window
     width: u32,
     height: u32,
     pub window: Window,
-    
+
     // wgpu
     surface: wgpu::Surface,
     device: wgpu::Device,
@@ -44,43 +44,45 @@ pub struct EventLoopWrapper {
 impl Gui {
     pub fn create_event_loop() -> EventLoopWrapper {
         let event_loop = EventLoop::new();
-        return EventLoopWrapper { event_loop };
+        EventLoopWrapper { event_loop }
     }
 
     pub fn start(event_loop_wrapper: EventLoopWrapper, mut gui: Gui) {
         // let event_loop = EventLoop::new();
         // let mut gui = Gui::new(&event_loop).unwrap();
 
-        event_loop_wrapper.event_loop.run(move |event, _, control_flow| {
-            control_flow.set_wait();
-            // println!("{event:?}");
+        event_loop_wrapper
+            .event_loop
+            .run(move |event, _, control_flow| {
+                control_flow.set_wait();
+                // println!("{event:?}");
 
-            match event {
-                Event::WindowEvent {
-                    event: WindowEvent::Resized(_),
-                    ..
-                } => {
-                    gui.recreate_swapchain().unwrap();
+                match event {
+                    Event::WindowEvent {
+                        event: WindowEvent::Resized(_),
+                        ..
+                    } => {
+                        gui.recreate_swapchain().unwrap();
+                    }
+                    Event::WindowEvent {
+                        event: WindowEvent::ScaleFactorChanged { .. },
+                        ..
+                    } => {
+                        gui.recreate_swapchain().unwrap();
+                    }
+                    Event::WindowEvent {
+                        event: WindowEvent::CloseRequested,
+                        ..
+                    } => {
+                        control_flow.set_exit();
+                    }
+                    Event::MainEventsCleared => gui.window.request_redraw(),
+                    Event::RedrawRequested(_window_id) => gui.draw().unwrap(),
+                    _ => (),
                 }
-                Event::WindowEvent {
-                    event: WindowEvent::ScaleFactorChanged { .. },
-                    ..
-                } => {
-                    gui.recreate_swapchain().unwrap();
-                }
-                | Event::WindowEvent {
-                    event: WindowEvent::CloseRequested,
-                    ..
-                } => {
-                    control_flow.set_exit();
-                }
-                Event::MainEventsCleared => gui.window.request_redraw(),
-                Event::RedrawRequested(_window_id) => gui.draw().unwrap(),
-                _ => (),
-            }
 
-            gui.forward_event(&event);
-        });
+                gui.forward_event(&event);
+            });
     }
 }
 
@@ -199,7 +201,8 @@ impl Gui {
     }
 
     pub fn forward_event(&mut self, event: &Event<()>) {
-        self.imgui_winit_platform.handle_event(self.imgui.io_mut(), &self.window, event);
+        self.imgui_winit_platform
+            .handle_event(self.imgui.io_mut(), &self.window, event);
     }
 
     pub fn draw(&mut self) -> Result<()> {
@@ -289,14 +292,13 @@ impl Gui {
     }
 }
 
-
 // MARK: - C API
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXGUICreateEventLoop() -> Box<EventLoopWrapper> {
     let event_loop = Gui::create_event_loop();
-    return Box::new(event_loop);
+    Box::new(event_loop)
 }
 
 #[cfg(feature = "cpp")]
@@ -304,7 +306,7 @@ pub extern "C" fn HLXGUICreateEventLoop() -> Box<EventLoopWrapper> {
 pub extern "C" fn HLXGUICreate(event_loop: Option<&mut EventLoopWrapper>) -> Box<Gui> {
     let event_loop = event_loop.unwrap();
     let gui = Gui::new(event_loop).unwrap();
-    return Box::new(gui);
+    Box::new(gui)
 }
 
 #[cfg(feature = "cpp")]
@@ -314,4 +316,3 @@ pub extern "C" fn HLXGUIStart(event_loop: Option<Box<EventLoopWrapper>>, gui: Op
     let gui = gui.unwrap();
     Gui::start(*event_loop, *gui);
 }
-
