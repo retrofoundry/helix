@@ -43,7 +43,8 @@ impl ControllerHub {
     pub fn write(&mut self, data: Box<Vec::<OSContPad>>) {
         for device in self.devices.iter_mut() {
             for (i, pad) in data.iter().enumerate() {
-                device.write(pad);
+                let mut item = pad;
+                device.write(&mut item);
             }
         }
     }

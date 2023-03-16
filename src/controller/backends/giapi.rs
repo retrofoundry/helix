@@ -50,7 +50,7 @@ impl ControllerDevice for GIController {
         }
     }
 
-    fn write(&mut self, data: &OSContPad) {
+    fn write(&mut self, data: &mut OSContPad) {
         if data.stick_x != 0 {
             data.stick_x = 0;
         }
