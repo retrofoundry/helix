@@ -1,21 +1,16 @@
 use helix::gui::Gui;
 
 fn main() {
-    println!("Hello, world!");
-    
-    // #[cfg(not(target_os = "linux"))]
-    // let mut speech_synthesizer = SpeechSynthesizer::new();
-    
-    // #[cfg(not(target_os = "linux"))] {
-    //     speech_synthesizer.init();
-    //     speech_synthesizer.set_volume(1.0);
-    //     speech_synthesizer.speak("Hello, world!", true);
-    // }
+    let event_loop = Gui::create_event_loop();
+    let gui = Gui::new(&event_loop).unwrap();
 
-    Gui::start();
-    
-    loop {
-        println!("Hello, world!");
-        std::thread::sleep(std::time::Duration::from_millis(1000));
-    }
+    let handler = std::thread::spawn(move || {
+        loop {
+            println!("Hello, world!");
+            std::thread::sleep(std::time::Duration::from_millis(1000));
+        }
+    });
+
+    Gui::start(event_loop, gui);
+    handler.join().unwrap();
 }

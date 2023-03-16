@@ -32,14 +32,24 @@ pub struct UIState {
     demo_open: bool,
 }
 
-impl Gui {
-    pub fn start() {
-        let event_loop = EventLoop::new();
-        let mut gui = Gui::new(&event_loop).unwrap();
+pub struct EventLoopWrapper {
+    event_loop: EventLoop<()>,
+}
 
-        event_loop.run(move |event, _, control_flow| {
+// static methods
+impl Gui {
+    pub fn create_event_loop() -> EventLoopWrapper {
+        let event_loop = EventLoop::new();
+        return EventLoopWrapper { event_loop };
+    }
+
+    pub fn start(event_loop_wrapper: EventLoopWrapper, mut gui: Gui) {
+        // let event_loop = EventLoop::new();
+        // let mut gui = Gui::new(&event_loop).unwrap();
+
+        event_loop_wrapper.event_loop.run(move |event, _, control_flow| {
             control_flow.set_wait();
-            println!("{event:?}");
+            // println!("{event:?}");
 
             match event {
                 Event::WindowEvent {
@@ -65,11 +75,13 @@ impl Gui {
                 _ => (),
             }
 
-            gui.handle_event(&event);
+            gui.forward_event(&event);
         });
     }
+}
 
-    pub fn new(event_loop: &EventLoop<()>) -> Result<Self> {
+impl Gui {
+    pub fn new(event_loop_wrapper: &EventLoopWrapper) -> Result<Self> {
         let (width, height) = (800, 600);
         let title = "Helix";
 
@@ -77,7 +89,7 @@ impl Gui {
             .with_title(title)
             .with_inner_size(PhysicalSize::new(width, height))
             .with_resizable(true)
-            .build(event_loop)?;
+            .build(&event_loop_wrapper.event_loop)?;
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
@@ -182,7 +194,7 @@ impl Gui {
         Ok(())
     }
 
-    pub fn handle_event(&mut self, event: &Event<()>) {
+    pub fn forward_event(&mut self, event: &Event<()>) {
         self.imgui_winit_platform.handle_event(self.imgui.io_mut(), &self.window, event);
     }
 
@@ -272,3 +284,30 @@ impl Gui {
         Ok(())
     }
 }
+
+
+// MARK: - C API
+
+#[cfg(feature = "cpp")]
+#[no_mangle]
+pub extern "C" fn HLXGUICreateEventLoop() -> Box<EventLoopWrapper> {
+    let event_loop = Gui::create_event_loop();
+    return Box::new(event_loop);
+}
+
+#[cfg(feature = "cpp")]
+#[no_mangle]
+pub extern "C" fn HLXGUICreate(event_loop: Option<&mut EventLoopWrapper>) -> Box<Gui> {
+    let event_loop = event_loop.unwrap();
+    let gui = Gui::new(event_loop).unwrap();
+    return Box::new(gui);
+}
+
+#[cfg(feature = "cpp")]
+#[no_mangle]
+pub extern "C" fn HLXGUIStart(event_loop: Option<Box<EventLoopWrapper>>, gui: Option<Box<Gui>>) {
+    let event_loop = event_loop.unwrap();
+    let gui = gui.unwrap();
+    Gui::start(*event_loop, *gui);
+}
+

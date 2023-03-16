@@ -2,21 +2,22 @@
 #include <string>
 #include <thread>
 
-#include <helix/speech.h>
+#include <helix/gui.h>
 
 auto main() -> int
 {
-  auto const message = "Hello, world!";
-  std::cout << message << '\n';
+  auto event_loop = HLXGUICreateEventLoop();
+  auto gui = HLXGUICreate(event_loop);
 
-#if defined(__APPLE__) || defined(__WIN32)
-  HLXSpeechSynthesizerInit();
-  HLXSpeechSynthesizerSetVolume(1.0);
-  HLXSpeechSynthesizerSpeak("Hello, world!", true);
-#endif
+  auto event_loop_thread = std::thread([] {
+    while (true) {
+      std::cout << "Hello World!" << std::endl;
+      std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+  });
 
-  // Wait for the speech to finish.
-  std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+  HLXGUIStart(event_loop, gui);
+  event_loop_thread.join();
 
   return 0;
 }
