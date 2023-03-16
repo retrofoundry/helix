@@ -20,9 +20,9 @@ impl ControllerHub {
         }
     }
 
-    pub fn init(&mut self, controllerBits: ControllerBits) {
+    pub fn init(&mut self, controller_bits: ControllerBits) {
         self.scan();
-        self.bits = Some(controllerBits);
+        self.bits = Some(controller_bits);
     }
 
     pub fn register(&mut self, device: Box<dyn ControllerDevice>) {
@@ -40,17 +40,23 @@ impl ControllerHub {
         // TODO: Register more devices
     }
 
-    pub fn write(&mut self, data: Box<Vec::<OSContPad>>) {
+    pub fn write(&mut self, mut data: Vec::<&mut OSContPad>) {
         for device in self.devices.iter_mut() {
-            for (i, pad) in data.iter().enumerate() {
-                let mut item = pad;
-                device.write(&mut item);
+            for pad in data.iter_mut() {
+                device.write(pad);
             }
         }
     }
 }
 
 // MARK: - C API
+
+#[cfg(feature = "cpp")]
+#[no_mangle]
+pub extern "C" fn HLXCreateControllerHub() -> Box<ControllerHub> {
+    let hub = ControllerHub::new();
+    Box::new(hub)
+}
 
 #[cfg(feature = "cpp")]
 #[no_mangle]

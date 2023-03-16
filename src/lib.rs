@@ -24,14 +24,3 @@ pub extern "C" fn HLXNetworkFeatureEnabled() -> bool {
     #[cfg(not(feature = "network"))]
     return false;
 }
-
-#[no_mangle]
-pub extern "C" fn HLXControllerFeatureEnabled() -> bool {
-    return true;
-}
-
-#[no_mangle]
-pub extern "C" fn HLXCreateControllerHub() -> *mut ControllerHub {
-    let hub = ControllerHub::new();
-    return Box::into_raw(Box::new(hub));
-}
