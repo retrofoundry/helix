@@ -1,17 +1,22 @@
-use helix::speech::SpeechSynthesizer;
+use helix::window::Window;
 
 fn main() {
     println!("Hello, world!");
     
-    #[cfg(not(target_os = "linux"))]
-    let mut speech_synthesizer = SpeechSynthesizer::new();
+    // #[cfg(not(target_os = "linux"))]
+    // let mut speech_synthesizer = SpeechSynthesizer::new();
     
-    #[cfg(not(target_os = "linux"))] {
-        speech_synthesizer.init();
-        speech_synthesizer.set_volume(1.0);
-        speech_synthesizer.speak("Hello, world!", true);
-    }
+    // #[cfg(not(target_os = "linux"))] {
+    //     speech_synthesizer.init();
+    //     speech_synthesizer.set_volume(1.0);
+    //     speech_synthesizer.speak("Hello, world!", true);
+    // }
 
-    // Wait for the speech to finish.
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    let window = Window::default();
+    window.start();
+    
+    loop {
+        println!("Hello, world!");
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+    }
 }

@@ -5,6 +5,7 @@ mod macros;
 pub mod network;
 #[cfg(feature = "speech")]
 pub mod speech;
+pub mod window;
 
 #[cfg(feature = "cpp")]
 use lazy_static::lazy_static;
