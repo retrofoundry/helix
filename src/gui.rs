@@ -11,18 +11,22 @@ use imgui_winit_support::winit::{
 };
 
 pub struct Gui {
+    // window
     width: u32,
     height: u32,
     pub window: Window,
+    
+    // wgpu
     surface: wgpu::Surface,
     device: wgpu::Device,
     queue: wgpu::Queue,
     renderer: Renderer,
 
-    // imgui bindings
+    // imgui
     imgui: imgui::Context,
     imgui_winit_platform: imgui_winit_support::WinitPlatform,
 
+    // ui state
     ui_state: UIState,
 }
 
