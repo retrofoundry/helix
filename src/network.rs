@@ -1,6 +1,4 @@
 #[cfg(feature = "cpp")]
-use crate::tcp_stream;
-#[cfg(feature = "cpp")]
 use std::ffi::CStr;
 use std::io::{Read, Write};
 use std::net::TcpStream as Stream;
@@ -92,24 +90,35 @@ impl TCPStream {
 // MARK: - C API
 
 #[cfg(feature = "cpp")]
+#[no_mangle]
+pub extern "C" fn HLXTCPCreate() -> Box<TCPStream> {
+    Box::new(TCPStream::new())
+}
+
+#[cfg(feature = "cpp")]
 type OnMessage = unsafe extern "C" fn(data: *const i8);
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXTCPConnect(host: *const i8, port: u16, on_message: OnMessage) {
+pub extern "C" fn HLXTCPConnect(
+    mut stream: Option<&mut TCPStream>,
+    host: *const i8,
+    port: u16,
+    on_message: OnMessage,
+) {
     let host_str: &CStr = unsafe { CStr::from_ptr(host) };
     let host: &str = str::from_utf8(host_str.to_bytes()).unwrap();
     let address = format!("{host}:{port}");
 
     // set enabled to true
-    *tcp_stream!().is_enabled.lock().unwrap() = true;
+    *stream.as_mut().unwrap().is_enabled.lock().unwrap() = true;
 
     // make copy of is_enabled to be used in the thread
-    let is_enabled = Arc::clone(&tcp_stream!().is_enabled);
+    let is_enabled = Arc::clone(&stream.as_ref().unwrap().is_enabled);
 
     // message stream writer and receiver - to be used for sending messages to the server
     let (tx, rx) = mpsc::channel();
-    tcp_stream!().backend = Some(Backend { sender: tx });
+    stream.as_mut().unwrap().backend = Some(Backend { sender: tx });
 
     std::thread::spawn(move || {
         tokio::runtime::Builder::new_current_thread()
@@ -132,13 +141,13 @@ pub extern "C" fn HLXTCPConnect(host: *const i8, port: u16, on_message: OnMessag
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXTCPDisconnect() {
-    tcp_stream!().disconnect();
+pub extern "C" fn HLXTCPDisconnect(stream: Option<Box<TCPStream>>) {
+    stream.unwrap().disconnect();
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXTCPSendMessage(message: *const i8) {
+pub extern "C" fn HLXTCPSendMessage(stream: Option<&mut TCPStream>, message: *const i8) {
     let message_str: &CStr = unsafe { CStr::from_ptr(message) };
     let message: &str = str::from_utf8(message_str.to_bytes()).unwrap();
 
@@ -147,7 +156,7 @@ pub extern "C" fn HLXTCPSendMessage(message: *const i8) {
         .build()
         .expect("[TCPStream] failed to create async runtime")
         .block_on(async move {
-            tcp_stream!().send_message(message);
+            stream.unwrap().send_message(message);
         });
 }
 
