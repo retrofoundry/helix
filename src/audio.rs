@@ -1,5 +1,3 @@
-#[cfg(feature = "cpp")]
-use crate::audio;
 use byteorder::{LittleEndian, ReadBytesExt};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::{HeapProducer, HeapRb};
@@ -14,7 +12,10 @@ pub struct AudioPlayer {
 pub struct Backend {
     buffer_producer: HeapProducer<f32>,
     resampler: Option<FftFixedInOut<f32>>,
-    resample_buffer: Vec<f32>,
+    pre_resampled_buffer: Vec<f32>,
+    pre_resampled_split_buffers: [Vec<f32>; 2],
+    resample_process_buffers: [Vec<f32>; 2],
+    resampled_buffer: Vec<f32>,
     output_stream: cpal::Stream,
 }
 
@@ -116,8 +117,11 @@ impl AudioPlayer {
         self.backend = Some(Backend {
             buffer_producer,
             output_stream,
+            pre_resampled_buffer: Vec::new(),
+            pre_resampled_split_buffers: [Vec::new(), Vec::new()],
+            resample_process_buffers: [Vec::new(), Vec::new()],
+            resampled_buffer: Vec::new(),
             resampler,
-            resample_buffer: Vec::new(),
         });
 
         true
@@ -145,27 +149,26 @@ impl AudioPlayer {
     pub fn play_buffer(&mut self, buf: &[u8]) {
         if let Some(backend) = self.backend.as_mut() {
             // helper method to split channels into separate vectors
-            fn read_frames(inbuffer: &[f32], n_frames: usize, channels: usize) -> Vec<Vec<f32>> {
-                let mut wfs = Vec::with_capacity(channels);
-                for _chan in 0..channels {
-                    wfs.push(Vec::with_capacity(n_frames));
+            fn read_frames(inbuffer: &[f32], n_frames: usize, outputs: &mut [Vec<f32>]) {
+                for output in outputs.iter_mut() {
+                    output.clear();
+                    output.reserve(n_frames);
                 }
                 let mut value: f32;
                 let mut inbuffer_iter = inbuffer.iter();
                 for _ in 0..n_frames {
-                    for wf in wfs.iter_mut().take(channels) {
+                    for output in outputs.iter_mut() {
                         value = *inbuffer_iter.next().unwrap();
-                        wf.push(value);
+                        output.push(value);
                     }
                 }
-                wfs
             }
 
             /// Helper to merge channels into a single vector
-            fn write_frames(waves: Vec<Vec<f32>>, outbuffer: &mut Vec<f32>, channels: usize) {
+            fn write_frames(waves: &[Vec<f32>], outbuffer: &mut Vec<f32>) {
                 let nbr = waves[0].len();
                 for frame in 0..nbr {
-                    for wave in waves.iter().take(channels) {
+                    for wave in waves.iter() {
                         outbuffer.push(wave[frame]);
                     }
                 }
@@ -180,23 +183,54 @@ impl AudioPlayer {
             }
 
             if let Some(resampler) = &mut backend.resampler {
-                backend.resample_buffer.extend_from_slice(&samples);
+                backend.pre_resampled_buffer.extend_from_slice(&samples);
 
                 loop {
                     let frames = resampler.input_frames_next();
-                    if backend.resample_buffer.len() < frames * 2 {
+                    if backend.pre_resampled_buffer.len() < frames * 2 {
                         return;
                     }
 
                     // only read the needed frames
-                    let input = read_frames(&backend.resample_buffer, frames, 2);
-                    let output = resampler.process(&input, None).unwrap();
+                    read_frames(
+                        &backend.pre_resampled_buffer,
+                        frames,
+                        &mut backend.pre_resampled_split_buffers,
+                    );
 
-                    let mut resampled = Vec::with_capacity(output[0].len() * 2);
-                    write_frames(output, &mut resampled, 2);
+                    backend.resample_process_buffers[0].clear();
+                    backend.resample_process_buffers[0].clear();
 
-                    backend.buffer_producer.push_slice(&resampled);
-                    backend.resample_buffer = backend.resample_buffer.split_off(frames * 2);
+                    let output_frames = resampler.output_frames_next();
+                    backend.resample_process_buffers[0].reserve(output_frames);
+                    backend.resample_process_buffers[1].reserve(output_frames);
+
+                    resampler
+                        .process_into_buffer(
+                            &backend.pre_resampled_split_buffers,
+                            &mut backend.resample_process_buffers,
+                            None,
+                        )
+                        .unwrap();
+
+                    // resample
+                    if backend.resampled_buffer.len() < output_frames * 2 {
+                        backend
+                            .resampled_buffer
+                            .reserve(output_frames * 2 - backend.resampled_buffer.len());
+                    }
+                    backend.resampled_buffer.clear();
+                    write_frames(
+                        &backend.resample_process_buffers,
+                        &mut backend.resampled_buffer,
+                    );
+
+                    backend
+                        .buffer_producer
+                        .push_slice(&backend.resampled_buffer);
+
+                    backend.pre_resampled_buffer =
+                        backend.pre_resampled_buffer.split_off(frames * 2);
                 }
             } else {
                 backend.buffer_producer.push_slice(&samples);
@@ -213,31 +247,45 @@ impl AudioPlayer {
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXAudioPlayerInit(sample_rate: u32, channels: u16) -> bool {
-    return audio!().init(sample_rate, channels);
+pub extern "C" fn HLXAudioPlayerCreate() -> Box<AudioPlayer> {
+    Box::new(AudioPlayer::new())
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXAudioPlayerDeinit() {
-    audio!().deinit();
+pub extern "C" fn HLXAudioPlayerInit(
+    player: Option<&mut AudioPlayer>,
+    sample_rate: u32,
+    channels: u16,
+) -> bool {
+    return player.unwrap().init(sample_rate, channels);
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXAudioPlayerGetBuffered() -> i32 {
-    return audio!().buffered();
+pub extern "C" fn HLXAudioPlayerDeinit(player: Option<Box<AudioPlayer>>) {
+    player.unwrap().deinit();
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXAudioPlayerGetDesiredBuffered() -> i32 {
-    return audio!().desired_buffer();
+pub extern "C" fn HLXAudioPlayerGetBuffered(player: Option<&mut AudioPlayer>) -> i32 {
+    return player.unwrap().buffered();
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXAudioPlayerPlayBuffer(buf: *const u8, len: usize) {
+pub extern "C" fn HLXAudioPlayerGetDesiredBuffered(player: Option<&mut AudioPlayer>) -> i32 {
+    return player.unwrap().desired_buffer();
+}
+
+#[cfg(feature = "cpp")]
+#[no_mangle]
+pub extern "C" fn HLXAudioPlayerPlayBuffer(
+    player: Option<&mut AudioPlayer>,
+    buf: *const u8,
+    len: usize,
+) {
     let buf = unsafe { std::slice::from_raw_parts(buf, len) };
-    audio!().play_buffer(buf);
+    player.unwrap().play_buffer(buf);
 }

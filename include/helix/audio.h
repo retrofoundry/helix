@@ -8,13 +8,14 @@
 extern "C" {
 #endif
 
-bool HLXAudioPlayerInit(uint32_t sampleRate, uint16_t channels);
-void HLXAudioPlayerDeinit(void);
+void* HLXAudioPlayerCreate(void);
+bool HLXAudioPlayerInit(void* player, uint32_t sampleRate, uint16_t channels);
+void HLXAudioPlayerDeinit(void* player);
 
-int32_t HLXAudioPlayerGetBuffered(void);
-int32_t HLXAudioPlayerGetDesiredBuffered(void);
+int32_t HLXAudioPlayerGetBuffered(void* player);
+int32_t HLXAudioPlayerGetDesiredBuffered(void* player);
 
-void HLXAudioPlayerPlayBuffer(const uint8_t* buf, size_t len);
+void HLXAudioPlayerPlayBuffer(void* player, const uint8_t* buf, size_t len);
 
 #ifdef __cplusplus
 }
