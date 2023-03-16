@@ -64,6 +64,10 @@ if(WIN32)
     target_link_libraries(cpp_exe PRIVATE ntdll imm32 winmm d3d11 dxgi d3dcompiler uxtheme dwmapi)
 endif()
 
+if(UNIX AND NOT APPLE)
+    target_link_libraries(cpp_exe PRIVATE X11 fontconfig freetype asound)
+endif()
+
 # ---- Install rules ----
 
 if(NOT CMAKE_SKIP_INSTALL_RULES)
