@@ -21,11 +21,3 @@ macro_rules! tcp_stream {
         $crate::TCP_STREAM.lock().unwrap()
     };
 }
-
-#[cfg(feature = "cpp")]
-#[macro_export]
-macro_rules! controller_hub {
-    () => {
-        $crate::CONTROLLER_HUB.lock().unwrap()
-    };
-}

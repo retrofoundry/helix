@@ -1,6 +1,8 @@
 use gilrs::{GamepadId, Gilrs};
 use std::sync::{Arc, Mutex};
 
+use crate::controller::types::OSContPad;
+
 use super::super::device::ControllerDevice;
 use super::super::types::Profile;
 
@@ -48,8 +50,13 @@ impl ControllerDevice for GIController {
         }
     }
 
-    fn write(&mut self) {
-        todo!()
+    fn write(&mut self, data: &OSContPad) {
+        if data.stick_x != 0 {
+            data.stick_x = 0;
+        }
+        if data.stick_y != 0 {
+            data.stick_y = 0;
+        }
     }
 
     fn load_profile(&self, _slot: u8) -> &Profile {

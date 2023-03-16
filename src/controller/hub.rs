@@ -1,12 +1,11 @@
 #[cfg(feature = "cpp")]
 use std::ptr;
 use std::mem::size_of;
-use crate::controller_hub;
 use std::os::raw::c_void;
 use super::types::{OSContPad, OSContStatus, ControllerBits};
 use super::{device::ControllerDevice, backends::giapi::GIApi};
 
-static mut MAX_CONTROLLERS: i32 = 4;
+static mut MAX_CONTROLLERS: usize = 4;
 
 pub struct ControllerHub {
     devices: Vec<Box<dyn ControllerDevice>>,
@@ -41,9 +40,11 @@ impl ControllerHub {
         // TODO: Register more devices
     }
 
-    pub fn write(&mut self, pad: Box<OSContPad>) {
+    pub fn write(&mut self, data: Box<Vec::<OSContPad>>) {
         for device in self.devices.iter_mut() {
-
+            for (i, pad) in data.iter().enumerate() {
+                device.write(pad);
+            }
         }
     }
 }
@@ -54,7 +55,7 @@ impl ControllerHub {
 #[no_mangle]
 extern "C" fn osContInit(mq: *mut c_void, controllerBits: *mut u8, status: *mut OSContStatus) -> i32 {
     unsafe { *controllerBits = 0; }
-    controller_hub!().init(Box::new(unsafe { *controllerBits }));
+    // controller_hub!().init(Box::new(unsafe { *controllerBits }));
     return 0;
 }
 
@@ -66,9 +67,9 @@ extern "C" fn osContStartReadData(mq: *mut c_void) -> i32 {
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-extern "C" fn osContGetReadData(pad: *mut OSContPad) {
-
-    unsafe { ptr::write_bytes(pad, 0, size_of::<OSContPad>() * MAX_CONTROLLERS); }
-
-    controller_hub!().write(pad);
+unsafe extern "C" fn osContGetReadData(pad: *mut OSContPad) {
+    ptr::write_bytes(pad, 0, size_of::<OSContPad>() * MAX_CONTROLLERS);
+    let data = Vec::<OSContPad>::from_raw_parts(pad, size_of::<OSContPad>(), MAX_CONTROLLERS);
+    // controller_hub!().write(Box::new(data));
+    // ptr::copy_nonoverlapping(data.as_mut_ptr(), pad, data.len());
 }

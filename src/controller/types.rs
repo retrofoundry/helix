@@ -34,15 +34,15 @@ pub struct Profile {
 
 #[repr(C)]
 pub struct OSContStatus {
-    stype: u16,
-    status: u8,
-    errno: u8,
+    pub stype: u16,
+    pub status: u8,
+    pub errno: u8,
 }
 
 #[repr(C)]
 pub struct OSContPad {
-    button: u16,
-    stick_x: i8,
-    stick_y: i8,
-    errno: u8,
+    pub button: u16,
+    pub stick_x: i8,
+    pub stick_y: i8,
+    pub errno: u8,
 }

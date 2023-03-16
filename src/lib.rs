@@ -7,6 +7,7 @@ pub mod network;
 #[cfg(feature = "speech")]
 pub mod speech;
 
+use controller::hub::ControllerHub;
 #[cfg(feature = "cpp")]
 use lazy_static::lazy_static;
 #[cfg(feature = "cpp")]
@@ -31,13 +32,6 @@ lazy_static! {
     static ref TCP_STREAM: Arc<Mutex<network::TCPStream>> =
         Arc::new(Mutex::new(network::TCPStream::new()));
 }
-
-#[cfg(feature = "cpp")]
-lazy_static! {
-    static ref CONTROLLER_HUB: Arc<Mutex<controller::hub::ControllerHub>> =
-        Arc::new(Mutex::new(controller::hub::ControllerHub::new()));
-}
-
 // MARK: - C API
 
 #[cfg(feature = "cpp")]
@@ -60,8 +54,11 @@ pub extern "C" fn HLXNetworkFeatureEnabled() -> bool {
 
 #[no_mangle]
 pub extern "C" fn HLXControllerFeatureEnabled() -> bool {
-    #[cfg(feature = "controller")]
     return true;
-    #[cfg(not(feature = "controller"))]
-    return false;
+}
+
+#[no_mangle]
+pub extern "C" fn HLXCreateControllerHub() -> *mut ControllerHub {
+    let hub = ControllerHub::new();
+    return Box::into_raw(Box::new(hub));
 }
