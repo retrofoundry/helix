@@ -7,10 +7,11 @@
 extern "C" {
 #endif
 
-void HLXTCPConnect(char* host, uint16_t port, void (*callback)(const char* data));
-void HLXTCPDisconnect(void);
+void* HLXTCPCreate(void);
+void HLXTCPConnect(void* stream, char* host, uint16_t port, void (*callback)(const char* data));
+void HLXTCPDisconnect(void* stream);
 
-void HLXTCPSendMessage(const char* data);
+void HLXTCPSendMessage(void* stream, const char* data);
 
 #ifdef __cplusplus
 }
