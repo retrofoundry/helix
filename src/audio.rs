@@ -1,5 +1,3 @@
-#[cfg(feature = "cpp")]
-use crate::audio;
 use byteorder::{LittleEndian, ReadBytesExt};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::{HeapProducer, HeapRb};
@@ -249,31 +247,45 @@ impl AudioPlayer {
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXAudioPlayerInit(sample_rate: u32, channels: u16) -> bool {
-    return audio!().init(sample_rate, channels);
+pub extern "C" fn HLXAudioPlayerCreate() -> Box<AudioPlayer> {
+    Box::new(AudioPlayer::new())
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXAudioPlayerDeinit() {
-    audio!().deinit();
+pub extern "C" fn HLXAudioPlayerInit(
+    player: Option<&mut AudioPlayer>,
+    sample_rate: u32,
+    channels: u16,
+) -> bool {
+    return player.unwrap().init(sample_rate, channels);
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXAudioPlayerGetBuffered() -> i32 {
-    return audio!().buffered();
+pub extern "C" fn HLXAudioPlayerDeinit(player: Option<Box<AudioPlayer>>) {
+    player.unwrap().deinit();
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXAudioPlayerGetDesiredBuffered() -> i32 {
-    return audio!().desired_buffer();
+pub extern "C" fn HLXAudioPlayerGetBuffered(player: Option<&mut AudioPlayer>) -> i32 {
+    return player.unwrap().buffered();
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXAudioPlayerPlayBuffer(buf: *const u8, len: usize) {
+pub extern "C" fn HLXAudioPlayerGetDesiredBuffered(player: Option<&mut AudioPlayer>) -> i32 {
+    return player.unwrap().desired_buffer();
+}
+
+#[cfg(feature = "cpp")]
+#[no_mangle]
+pub extern "C" fn HLXAudioPlayerPlayBuffer(
+    player: Option<&mut AudioPlayer>,
+    buf: *const u8,
+    len: usize,
+) {
     let buf = unsafe { std::slice::from_raw_parts(buf, len) };
-    audio!().play_buffer(buf);
+    player.unwrap().play_buffer(buf);
 }

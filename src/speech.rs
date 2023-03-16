@@ -1,6 +1,4 @@
 #[cfg(feature = "cpp")]
-use crate::speech;
-#[cfg(feature = "cpp")]
 use std::ffi::CStr;
 use std::str;
 use tts::*;
@@ -131,42 +129,61 @@ impl SpeechSynthesizer {
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXSpeechSynthesizerInit() {
-    speech!().init();
+pub extern "C" fn HLXSpeechSynthesizerCreate() -> Box<SpeechSynthesizer> {
+    Box::new(SpeechSynthesizer::new())
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXSpeechSynthesizerDeinit() {
-    speech!().deinit();
+pub extern "C" fn HLXSpeechSynthesizerInit(synthesizer: Option<&mut SpeechSynthesizer>) {
+    synthesizer.unwrap().init();
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXSpeechSynthesizerSetVolume(volume: f32) {
-    speech!().set_volume(volume);
+pub extern "C" fn HLXSpeechSynthesizerDeinit(synthesizer: Option<Box<SpeechSynthesizer>>) {
+    synthesizer.unwrap().deinit();
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXSpeechSynthesizerSetLanguage(language_raw: *const i8) {
+pub extern "C" fn HLXSpeechSynthesizerSetVolume(
+    synthesizer: Option<&mut SpeechSynthesizer>,
+    volume: f32,
+) {
+    synthesizer.unwrap().set_volume(volume);
+}
+
+#[cfg(feature = "cpp")]
+#[no_mangle]
+pub extern "C" fn HLXSpeechSynthesizerSetLanguage(
+    synthesizer: Option<&mut SpeechSynthesizer>,
+    language_raw: *const i8,
+) {
     let language_str: &CStr = unsafe { CStr::from_ptr(language_raw) };
     let language: &str = str::from_utf8(language_str.to_bytes()).unwrap();
 
-    speech!().set_language(language);
+    synthesizer.unwrap().set_language(language);
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXSpeechSynthesizerSetGender(gender: SpeechSynthesizerGender) {
-    speech!().set_gender(gender);
+pub extern "C" fn HLXSpeechSynthesizerSetGender(
+    synthesizer: Option<&mut SpeechSynthesizer>,
+    gender: SpeechSynthesizerGender,
+) {
+    synthesizer.unwrap().set_gender(gender);
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXSpeechSynthesizerSpeak(text_raw: *const i8, interrupt: u8) {
+pub extern "C" fn HLXSpeechSynthesizerSpeak(
+    synthesizer: Option<&mut SpeechSynthesizer>,
+    text_raw: *const i8,
+    interrupt: u8,
+) {
     let text_str: &CStr = unsafe { CStr::from_ptr(text_raw) };
     let text: &str = str::from_utf8(text_str.to_bytes()).unwrap();
 
-    speech!().speak(text, interrupt != 0);
+    synthesizer.unwrap().speak(text, interrupt != 0);
 }
