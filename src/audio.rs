@@ -199,14 +199,14 @@ impl AudioPlayer {
                         frames,
                         &mut backend.pre_resampled_split_buffers,
                     );
-   
+
                     backend.resample_process_buffers[0].clear();
                     backend.resample_process_buffers[0].clear();
-   
+
                     let output_frames = resampler.output_frames_next();
                     backend.resample_process_buffers[0].reserve(output_frames);
                     backend.resample_process_buffers[1].reserve(output_frames);
-   
+
                     resampler
                         .process_into_buffer(
                             &backend.pre_resampled_split_buffers,
@@ -214,18 +214,25 @@ impl AudioPlayer {
                             None,
                         )
                         .unwrap();
-                    
-                    // resample 
+
+                    // resample
                     if backend.resampled_buffer.len() < output_frames * 2 {
-                        backend.resampled_buffer
+                        backend
+                            .resampled_buffer
                             .reserve(output_frames * 2 - backend.resampled_buffer.len());
                     }
                     backend.resampled_buffer.clear();
-                    write_frames(&backend.resample_process_buffers, &mut backend.resampled_buffer);
+                    write_frames(
+                        &backend.resample_process_buffers,
+                        &mut backend.resampled_buffer,
+                    );
 
-                    backend.buffer_producer.push_slice(&backend.resampled_buffer);
+                    backend
+                        .buffer_producer
+                        .push_slice(&backend.resampled_buffer);
 
-                    backend.pre_resampled_buffer = backend.pre_resampled_buffer.split_off(frames * 2);
+                    backend.pre_resampled_buffer =
+                        backend.pre_resampled_buffer.split_off(frames * 2);
                 }
             } else {
                 backend.buffer_producer.push_slice(&samples);
