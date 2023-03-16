@@ -61,7 +61,7 @@ if(APPLE)
 endif()
 
 if(WIN32)
-    target_link_libraries(cpp_exe PRIVATE ntdll)
+    target_link_libraries(cpp_exe PRIVATE ntdll imm32 winmm d3d11 dxgi d3dcompiler uxtheme dwmapi)
 endif()
 
 # ---- Install rules ----
@@ -69,4 +69,3 @@ endif()
 if(NOT CMAKE_SKIP_INSTALL_RULES)
   include(cmake/install-rules.cmake)
 endif()
-
