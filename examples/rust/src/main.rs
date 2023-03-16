@@ -1,4 +1,4 @@
-use helix::window::Window;
+use helix::gui::Gui;
 
 fn main() {
     println!("Hello, world!");
@@ -12,8 +12,7 @@ fn main() {
     //     speech_synthesizer.speak("Hello, world!", true);
     // }
 
-    let window = Window::default();
-    window.start();
+    Gui::start();
     
     loop {
         println!("Hello, world!");
