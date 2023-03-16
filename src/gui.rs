@@ -3,7 +3,7 @@ use imgui::{Condition, FontSource, MouseCursor};
 use imgui_wgpu::{Renderer, RendererConfig};
 use pollster::block_on;
 use std::time::Instant;
-use winit::{
+use imgui_winit_support::winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
     event_loop::EventLoop,
