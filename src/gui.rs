@@ -1,5 +1,8 @@
 use anyhow::Result;
+use imgui::{Condition, FontSource, MouseCursor};
+use imgui_wgpu::{Renderer, RendererConfig};
 use pollster::block_on;
+use std::time::Instant;
 use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
@@ -13,6 +16,20 @@ pub struct Gui {
     pub window: Window,
     surface: wgpu::Surface,
     device: wgpu::Device,
+    queue: wgpu::Queue,
+    renderer: Renderer,
+
+    // imgui bindings
+    imgui: imgui::Context,
+    imgui_winit_platform: imgui_winit_support::WinitPlatform,
+
+    ui_state: UIState,
+}
+
+pub struct UIState {
+    last_frame: Instant,
+    last_cursor: Option<MouseCursor>,
+    demo_open: bool,
 }
 
 impl Gui {
@@ -25,28 +42,30 @@ impl Gui {
             println!("{event:?}");
 
             match event {
-                Event::WindowEvent { event, window_id } => {
-                    // Update Egui integration so the UI works!
-                    // let _response = gui.egui_integration.handle_event(&event);
-                    match event {
-                        WindowEvent::Resized(_) => {
-                            gui.recreate_swapchain().unwrap();
-                        }
-                        WindowEvent::ScaleFactorChanged { .. } => {
-                            gui.recreate_swapchain().unwrap();
-                        }
-                        WindowEvent::CloseRequested => {
-                            if window_id == gui.window.id() {
-                                control_flow.set_exit();
-                            }
-                        }
-                        _ => (),
-                    }
+                Event::WindowEvent {
+                    event: WindowEvent::Resized(_),
+                    ..
+                } => {
+                    gui.recreate_swapchain().unwrap();
+                }
+                Event::WindowEvent {
+                    event: WindowEvent::ScaleFactorChanged { .. },
+                    ..
+                } => {
+                    gui.recreate_swapchain().unwrap();
+                }
+                | Event::WindowEvent {
+                    event: WindowEvent::CloseRequested,
+                    ..
+                } => {
+                    control_flow.set_exit();
                 }
                 Event::MainEventsCleared => gui.window.request_redraw(),
                 Event::RedrawRequested(_window_id) => gui.draw().unwrap(),
                 _ => (),
             }
+
+            gui.handle_event(&event);
         });
     }
 
@@ -66,6 +85,8 @@ impl Gui {
         });
 
         let surface = unsafe { instance.create_surface(&window) }?;
+
+        let hidpi_factor = window.scale_factor();
 
         let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
@@ -89,21 +110,57 @@ impl Gui {
 
         surface.configure(&device, &surface_desc);
 
-        return Ok(Self {
+        // Setup ImGui
+        let mut imgui = imgui::Context::create();
+        let mut imgui_winit_platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
+        imgui_winit_platform.attach_window(
+            imgui.io_mut(),
+            &window,
+            imgui_winit_support::HiDpiMode::Default,
+        );
+        imgui.set_ini_filename(None);
+
+        let font_size = (13.0 * hidpi_factor) as f32;
+        imgui.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
+
+        imgui.fonts().add_font(&[FontSource::DefaultFontData {
+            config: Some(imgui::FontConfig {
+                oversample_h: 1,
+                pixel_snap_h: true,
+                size_pixels: font_size,
+                ..Default::default()
+            }),
+        }]);
+
+        // Set up dear imgui wgpu renderer
+        let renderer_config = RendererConfig {
+            texture_format: surface_desc.format,
+            ..Default::default()
+        };
+
+        let renderer = Renderer::new(&mut imgui, &device, &queue, renderer_config);
+
+        // Initial UI state
+        let last_frame = Instant::now();
+        let demo_open = true;
+        let last_cursor = None;
+
+        Ok(Self {
             width,
             height,
             window,
             surface,
-            device
-        });
-    }
-
-    pub fn draw(&mut self) -> Result<()> {
-        if self.width == 0 || self.height == 0 {
-            return Ok(());
-        }
-
-        Ok(())
+            device,
+            queue,
+            renderer,
+            imgui,
+            imgui_winit_platform,
+            ui_state: UIState {
+                last_frame,
+                last_cursor,
+                demo_open,
+            },
+        })
     }
 
     pub fn recreate_swapchain(&mut self) -> Result<()> {
@@ -122,6 +179,95 @@ impl Gui {
         };
 
         self.surface.configure(&self.device, &surface_desc);
+        Ok(())
+    }
+
+    pub fn handle_event(&mut self, event: &Event<()>) {
+        self.imgui_winit_platform.handle_event(self.imgui.io_mut(), &self.window, event);
+    }
+
+    pub fn draw(&mut self) -> Result<()> {
+        if self.width == 0 || self.height == 0 {
+            return Ok(());
+        }
+
+        let delta_s = self.ui_state.last_frame.elapsed();
+        let now = Instant::now();
+        self.imgui
+            .io_mut()
+            .update_delta_time(now - self.ui_state.last_frame);
+
+        let frame = self.surface.get_current_texture()?;
+        self.imgui_winit_platform
+            .prepare_frame(self.imgui.io_mut(), &self.window)
+            .expect("Failed to prepare frame");
+        let ui = self.imgui.frame();
+
+        {
+            let window = ui.window("Hello world");
+            window
+                .size([300.0, 100.0], Condition::FirstUseEver)
+                .build(|| {
+                    ui.text("Hello world!");
+                    ui.text("This...is...imgui-rs on WGPU!");
+                    ui.separator();
+                    let mouse_pos = ui.io().mouse_pos;
+                    ui.text(format!(
+                        "Mouse Position: ({:.1},{:.1})",
+                        mouse_pos[0], mouse_pos[1]
+                    ));
+                });
+
+            let window = ui.window("Hello too");
+            window
+                .size([400.0, 200.0], Condition::FirstUseEver)
+                .position([400.0, 200.0], Condition::FirstUseEver)
+                .build(|| {
+                    ui.text(format!("Frametime: {delta_s:?}"));
+                });
+
+            ui.show_demo_window(&mut self.ui_state.demo_open);
+        }
+
+        let mut encoder: wgpu::CommandEncoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+
+        if self.ui_state.last_cursor != ui.mouse_cursor() {
+            self.ui_state.last_cursor = ui.mouse_cursor();
+            self.imgui_winit_platform.prepare_render(ui, &self.window);
+        }
+
+        let view = frame
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: None,
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                        r: 0.1,
+                        g: 0.2,
+                        b: 0.3,
+                        a: 1.0,
+                    }),
+                    store: true,
+                },
+            })],
+            depth_stencil_attachment: None,
+        });
+
+        self.renderer
+            .render(self.imgui.render(), &self.queue, &self.device, &mut rpass)
+            .expect("Rendering failed");
+
+        drop(rpass);
+
+        self.queue.submit(Some(encoder.finish()));
+
+        frame.present();
 
         Ok(())
     }
