@@ -9,10 +9,12 @@ auto main() -> int
   auto const message = "Hello, world!";
   std::cout << message << '\n';
 
+  auto speechSynthesizer = HLXSpeechSynthesizerCreate();
+
 #if defined(__APPLE__) || defined(__WIN32)
-  HLXSpeechSynthesizerInit();
-  HLXSpeechSynthesizerSetVolume(1.0);
-  HLXSpeechSynthesizerSpeak("Hello, world!", true);
+  HLXSpeechSynthesizerInit(speechSynthesizer);
+  HLXSpeechSynthesizerSetVolume(speechSynthesizer, 1.0);
+  HLXSpeechSynthesizerSpeak(speechSynthesizer, "Hello, world!", true);
 #endif
 
   // Wait for the speech to finish.
