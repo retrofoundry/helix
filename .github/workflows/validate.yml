@@ -32,7 +32,7 @@ jobs:
       run: |
         sudo apt-get install libasound2-dev
     - name: Test
-      run: cargo test --features "network"
+      run: cargo test --features "speech network"
   windows-check:
     runs-on: windows-latest
     steps:

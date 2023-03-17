@@ -57,7 +57,7 @@ jobs:
     - name: Build
       working-directory: examples/cpp
       run: |
-        cargo build --features "network"
+        cargo build --features "speech network"
   windows-cpp-example:
     runs-on: windows-latest
     steps:

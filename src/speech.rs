@@ -1,7 +1,8 @@
 #[cfg(feature = "cpp")]
 use std::ffi::CStr;
+#[cfg(feature = "cpp")]
 use std::str;
-use tts::*;
+use tts::{Gender, LanguageTag, Tts, Voice};
 
 #[allow(dead_code)]
 #[repr(C)]
