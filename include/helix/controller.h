@@ -7,7 +7,8 @@
 extern "C" {
 #endif
 
-void HLXControllerInit(void);
+void* HLXCreateControllerHub(void);
+int32_t HLXControllerInit(void* hub, uint8_t* bits);
 void HLXControllerRead(void);
 
 #ifdef __cplusplus

@@ -52,6 +52,7 @@ if(APPLE)
     target_link_libraries(cpp_exe PRIVATE "-framework CoreFoundation")
     target_link_libraries(cpp_exe PRIVATE "-framework CoreAudio")
     target_link_libraries(cpp_exe PRIVATE "-framework AudioToolbox")
+    target_link_libraries(cpp_exe PRIVATE "-framework IOKit")
 endif()
 
 if(WIN32)

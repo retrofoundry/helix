@@ -3,12 +3,17 @@
 #include <thread>
 
 #include <helix/speech.h>
-#include <helix/con
+#include <libultra/os.h>
 
 auto main() -> int
 {
   auto const message = "Hello, world!";
   std::cout << message << '\n';
+
+  auto controllHub = HLXCreateControllerHub();
+  __osControlHubInstance = controllHub;
+
+  osContInit(nullptr, nullptr, nullptr);
 
 #if defined(__APPLE__) || defined(__WIN32)
   auto speechSynthesizer = HLXSpeechSynthesizerCreate();

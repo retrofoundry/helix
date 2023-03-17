@@ -60,15 +60,9 @@ pub extern "C" fn HLXCreateControllerHub() -> Box<ControllerHub> {
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-extern "C" fn osContInit(
-    _mq: *mut c_void,
-    controller_bits: *mut u8,
-    _status: *mut OSContStatus,
-) -> i32 {
-    unsafe {
-        *controller_bits = 0;
-    }
-    // controller_hub!().init(Box::new(unsafe { *controllerBits }));
+extern "C" fn HLXControllerInit(hub: Option<&mut ControllerHub>, bits: *mut u8) -> i32 {
+    // convert bits to a Box
+    hub.unwrap().init(Box::new(0));
     0
 }
 

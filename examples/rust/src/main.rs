@@ -1,7 +1,11 @@
 use helix::speech::SpeechSynthesizer;
+use helix::controller::hub::ControllerHub;
 
 fn main() {
     println!("Hello, world!");
+
+    let mut control_hub = ControllerHub::new();
+    control_hub.init(Box::new(0));
     
     #[cfg(not(target_os = "linux"))]
     let mut speech_synthesizer = SpeechSynthesizer::new();

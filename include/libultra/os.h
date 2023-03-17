@@ -35,7 +35,8 @@
 extern "C" {
 #endif
 
-#include <ultratypes.h>
+#include <libultra/ultratypes.h>
+#include <helix/controller.h>
 
 #if defined(_LANGUAGE_C) || defined(_LANGUAGE_C_PLUS_PLUS)
 
@@ -671,6 +672,17 @@ typedef struct {
  * Size of buffer the retains contents after NMI
  */
 #define OS_APP_NMI_BUFSIZE	64
+
+// TODO: Temporary test, until the check below adds __cplusplus
+
+void* __osControlHubInstance; // this should be set early in the game code
+
+extern int32_t		osContInit(void *, uint8_t* bits, void *) {
+	// forward call to HLX using the instance pointer 
+	HLXControllerInit(__osControlHubInstance, bits);
+}
+
+// END TODO
 
 #if defined(_LANGUAGE_C) || defined(_LANGUAGE_C_PLUS_PLUS)
 
