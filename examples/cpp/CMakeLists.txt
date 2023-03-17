@@ -23,8 +23,8 @@ include(FetchContent)
 
 FetchContent_Declare(
     Corrosion
-    GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
-    GIT_TAG v0.3 # Optionally specify a commit hash, version tag or branch here
+    GIT_REPOSITORY https://github.com/dcvz/corrosion.git
+    GIT_TAG c7cc89bef9071dbc662308559463006695a0ddca # Optionally specify a commit hash, version tag or branch here
 )
 FetchContent_MakeAvailable(Corrosion)
 
@@ -48,10 +48,6 @@ if(APPLE)
     target_link_libraries(cpp_exe PRIVATE "-framework CoreFoundation")
     target_link_libraries(cpp_exe PRIVATE "-framework CoreAudio")
     target_link_libraries(cpp_exe PRIVATE "-framework AudioToolbox")
-endif()
-
-if(WIN32)
-    target_link_libraries(cpp_exe PRIVATE ntdll)
 endif()
 
 # ---- Install rules ----
