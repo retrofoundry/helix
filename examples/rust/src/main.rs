@@ -5,7 +5,7 @@ fn main() {
     let gui = Gui::new("Helix Example", &event_loop, |ui| {
         ui.menu("File", || {
             ui.menu_item_config("Quit")
-                .shortcut("Ctrl+O")
+                .shortcut("Ctrl+Q")
                 .build();
         });
         ui.separator();

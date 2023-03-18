@@ -42,7 +42,6 @@ target_compile_features(cpp_exe PRIVATE cxx_std_17)
 target_link_libraries(cpp_exe PRIVATE helix)
 target_include_directories(cpp_exe PRIVATE ../../include)
 
-target_compile_definitions(cpp_exe PRIVATE CIMGUI_DEFINE_ENUMS_AND_STRUCTS)
 
 # ---- Install rules ----
 

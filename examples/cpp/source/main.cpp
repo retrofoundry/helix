@@ -3,18 +3,19 @@
 #include <thread>
 
 #include <helix/gui.h>
-#include <cimgui/cimgui.h>
+#include <imgui/imgui.h>
 
 void draw_menu_bar() {
-  if (igBeginMenu("File", true)) {
-    igEndMenu();
-  };
+  if (ImGui::BeginMenu("File")) {
+    if (ImGui::MenuItem("Quit", "Ctrl+Q")) {}
+    ImGui::EndMenu();
+  }
 
-  igSeparator();
+  ImGui::Separator();
 
-  if (igBeginMenu("Edit", true)) {
-    igEndMenu();
-  };
+  if (ImGui::BeginMenu("Edit")) {
+    ImGui::EndMenu();
+  }
 }
 
 auto main() -> int
