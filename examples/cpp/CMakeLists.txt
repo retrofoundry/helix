@@ -24,7 +24,7 @@ include(FetchContent)
 FetchContent_Declare(
     Corrosion
     GIT_REPOSITORY https://github.com/dcvz/corrosion.git
-    GIT_TAG 2f95e098a727ebdb04180882ce2f0b601b72d72a # Optionally specify a commit hash, version tag or branch here
+    GIT_TAG 1f8fc7733b7a174a249e423e101e0914dc4f9f61 # Optionally specify a commit hash, version tag or branch here
 )
 FetchContent_MakeAvailable(Corrosion)
 
