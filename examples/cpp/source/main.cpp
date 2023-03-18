@@ -10,7 +10,6 @@ auto main() -> int
   std::cout << message << '\n';
 
   auto speechSynthesizer = HLXSpeechSynthesizerCreate();
-  HLXSpeechSynthesizerInit(speechSynthesizer);
   HLXSpeechSynthesizerSetVolume(speechSynthesizer, 1.0);
   HLXSpeechSynthesizerSpeak(speechSynthesizer, "Hello, world!", true);
 

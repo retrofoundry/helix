@@ -275,9 +275,11 @@ pub extern "C" fn HLXAudioPlayerPlayBuffer(
     buf: *const u8,
     len: usize,
 ) {
-    let buf = unsafe { std::slice::from_raw_parts(buf, len) };
     match player {
-        Some(player) => player.play_buffer(buf),
+        Some(player) => {
+            let buf = unsafe { std::slice::from_raw_parts(buf, len) };
+            player.play_buffer(buf);
+        }
         None => {
             eprintln!("[Audio] failed to play audio buffer: was given an invalid instance pointer")
         }

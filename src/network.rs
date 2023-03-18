@@ -96,6 +96,14 @@ pub extern "C" fn HLXTCPCreate() -> Box<TCPStream> {
 }
 
 #[cfg(feature = "cpp")]
+#[no_mangle]
+pub extern "C" fn HLXTCPFree(stream: Option<Box<TCPStream>>) {
+    if let Some(stream) = stream {
+        drop(stream);
+    }
+}
+
+#[cfg(feature = "cpp")]
 type OnMessage = unsafe extern "C" fn(data: *const i8);
 
 #[cfg(feature = "cpp")]
@@ -106,6 +114,11 @@ pub extern "C" fn HLXTCPConnect(
     port: u16,
     on_message: OnMessage,
 ) {
+    if stream.is_none() {
+        eprintln!("[TCPStream] Failed to connect to server: was given an invalid instance pointer");
+        return;
+    }
+
     let host_str: &CStr = unsafe { CStr::from_ptr(host) };
     let host: &str = str::from_utf8(host_str.to_bytes()).unwrap();
     let address = format!("{host}:{port}");
@@ -142,12 +155,22 @@ pub extern "C" fn HLXTCPConnect(
 #[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXTCPDisconnect(stream: Option<Box<TCPStream>>) {
-    stream.unwrap().disconnect();
+    match stream {
+        Some(stream) => stream.disconnect(),
+        None => eprintln!(
+            "[TCPStream] Failed to disconnect from server: was given an invalid instance pointer"
+        ),
+    }
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXTCPSendMessage(stream: Option<&mut TCPStream>, message: *const i8) {
+    if stream.is_none() {
+        eprintln!("[TCPStream] Failed to connect to server: was given an invalid instance pointer");
+        return;
+    }
+
     let message_str: &CStr = unsafe { CStr::from_ptr(message) };
     let message: &str = str::from_utf8(message_str.to_bytes()).unwrap();
 
