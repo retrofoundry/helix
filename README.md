@@ -1,4 +1,4 @@
-# helix
+# Helix
 
 Helix is a library written in Rust providing core features for getting your N64 software running on PC and other systems.
 
@@ -8,8 +8,8 @@ Helix is a library written in Rust providing core features for getting your N64 
 - [x] Speech Synthesis (speech)
 - [x] TCP Stream (network)
 
-For details on each of the features provided please see our documentation[https://dcvz.github.io/helix/].
+For details on each of the features provided please see our [documentation](https://dcvz.github.io/helix/).
 
 ## How to setup?
 
-For setup and more in-depth information please see our documentation[https://dcvz.github.io/helix/].
+For setup and more in-depth information please see our [documentation](https://dcvz.github.io/helix/).

@@ -73,4 +73,4 @@ extra:
 
 nav:
   - 'Overview': index.md
-  - 'Integrating': integrating.md
+  - 'Integration': integration.md

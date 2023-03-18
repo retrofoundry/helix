@@ -1,5 +1,4 @@
-# Integrating
-Getting Helix into your project.
+# Integration
 
 ## C/C++ Project 
 If you're working on a C or C++ project the recommended way of integrating Helix into your project is using CMake. You can easily build and link this library by using [Corrosion](https://github.com/dcvz/corrosion/tree/helix), a tool that integrate Rust libraries into C/C++ projects. You'll want to:
@@ -13,7 +12,7 @@ If you're working on a C or C++ project the recommended way of integrating Helix
 __NOTE: If you get a build error that certain header methods are not implemented, you're likely not building with that feature enabled.__
 
 Example:
-```
+```cpp
 corrosion_import_crate(MANIFEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../helix/Cargo.toml FEATURES network)
 # methods in these headers will work:
 # include <helix/network.h>, <helix/audio.h>
