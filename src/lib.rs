@@ -1,4 +1,5 @@
 pub mod audio;
+pub mod gui;
 #[cfg(feature = "network")]
 pub mod network;
 #[cfg(feature = "speech")]

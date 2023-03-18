@@ -22,3 +22,10 @@ corrosion_import_crate(MANIFEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../helix/Cargo.
 
 ## Rust Project
 If you're working on a Rust project, you can add Helix via `cargo add helix`.
+
+## Dependencies Required
+
+### Linux 
+- libasound2-dev
+- fontconfig, freetype, x11
+- speech-dispatcher (optional - feature: speech)

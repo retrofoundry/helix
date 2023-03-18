@@ -2,19 +2,43 @@
 #include <string>
 #include <thread>
 
-#include <helix/speech.h>
+#include <helix/gui.h>
+#include <imgui/imgui.h>
+
+static bool show_app_metrics = true;
+
+void draw_menu_bar() {
+  if (ImGui::BeginMenu("File")) {
+    if (ImGui::MenuItem("Quit", "Ctrl+Q")) {}
+    ImGui::EndMenu();
+  }
+
+  ImGui::Separator();
+
+  if (ImGui::BeginMenu("Edit")) {
+    ImGui::EndMenu();
+  }
+}
+
+void draw_main() {
+  if (show_app_metrics)
+    ImGui::ShowMetricsWindow(&show_app_metrics);
+}
 
 auto main() -> int
 {
-  auto const message = "Hello, world!";
-  std::cout << message << '\n';
+  auto event_loop = HLXGUICreateEventLoop();
+  auto gui = HLXGUICreate("Helix Example", event_loop, &draw_menu_bar, &draw_main);
 
-  auto speechSynthesizer = HLXSpeechSynthesizerCreate();
-  HLXSpeechSynthesizerSetVolume(speechSynthesizer, 1.0);
-  HLXSpeechSynthesizerSpeak(speechSynthesizer, "Hello, world!", true);
+  auto event_loop_thread = std::thread([] {
+    while (true) {
+      std::cout << "Hello World!" << std::endl;
+      std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+  });
 
-  // Wait for the speech to finish.
-  std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+  HLXGUIStart(event_loop, gui);
+  event_loop_thread.join();
 
   return 0;
 }
