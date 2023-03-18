@@ -5,21 +5,15 @@ Helix provides functionality for audio playback. Audio playback is simple and He
 
 ```cpp
 /**
- * Creates the audio player and returns a pointer to the object
+ * Creates and sets up the audio player, returning a pointer to the instance or nullptr if creation failed
 **/
-void* HLXAudioPlayerCreate(void);
-// Rust: let mut audio_player = AudioPlayer::new();
+void* HLXAudioPlayerCreate(uint32_t sampleRate, uint16_t channels);
+// Rust: let mut audio_Player = AudiPlayer::new().unwrap();
 
 /**
- * Initializes the audio playe rand sets up output devices
+ * Frees the audio player instance.
 **/
-bool HLXAudioPlayerInit(void* player, uint32_t sampleRate, uint16_t channels);
-// Rust: audio_player.init() -> bool
-
-/**
- * Deinits the audio player and frees the instance.
-**/
-void HLXAudioPlayerDeinit(void* player);
+void HLXAudioPlayerFree(void* player);
 // Rust: no dedicated method, instance drop will deallocate it
 
 /**
@@ -39,4 +33,45 @@ int32_t HLXAudioPlayerGetDesiredBuffered(void* player);
 **/
 void HLXAudioPlayerPlayBuffer(void* player, const uint8_t* buf, size_t len);
 // Rust: audio_player.play_buffer(buf: &[u8])
+```
+
+## Speech
+Helix provides an API for text-to-speech (TTS):
+
+```cpp
+/**
+ * Creates and sets up the audio synthesizer, returning a pointer to the instance or nullptr if creation failed
+**/
+void* HLXSpeechSynthesizerCreate(void);
+// Rust: let mut speech_synthesizer = SpeechSynthesizer::new().unwrap();
+
+/**
+ * Frees the speech synthesizer instance.
+**/
+void HLXSpeechSynthesizerFree(void* synthesizer);
+// Rust: no dedicated method, instance drop will deallocate it
+
+/**
+ * Sets the volume for the synthesizer, scale from 0-1.
+**/
+void HLXSpeechSynthesizerSetVolume(void* synthesizer, float volume);
+// Rust: speech_synthesizer.set_volume(volume: f32)
+
+/**
+ * Sets the language of the speaker, takes in a en-US type locale.
+**/
+void HLXSpeechSynthesizerSetLanguage(void* synthesizer, const char* language);
+// Rust: speech_synthesizer.set_language(language: &str)
+
+/**
+ * Sets the gender of the speaker, accepted values: HLXSpeechSynthesizerGenderFemale/Male/Neutral.
+**/
+void HLXSpeechSynthesizerSetGender(void* synthesizer, HLXSpeechSynthesizerGender gender);
+// Rust: speech_synthesizer.set_gender(gender: HLXSpeechSynthesizerGender)
+
+/**
+ * Dictates the given text, specifying whether previous utterances should be interrupted.
+**/
+void HLXSpeechSynthesizerSpeak(void* synthesizer, const char* text, uint8_t interrupt);
+// Rust: speech_synthesizer.speak(text: &str, interrupt: bool)
 ```

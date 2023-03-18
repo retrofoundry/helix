@@ -14,8 +14,7 @@ typedef enum {
 } HLXSpeechSynthesizerGender;
 
 void* HLXSpeechSynthesizerCreate(void);
-bool HLXSpeechSynthesizerInit(void* synthesizer);
-void HLXSpeechSynthesizerDeinit(void* synthesizer);
+void HLXSpeechSynthesizerFree(void* synthesizer);
 
 void HLXSpeechSynthesizerSetVolume(void* synthesizer, float volume);
 void HLXSpeechSynthesizerSetLanguage(void* synthesizer, const char* language);
