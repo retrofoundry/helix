@@ -1,0 +1,76 @@
+site_name: Helix Documentation
+repo_name: helix
+repo_url: https://github.com/dcvz/helix
+site_description: "A library to facilitate porting your N64 software."
+site_author: dcvz
+site_url: https://dcvz.github.io/helix/
+remote_branch: gh-pages
+edit_uri: edit/main/docs/
+
+copyright: 'Copyright &copy; 2023 dcvz'
+
+theme:
+  name: 'material'
+  logo: images/favicon.png
+  favicon: images/favicon.png
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+  - media: "(prefers-color-scheme: light)"
+    scheme: default
+    primary: red
+    accent: pink
+    toggle:
+      icon: material/weather-sunny
+      name: Switch to dark mode
+  - media: "(prefers-color-scheme: dark)"
+    scheme: slate
+    primary: indigo
+    accent: indigo
+    toggle:
+      icon: material/weather-night
+      name: Switch to light mode
+  features:
+    - tabs
+    - instant
+
+extra_css:
+  - 'css/app.css'
+
+markdown_extensions:
+  - admonition
+  - smarty
+  - codehilite:
+      guess_lang: false
+      linenums: True
+  - footnotes
+  - meta
+  - toc:
+      permalink: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.inlinehilite
+  - pymdownx.magiclink
+  - pymdownx.smartsymbols
+  - pymdownx.superfences
+  - pymdownx.tabbed
+  - tables
+
+plugins:
+  - search
+
+extra:
+  # type is the name of the FontAwesome icon without the fa- prefix.
+  social:
+    - icon: fontawesome/brands/github-alt
+      link: https://github.com/dcvz/helix
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/dcvz
+  version:
+    provider: mike
+
+nav:
+  - 'Overview': index.md
+  - 'Integrating': integrating.md
