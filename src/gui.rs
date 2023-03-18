@@ -33,8 +33,9 @@ pub struct Gui {
     // ui state
     ui_state: UIState,
 
-    // draw callback
+    // draw callbacks
     draw_menu_callback: Box<dyn Fn(&Ui) + 'static>,
+    draw_main_callback: Box<dyn Fn(&Ui) + 'static>,
 }
 
 pub struct UIState {
@@ -47,9 +48,10 @@ pub struct EventLoopWrapper {
 }
 
 impl Gui {
-    pub fn new<D>(title: &str, event_loop_wrapper: &EventLoopWrapper, draw_menu: D) -> Result<Self>
+    pub fn new<D, E>(title: &str, event_loop_wrapper: &EventLoopWrapper, draw_menu: D, draw_main: E) -> Result<Self>
     where
         D: Fn(&Ui) + 'static,
+        E: Fn(&Ui) + 'static,
     {
         let (width, height) = (800, 600);
 
@@ -139,6 +141,7 @@ impl Gui {
                 last_cursor,
             },
             draw_menu_callback: Box::new(draw_menu),
+            draw_main_callback: Box::new(draw_main),
         })
     }
 
@@ -190,6 +193,8 @@ impl Gui {
             ui.main_menu_bar(|| {
                 (self.draw_menu_callback)(ui);
             });
+
+            (self.draw_main_callback)(ui);
 
             // let available_size = ui.content_region_avail();
             // Image::new(texture_id, available_size).build(ui);
@@ -294,14 +299,15 @@ pub extern "C" fn HLXGUICreateEventLoop() -> Box<EventLoopWrapper> {
 }
 
 #[cfg(feature = "cpp")]
-type DrawMenu = unsafe extern "C" fn();
+type OnDraw = unsafe extern "C" fn();
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXGUICreate(
     title_raw: *const i8,
     event_loop: Option<&mut EventLoopWrapper>,
-    draw_menu: Option<DrawMenu>,
+    draw_menu: Option<OnDraw>,
+    draw_main: Option<OnDraw>,
 ) -> Box<Gui> {
     let title_str: &CStr = unsafe { CStr::from_ptr(title_raw) };
     let title: &str = str::from_utf8(title_str.to_bytes()).unwrap();
@@ -310,6 +316,10 @@ pub extern "C" fn HLXGUICreate(
     let gui = Gui::new(title, event_loop, move |_ui| unsafe {
         if let Some(draw_menu) = draw_menu {
             draw_menu();
+        }
+    }, move |_ui| unsafe {
+        if let Some(draw_main) = draw_main {
+            draw_main();
         }
     })
     .unwrap();

@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 void* HLXGUICreateEventLoop();
-void* HLXGUICreate(const char* title, void* event_loop, void (*draw_menu_callback)());
+void* HLXGUICreate(const char* title, void* event_loop, void (*draw_menu_callback)(), void (*draw_main_callback)());
 void* HLXGUIStart(void* event_loop, void* gui);
 
 #ifdef __cplusplus

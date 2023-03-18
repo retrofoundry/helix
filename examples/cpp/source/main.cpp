@@ -5,6 +5,8 @@
 #include <helix/gui.h>
 #include <imgui/imgui.h>
 
+static bool show_app_metrics = true;
+
 void draw_menu_bar() {
   if (ImGui::BeginMenu("File")) {
     if (ImGui::MenuItem("Quit", "Ctrl+Q")) {}
@@ -18,10 +20,15 @@ void draw_menu_bar() {
   }
 }
 
+void draw_main() {
+  if (show_app_metrics)
+    ImGui::ShowMetricsWindow(&show_app_metrics);
+}
+
 auto main() -> int
 {
   auto event_loop = HLXGUICreateEventLoop();
-  auto gui = HLXGUICreate("Helix Example", event_loop, &draw_menu_bar);
+  auto gui = HLXGUICreate("Helix Example", event_loop, &draw_menu_bar, &draw_main);
 
   auto event_loop_thread = std::thread([] {
     while (true) {
