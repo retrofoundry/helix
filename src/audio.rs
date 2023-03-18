@@ -225,25 +225,46 @@ impl AudioPlayer {
 #[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerCreate(sample_rate: u32, channels: u16) -> Box<AudioPlayer> {
-    Box::new(AudioPlayer::new())
+    match AudioPlayer::new(sample_rate, channels) {
+        Ok(player) => Box::new(player),
+        Err(err) => {
+            eprintln!("[Audio] failed to create audio player: {}", err);
+            return unsafe { Box::from_raw(std::ptr::null_mut()) }
+        }
+    }
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerFree(player: Option<Box<AudioPlayer>>) {
-    player.unwrap();
+    match player {
+        Some(player) => drop(player),
+        None => eprintln!("[Audio] failed to free audio player: was given an invalid instance pointer"),
+    }
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerGetBuffered(player: Option<&mut AudioPlayer>) -> i32 {
-    player.unwrap().buffered()
+    match player {
+        Some(player) => player.buffered(),
+        None => {
+            eprintln!("[Audio] failed to get buffered audio: was given an invalid instance pointer");
+            return 0;
+        }
+    }
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerGetDesiredBuffered(player: Option<&mut AudioPlayer>) -> i32 {
-    player.unwrap().desired_buffer()
+    match player {
+        Some(player) => player.desired_buffer(),
+        None => {
+            eprintln!("[Audio] failed to get desired buffered audio: was given an invalid instance pointer");
+            return 0;
+        }
+    }
 }
 
 #[cfg(feature = "cpp")]
@@ -254,5 +275,8 @@ pub extern "C" fn HLXAudioPlayerPlayBuffer(
     len: usize,
 ) {
     let buf = unsafe { std::slice::from_raw_parts(buf, len) };
-    player.unwrap().play_buffer(buf);
+    match player {
+        Some(player) => player.play_buffer(buf),
+        None => eprintln!("[Audio] failed to play audio buffer: was given an invalid instance pointer"),
+    }
 }
