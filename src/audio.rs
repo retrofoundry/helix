@@ -258,7 +258,7 @@ pub extern "C" fn HLXAudioPlayerInit(
     sample_rate: u32,
     channels: u16,
 ) -> bool {
-    return player.unwrap().init(sample_rate, channels);
+    player.unwrap().init(sample_rate, channels)
 }
 
 #[cfg(feature = "cpp")]
@@ -270,13 +270,13 @@ pub extern "C" fn HLXAudioPlayerDeinit(player: Option<Box<AudioPlayer>>) {
 #[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerGetBuffered(player: Option<&mut AudioPlayer>) -> i32 {
-    return player.unwrap().buffered();
+    player.unwrap().buffered()
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXAudioPlayerGetDesiredBuffered(player: Option<&mut AudioPlayer>) -> i32 {
-    return player.unwrap().desired_buffer();
+    player.unwrap().desired_buffer()
 }
 
 #[cfg(feature = "cpp")]
