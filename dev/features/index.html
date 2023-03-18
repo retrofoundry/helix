@@ -310,6 +310,13 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#speech" class="md-nav__link">
+    Speech
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -351,6 +358,13 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#speech" class="md-nav__link">
+    Speech
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -373,21 +387,15 @@
 <h2 id="audio">Audio<a class="headerlink" href="#audio" title="Permanent link">&para;</a></h2>
 <p>Helix provides functionality for audio playback. Audio playback is simple and Helix provides the following API:</p>
 <div class="highlight"><pre><span></span><code><span class="cm">/**</span>
-<span class="cm"> * Creates the audio player and returns a pointer to the object</span>
+<span class="cm"> * Creates and sets up the audio player, returning a pointer to the instance or nullptr if creation failed</span>
 <span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">HLXAudioPlayerCreate</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span><span class="w"></span>
-<span class="c1">// Rust: let mut audio_player = AudioPlayer::new();</span>
+<span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">HLXAudioPlayerCreate</span><span class="p">(</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">sampleRate</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">channels</span><span class="p">);</span><span class="w"></span>
+<span class="c1">// Rust: let mut audio_Player = AudiPlayer::new().unwrap();</span>
 
 <span class="cm">/**</span>
-<span class="cm"> * Initializes the audio playe rand sets up output devices</span>
+<span class="cm"> * Frees the audio player instance.</span>
 <span class="cm">**/</span><span class="w"></span>
-<span class="kt">bool</span><span class="w"> </span><span class="nf">HLXAudioPlayerInit</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">player</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">sampleRate</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">channels</span><span class="p">);</span><span class="w"></span>
-<span class="c1">// Rust: audio_player.init() -&gt; bool</span>
-
-<span class="cm">/**</span>
-<span class="cm"> * Deinits the audio player and frees the instance.</span>
-<span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="w"> </span><span class="nf">HLXAudioPlayerDeinit</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">player</span><span class="p">);</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">HLXAudioPlayerFree</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">player</span><span class="p">);</span><span class="w"></span>
 <span class="c1">// Rust: no dedicated method, instance drop will deallocate it</span>
 
 <span class="cm">/**</span>
@@ -407,6 +415,44 @@
 <span class="cm">**/</span><span class="w"></span>
 <span class="kt">void</span><span class="w"> </span><span class="nf">HLXAudioPlayerPlayBuffer</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">player</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="o">*</span><span class="w"> </span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">len</span><span class="p">);</span><span class="w"></span>
 <span class="c1">// Rust: audio_player.play_buffer(buf: &amp;[u8])</span>
+</code></pre></div>
+<h2 id="speech">Speech<a class="headerlink" href="#speech" title="Permanent link">&para;</a></h2>
+<p>Helix provides an API for text-to-speech (TTS):</p>
+<div class="highlight"><pre><span></span><code><span class="cm">/**</span>
+<span class="cm"> * Creates and sets up the audio synthesizer, returning a pointer to the instance or nullptr if creation failed</span>
+<span class="cm">**/</span><span class="w"></span>
+<span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">HLXSpeechSynthesizerCreate</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span><span class="w"></span>
+<span class="c1">// Rust: let mut speech_synthesizer = SpeechSynthesizer::new().unwrap();</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * Frees the speech synthesizer instance.</span>
+<span class="cm">**/</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">HLXSpeechSynthesizerFree</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">synthesizer</span><span class="p">);</span><span class="w"></span>
+<span class="c1">// Rust: no dedicated method, instance drop will deallocate it</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * Sets the volume for the synthesizer, scale from 0-1.</span>
+<span class="cm">**/</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">HLXSpeechSynthesizerSetVolume</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">synthesizer</span><span class="p">,</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">volume</span><span class="p">);</span><span class="w"></span>
+<span class="c1">// Rust: speech_synthesizer.set_volume(volume: f32)</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * Sets the language of the speaker, takes in a en-US type locale.</span>
+<span class="cm">**/</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">HLXSpeechSynthesizerSetLanguage</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">synthesizer</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">language</span><span class="p">);</span><span class="w"></span>
+<span class="c1">// Rust: speech_synthesizer.set_language(language: &amp;str)</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * Sets the gender of the speaker, accepted values: HLXSpeechSynthesizerGenderFemale/Male/Neutral.</span>
+<span class="cm">**/</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">HLXSpeechSynthesizerSetGender</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">synthesizer</span><span class="p">,</span><span class="w"> </span><span class="n">HLXSpeechSynthesizerGender</span><span class="w"> </span><span class="n">gender</span><span class="p">);</span><span class="w"></span>
+<span class="c1">// Rust: speech_synthesizer.set_gender(gender: HLXSpeechSynthesizerGender)</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * Dictates the given text, specifying whether previous utterances should be interrupted.</span>
+<span class="cm">**/</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">HLXSpeechSynthesizerSpeak</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">synthesizer</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">text</span><span class="p">,</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">interrupt</span><span class="p">);</span><span class="w"></span>
+<span class="c1">// Rust: speech_synthesizer.speak(text: &amp;str, interrupt: bool)</span>
 </code></pre></div>
 
               
