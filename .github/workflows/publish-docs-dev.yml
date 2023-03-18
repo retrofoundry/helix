@@ -1,0 +1,23 @@
+name: publish-docs-dev
+on:
+  push:
+    branches:
+      - main
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build-and-publish-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+      - name: Install Python dependencies
+        run: |
+          pip3 install -r requirements.txt
+      - name: Build and deploy docs to GitHub Pages
+        run: |
+          git fetch origin gh-pages --depth=1
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          mike deploy --push dev 

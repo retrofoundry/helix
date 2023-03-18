@@ -16,7 +16,7 @@ speech = ["dep:tts"]
 network = ["dep:tokio"]
 
 [dependencies]
-anyhow = "1.0.69"
+anyhow = "1.0.70"
 byteorder = "1.4.3"
 cpal = "0.15.0"
 imgui = { version = "0.10.0", features = ["docking"] }
