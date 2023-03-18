@@ -3,12 +3,12 @@
 ## GUI
 Helix provides a GUI library for creating windows and rendering graphics. The GUI library is currently a work in progress and is not yet complete. 
 
-**ImGui is used for drawing, if you're working on a C/C++ project, you'll need to include the ImGui headers to your project:**
+__[ImGui](https://github.com/ocornut/imgui) / [imgui-rs](https://github.com/imgui-rs/imgui-rs) is used for drawing, if you're working on a C/C++ project, you'll need to include the ImGui headers to your project:__
 
 ```cpp
 // If C++
 #include <imgui/imgui.h>
-// If C
+// If C (make sure to set CIMGUI_DEFINE_ENUMS_AND_STRUCTS to 1)
 #include <cimgui/cimgui.h>
 ```
 
