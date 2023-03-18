@@ -127,7 +127,7 @@ impl AudioPlayer {
         true
     }
 
-    pub fn deinit(&mut self) {
+    fn deinit(&mut self) {
         if let Some(backend) = self.backend.as_mut() {
             backend.output_stream.pause().unwrap();
             self.backend = None;
