@@ -1,5 +1,5 @@
 use anyhow::Result;
-use imgui::{Condition, FontSource, MouseCursor};
+use imgui::{Condition, FontSource, MouseCursor, Image};
 use imgui_wgpu::{Renderer, RendererConfig};
 use imgui_winit_support::winit::{
     dpi::PhysicalSize,
@@ -8,11 +8,11 @@ use imgui_winit_support::winit::{
     window::{Window, WindowBuilder},
 };
 use pollster::block_on;
-use std::time::Instant;
 #[cfg(feature = "cpp")]
 use std::ffi::CStr;
 #[cfg(feature = "cpp")]
 use std::str;
+use std::time::Instant;
 
 pub struct Gui {
     // window
@@ -167,42 +167,35 @@ impl Gui {
             return Ok(());
         }
 
-        let delta_s = self.ui_state.last_frame.elapsed();
         let now = Instant::now();
+        self.imgui.io_mut().update_delta_time(now - self.ui_state.last_frame);
+        self.ui_state.last_frame = now;
+        
         self.imgui
             .io_mut()
             .update_delta_time(now - self.ui_state.last_frame);
 
         let frame = self.surface.get_current_texture()?;
-        self.imgui_winit_platform
-            .prepare_frame(self.imgui.io_mut(), &self.window)
-            .expect("Failed to prepare frame");
+        self.imgui_winit_platform.prepare_frame(self.imgui.io_mut(), &self.window)?;
         let ui = self.imgui.frame();
 
         {
-            let window = ui.window("Hello world");
-            window
-                .size([300.0, 100.0], Condition::FirstUseEver)
-                .build(|| {
-                    ui.text("Hello world!");
-                    ui.text("This...is...imgui-rs on WGPU!");
-                    ui.separator();
-                    let mouse_pos = ui.io().mouse_pos;
-                    ui.text(format!(
-                        "Mouse Position: ({:.1},{:.1})",
-                        mouse_pos[0], mouse_pos[1]
-                    ));
+            ui.main_menu_bar(|| {
+                ui.menu("File", || {
+                    ui.menu_item_config("Quit")
+                        .shortcut("Ctrl+O")
+                        .build();
                 });
-
-            let window = ui.window("Hello too");
-            window
-                .size([400.0, 200.0], Condition::FirstUseEver)
-                .position([400.0, 200.0], Condition::FirstUseEver)
-                .build(|| {
-                    ui.text(format!("Frametime: {delta_s:?}"));
+                ui.separator();
+                ui.menu("Edit", || {
+    
                 });
+            });
 
-            ui.show_demo_window(&mut self.ui_state.demo_open);
+            // let available_size = ui.content_region_avail();
+            // Image::new(texture_id, available_size).build(ui);
+
+            ui.show_metrics_window(&mut self.ui_state.demo_open);
         }
 
         let mut encoder: wgpu::CommandEncoder = self
@@ -236,8 +229,7 @@ impl Gui {
         });
 
         self.renderer
-            .render(self.imgui.render(), &self.queue, &self.device, &mut rpass)
-            .expect("Rendering failed");
+            .render(self.imgui.render(), &self.queue, &self.device, &mut rpass)?;
 
         drop(rpass);
 
@@ -306,7 +298,10 @@ pub extern "C" fn HLXGUICreateEventLoop() -> Box<EventLoopWrapper> {
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXGUICreate(title_raw: *const i8, event_loop: Option<&mut EventLoopWrapper>) -> Box<Gui> {
+pub extern "C" fn HLXGUICreate(
+    title_raw: *const i8,
+    event_loop: Option<&mut EventLoopWrapper>,
+) -> Box<Gui> {
     let title_str: &CStr = unsafe { CStr::from_ptr(title_raw) };
     let title: &str = str::from_utf8(title_str.to_bytes()).unwrap();
 
