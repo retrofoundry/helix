@@ -21,7 +21,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Test
-      run: cargo test --features "speech network"
+      run: cargo test --all-features
   ubuntu-check:
     runs-on: ubuntu-latest
     steps:
@@ -33,10 +33,10 @@ jobs:
         sudo apt-get install libasound2-dev
         sudo apt-get install libspeechd-dev
     - name: Test
-      run: cargo test --features "speech network"
+      run: cargo test --all-features
   windows-check:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v2
     - name: Test
-      run: cargo test --features "speech network"
+      run: cargo test --all-features
