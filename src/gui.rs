@@ -48,7 +48,12 @@ pub struct EventLoopWrapper {
 }
 
 impl Gui {
-    pub fn new<D, E>(title: &str, event_loop_wrapper: &EventLoopWrapper, draw_menu: D, draw_main: E) -> Result<Self>
+    pub fn new<D, E>(
+        title: &str,
+        event_loop_wrapper: &EventLoopWrapper,
+        draw_menu: D,
+        draw_main: E,
+    ) -> Result<Self>
     where
         D: Fn(&Ui) + 'static,
         E: Fn(&Ui) + 'static,
@@ -313,15 +318,20 @@ pub extern "C" fn HLXGUICreate(
     let title: &str = str::from_utf8(title_str.to_bytes()).unwrap();
 
     let event_loop = event_loop.unwrap();
-    let gui = Gui::new(title, event_loop, move |_ui| unsafe {
-        if let Some(draw_menu) = draw_menu {
-            draw_menu();
-        }
-    }, move |_ui| unsafe {
-        if let Some(draw_main) = draw_main {
-            draw_main();
-        }
-    })
+    let gui = Gui::new(
+        title,
+        event_loop,
+        move |_ui| unsafe {
+            if let Some(draw_menu) = draw_menu {
+                draw_menu();
+            }
+        },
+        move |_ui| unsafe {
+            if let Some(draw_main) = draw_main {
+                draw_main();
+            }
+        },
+    )
     .unwrap();
 
     Box::new(gui)

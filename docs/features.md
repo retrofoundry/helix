@@ -1,5 +1,41 @@
 # Features
 
+## GUI
+Helix provides a GUI library for creating windows and rendering graphics. The GUI library is currently a work in progress and is not yet complete. 
+
+**ImGui is used for drawing, if you're working on a C/C++ project, you'll need to include the ImGui headers to your project:**
+
+```cpp
+// If C++
+#include <imgui/imgui.h>
+// If C
+#include <cimgui/cimgui.h>
+```
+
+The following API is provided:
+
+```cpp
+/**
+ * Creates and sets up the event loop, returning a pointer to the instance or nullptr if creation failed
+**/
+void* HLXGUICreateEventLoop();
+// Rust: let event_loop = Gui::create_event_loop();
+
+/**
+ * Creates the window and sets up the GUI, returning a pointer to the instance or nullptr if creation failed.
+ * It takes two callbacks, one for drawing the menu and one for drawing the main screen and are called every frame.
+ * ImGui is used for drawing, so you're free to use any ImGui functions in your callbacks.
+**/
+void* HLXGUICreate(const char* title, void* event_loop, void (*draw_menu_callback)(), void (*draw_main_callback)());
+// Rust: let mut gui = GUI::new("My Title", &event_loop, draw_menu_callback, draw_main_callback).unwrap();
+
+/**
+ * Starts the rendering loop and returns when the window is closed.
+**/
+void* HLXGUIStart(void* event_loop, void* gui);
+// Rust: gui.start();
+```
+
 ## Audio
 Helix provides functionality for audio playback. Audio playback is simple and Helix provides the following API:
 

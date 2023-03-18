@@ -4,6 +4,7 @@ Helix is a library written in Rust providing core features for getting your N64 
 
 ## Features Provided
 
+- [ ] Window, GUI & Rendering (gui) (WIP)
 - [x] Audio Playback (audio)
 - [x] Speech Synthesis (speech)
 - [x] TCP Stream (network)
