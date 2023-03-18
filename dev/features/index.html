@@ -304,6 +304,13 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#gui" class="md-nav__link">
+    GUI
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#audio" class="md-nav__link">
     Audio
   </a>
@@ -352,6 +359,13 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#gui" class="md-nav__link">
+    GUI
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#audio" class="md-nav__link">
     Audio
   </a>
@@ -384,6 +398,35 @@
 
 
 <h1 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h1>
+<h2 id="gui">GUI<a class="headerlink" href="#gui" title="Permanent link">&para;</a></h2>
+<p>Helix provides a GUI library for creating windows and rendering graphics. The GUI library is currently a work in progress and is not yet complete. </p>
+<p><strong><a href="https://github.com/ocornut/imgui">ImGui</a> / <a href="https://github.com/imgui-rs/imgui-rs">imgui-rs</a> is used for drawing, if you&rsquo;re working on a C/C++ project, you&rsquo;ll need to include the ImGui headers to your project:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="c1">// If C++</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;imgui/imgui.h&gt;</span><span class="cp"></span>
+<span class="c1">// If C (make sure to set CIMGUI_DEFINE_ENUMS_AND_STRUCTS to 1)</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cimgui/cimgui.h&gt;</span><span class="cp"></span>
+</code></pre></div>
+<p>The following API is provided:</p>
+<div class="highlight"><pre><span></span><code><span class="cm">/**</span>
+<span class="cm"> * Creates and sets up the event loop, returning a pointer to the instance or nullptr if creation failed</span>
+<span class="cm">**/</span><span class="w"></span>
+<span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">HLXGUICreateEventLoop</span><span class="p">();</span><span class="w"></span>
+<span class="c1">// Rust: let event_loop = Gui::create_event_loop();</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * Creates the window and sets up the GUI, returning a pointer to the instance or nullptr if creation failed.</span>
+<span class="cm"> * It takes two callbacks, one for drawing the menu and one for drawing the main screen and are called every frame.</span>
+<span class="cm"> * ImGui is used for drawing, so you&#39;re free to use any ImGui functions in your callbacks.</span>
+<span class="cm">**/</span><span class="w"></span>
+<span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">HLXGUICreate</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">title</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">event_loop</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">draw_menu_callback</span><span class="p">)(),</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">draw_main_callback</span><span class="p">)());</span><span class="w"></span>
+<span class="c1">// Rust: let mut gui = GUI::new(&quot;My Title&quot;, &amp;event_loop, draw_menu_callback, draw_main_callback).unwrap();</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * Starts the rendering loop and returns when the window is closed.</span>
+<span class="cm">**/</span><span class="w"></span>
+<span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">HLXGUIStart</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">event_loop</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">gui</span><span class="p">);</span><span class="w"></span>
+<span class="c1">// Rust: gui.start();</span>
+</code></pre></div>
 <h2 id="audio">Audio<a class="headerlink" href="#audio" title="Permanent link">&para;</a></h2>
 <p>Helix provides functionality for audio playback. Audio playback is simple and Helix provides the following API:</p>
 <div class="highlight"><pre><span></span><code><span class="cm">/**</span>
