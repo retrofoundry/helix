@@ -16,6 +16,7 @@ speech = ["dep:tts"]
 network = ["dep:tokio"]
 
 [dependencies]
+anyhow = "1.0.70"
 byteorder = "1.4.3"
 cpal = "0.15.0"
 lazy_static = "1.4.0"

@@ -5,21 +5,15 @@ Helix provides functionality for audio playback. Audio playback is simple and He
 
 ```cpp
 /**
- * Creates the audio player and returns a pointer to the object
+ * Creates and sets up the audio player, returning a pointer to the instnace
 **/
-void* HLXAudioPlayerCreate(void);
-// Rust: let mut audio_player = AudioPlayer::new();
-
-/**
- * Initializes the audio playe rand sets up output devices
-**/
-bool HLXAudioPlayerInit(void* player, uint32_t sampleRate, uint16_t channels);
+void* HLXAudioPlayerCreate(uint32_t sampleRate, uint16_t channels);
 // Rust: audio_player.init() -> bool
 
 /**
- * Deinits the audio player and frees the instance.
+ * Frees the audio player instance.
 **/
-void HLXAudioPlayerDeinit(void* player);
+void HLXAudioPlayerFree(void* player);
 // Rust: no dedicated method, instance drop will deallocate it
 
 /**
