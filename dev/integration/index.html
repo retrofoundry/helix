@@ -12,14 +12,14 @@
         <meta name="author" content="dcvz">
       
       
-        <link rel="canonical" href="https://dcvz.github.io/helix/dev/integrating/">
+        <link rel="canonical" href="https://dcvz.github.io/helix/dev/integration/">
       
       <link rel="icon" href="../images/favicon.png">
       <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.11">
     
     
       
-        <title>Integrating - Helix Documentation</title>
+        <title>Integration - Helix Documentation</title>
       
     
     
@@ -71,7 +71,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#integrating" class="md-skip">
+        <a href="#integration" class="md-skip">
           Skip to content
         </a>
       
@@ -109,7 +109,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Integrating
+              Integration
             
           </span>
         </div>
@@ -265,12 +265,12 @@
       
       
         <label class="md-nav__link md-nav__link--active" for="__toc">
-          Integrating
+          Integration
           <span class="md-nav__icon md-icon"></span>
         </label>
       
       <a href="./" class="md-nav__link md-nav__link--active">
-        Integrating
+        Integration
       </a>
       
         
@@ -306,6 +306,21 @@
   
 </nav>
       
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/" class="md-nav__link">
+        Features
+      </a>
     </li>
   
 
@@ -362,14 +377,13 @@
             <article class="md-content__inner md-typeset">
               
                 
-  <a href="https://github.com/dcvz/helix/edit/main/docs/integrating.md" title="Edit this page" class="md-content__button md-icon">
+  <a href="https://github.com/dcvz/helix/edit/main/docs/integration.md" title="Edit this page" class="md-content__button md-icon">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25Z"/></svg>
   </a>
 
 
 
-<h1 id="integrating">Integrating<a class="headerlink" href="#integrating" title="Permanent link">&para;</a></h1>
-<p>Getting Helix into your project.</p>
+<h1 id="integration">Integration<a class="headerlink" href="#integration" title="Permanent link">&para;</a></h1>
 <h2 id="cc-project">C/C++ Project<a class="headerlink" href="#cc-project" title="Permanent link">&para;</a></h2>
 <p>If you&rsquo;re working on a C or C++ project the recommended way of integrating Helix into your project is using CMake. You can easily build and link this library by using <a href="https://github.com/dcvz/corrosion/tree/helix">Corrosion</a>, a tool that integrate Rust libraries into C/C++ projects. You&rsquo;ll want to:</p>
 <ol>
@@ -381,11 +395,11 @@
 </ol>
 <p><strong>NOTE: If you get a build error that certain header methods are not implemented, you&rsquo;re likely not building with that feature enabled.</strong></p>
 <p>Example:
-<div class="highlight"><pre><span></span><code>corrosion_import_crate(MANIFEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../helix/Cargo.toml FEATURES network)
-# methods in these headers will work:
-# include &lt;helix/network.h&gt;, &lt;helix/audio.h&gt;
-# methods in these headers won&#39;t work:
-# include &lt;helix/speech.h&gt;
+<div class="highlight"><pre><span></span><code><span class="n">corrosion_import_crate</span><span class="p">(</span><span class="n">MANIFEST_PATH</span><span class="w"> </span><span class="n">$</span><span class="p">{</span><span class="n">CMAKE_CURRENT_SOURCE_DIR</span><span class="p">}</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">helix</span><span class="o">/</span><span class="n">Cargo</span><span class="p">.</span><span class="n">toml</span><span class="w"> </span><span class="n">FEATURES</span><span class="w"> </span><span class="n">network</span><span class="p">)</span><span class="w"></span>
+<span class="cp"># methods in these headers will work:</span>
+<span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;helix/network.h&gt;</span><span class="c1">, &lt;helix/audio.h&gt;</span><span class="cp"></span>
+<span class="cp"># methods in these headers won&#39;t work:</span>
+<span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;helix/speech.h&gt;</span><span class="cp"></span>
 </code></pre></div></p>
 <h2 id="rust-project">Rust Project<a class="headerlink" href="#rust-project" title="Permanent link">&para;</a></h2>
 <p>If you&rsquo;re working on a Rust project, you can add Helix via <code>cargo add helix</code>.</p>
@@ -416,6 +430,21 @@
           </div>
         </a>
       
+      
+        
+        <a href="../features/" class="md-footer__link md-footer__link--next" aria-label="Next: Features" rel="next">
+          <div class="md-footer__title">
+            <div class="md-ellipsis">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              Features
+            </div>
+          </div>
+          <div class="md-footer__button md-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4Z"/></svg>
+          </div>
+        </a>
       
     </nav>
   
