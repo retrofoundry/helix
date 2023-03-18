@@ -1,5 +1,5 @@
 use anyhow::Result;
-use imgui::{Condition, FontSource, MouseCursor, Image, Ui};
+use imgui::{FontSource, MouseCursor, Ui};
 use imgui_wgpu::{Renderer, RendererConfig};
 use imgui_winit_support::winit::{
     dpi::PhysicalSize,
@@ -40,7 +40,6 @@ pub struct Gui {
 pub struct UIState {
     last_frame: Instant,
     last_cursor: Option<MouseCursor>,
-    demo_open: bool,
 }
 
 pub struct EventLoopWrapper {
@@ -48,7 +47,7 @@ pub struct EventLoopWrapper {
 }
 
 impl Gui {
-    pub fn new<D>(title: &str, event_loop_wrapper: &EventLoopWrapper, draw_menu: D) -> Result<Self> 
+    pub fn new<D>(title: &str, event_loop_wrapper: &EventLoopWrapper, draw_menu: D) -> Result<Self>
     where
         D: Fn(&Ui) + 'static,
     {
@@ -123,7 +122,6 @@ impl Gui {
 
         // Initial UI state
         let last_frame = Instant::now();
-        let demo_open = true;
         let last_cursor = None;
 
         Ok(Self {
@@ -139,7 +137,6 @@ impl Gui {
             ui_state: UIState {
                 last_frame,
                 last_cursor,
-                demo_open,
             },
             draw_menu_callback: Box::new(draw_menu),
         })
@@ -175,26 +172,27 @@ impl Gui {
         }
 
         let now = Instant::now();
-        self.imgui.io_mut().update_delta_time(now - self.ui_state.last_frame);
+        self.imgui
+            .io_mut()
+            .update_delta_time(now - self.ui_state.last_frame);
         self.ui_state.last_frame = now;
-        
+
         self.imgui
             .io_mut()
             .update_delta_time(now - self.ui_state.last_frame);
 
         let frame = self.surface.get_current_texture()?;
-        self.imgui_winit_platform.prepare_frame(self.imgui.io_mut(), &self.window)?;
+        self.imgui_winit_platform
+            .prepare_frame(self.imgui.io_mut(), &self.window)?;
         let ui = self.imgui.frame();
 
         {
             ui.main_menu_bar(|| {
-                (self.draw_menu_callback)(&ui);
+                (self.draw_menu_callback)(ui);
             });
 
             // let available_size = ui.content_region_avail();
             // Image::new(texture_id, available_size).build(ui);
-
-            ui.show_metrics_window(&mut self.ui_state.demo_open);
         }
 
         let mut encoder: wgpu::CommandEncoder = self
@@ -309,13 +307,12 @@ pub extern "C" fn HLXGUICreate(
     let title: &str = str::from_utf8(title_str.to_bytes()).unwrap();
 
     let event_loop = event_loop.unwrap();
-    let gui = Gui::new(title, event_loop, move |_ui| {
-        unsafe {
-            if let Some(draw_menu) = draw_menu {
-                draw_menu();
-            }
+    let gui = Gui::new(title, event_loop, move |_ui| unsafe {
+        if let Some(draw_menu) = draw_menu {
+            draw_menu();
         }
-    }).unwrap();
+    })
+    .unwrap();
 
     Box::new(gui)
 }
