@@ -1,5 +1,5 @@
 use anyhow::Result;
-use imgui::{Condition, FontSource, MouseCursor, Image};
+use imgui::{Condition, FontSource, MouseCursor, Image, Ui};
 use imgui_wgpu::{Renderer, RendererConfig};
 use imgui_winit_support::winit::{
     dpi::PhysicalSize,
@@ -32,6 +32,9 @@ pub struct Gui {
 
     // ui state
     ui_state: UIState,
+
+    // draw callback
+    draw_menu_callback: Box<dyn Fn(&Ui) + 'static>,
 }
 
 pub struct UIState {
@@ -45,7 +48,10 @@ pub struct EventLoopWrapper {
 }
 
 impl Gui {
-    pub fn new(title: &str, event_loop_wrapper: &EventLoopWrapper) -> Result<Self> {
+    pub fn new<D>(title: &str, event_loop_wrapper: &EventLoopWrapper, draw_menu: D) -> Result<Self> 
+    where
+        D: Fn(&Ui) + 'static,
+    {
         let (width, height) = (800, 600);
 
         let window = WindowBuilder::new()
@@ -135,6 +141,7 @@ impl Gui {
                 last_cursor,
                 demo_open,
             },
+            draw_menu_callback: Box::new(draw_menu),
         })
     }
 
@@ -181,15 +188,7 @@ impl Gui {
 
         {
             ui.main_menu_bar(|| {
-                ui.menu("File", || {
-                    ui.menu_item_config("Quit")
-                        .shortcut("Ctrl+O")
-                        .build();
-                });
-                ui.separator();
-                ui.menu("Edit", || {
-    
-                });
+                (self.draw_menu_callback)(&ui);
             });
 
             // let available_size = ui.content_region_avail();
@@ -297,16 +296,26 @@ pub extern "C" fn HLXGUICreateEventLoop() -> Box<EventLoopWrapper> {
 }
 
 #[cfg(feature = "cpp")]
+type DrawMenu = unsafe extern "C" fn();
+
+#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn HLXGUICreate(
     title_raw: *const i8,
     event_loop: Option<&mut EventLoopWrapper>,
+    draw_menu: Option<DrawMenu>,
 ) -> Box<Gui> {
     let title_str: &CStr = unsafe { CStr::from_ptr(title_raw) };
     let title: &str = str::from_utf8(title_str.to_bytes()).unwrap();
 
     let event_loop = event_loop.unwrap();
-    let gui = Gui::new(title, event_loop).unwrap();
+    let gui = Gui::new(title, event_loop, move |_ui| {
+        unsafe {
+            if let Some(draw_menu) = draw_menu {
+                draw_menu();
+            }
+        }
+    }).unwrap();
 
     Box::new(gui)
 }

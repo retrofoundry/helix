@@ -8,7 +8,7 @@ extern "C" {
 #endif
 
 void* HLXTCPCreate(void);
-void HLXTCPConnect(void* stream, char* host, uint16_t port, void (*callback)(const char* data));
+void HLXTCPConnect(void* stream, char* host, uint16_t port, void (*on_message_callback)(const char* data));
 void HLXTCPDisconnect(void* stream);
 
 void HLXTCPSendMessage(void* stream, const char* data);
