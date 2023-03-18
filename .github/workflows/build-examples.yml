@@ -28,7 +28,7 @@ jobs:
     - name: Build
       working-directory: examples/cpp
       run: |
-        cargo build --features "speech network"
+        cargo build --all-features
   ubuntu-cpp-example:
     runs-on: ubuntu-latest
     steps:
@@ -39,6 +39,7 @@ jobs:
       run: |
         sudo apt-get install ninja-build
         sudo apt-get install libasound2-dev
+        sudo apt-get install libspeechd-dev
     - name: Build
       working-directory: examples/cpp
       run: |
@@ -54,10 +55,11 @@ jobs:
       run: |
         sudo apt-get install ninja-build
         sudo apt-get install libasound2-dev
+        sudo apt-get install libspeechd-dev
     - name: Build
       working-directory: examples/cpp
       run: |
-        cargo build --features "network"
+        cargo build --all-features
   windows-cpp-example:
     runs-on: windows-latest
     steps:
@@ -78,4 +80,4 @@ jobs:
     - name: Build
       working-directory: examples/cpp
       run: |
-        cargo build --features "speech network"
+        cargo build --all-features
