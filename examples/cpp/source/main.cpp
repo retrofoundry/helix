@@ -7,7 +7,7 @@
 auto main() -> int
 {
   auto event_loop = HLXGUICreateEventLoop();
-  auto gui = HLXGUICreate(event_loop);
+  auto gui = HLXGUICreate("Helix Example", event_loop);
 
   auto event_loop_thread = std::thread([] {
     while (true) {

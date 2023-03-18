@@ -2,7 +2,7 @@ use helix::gui::Gui;
 
 fn main() {
     let event_loop = Gui::create_event_loop();
-    let gui = Gui::new(&event_loop).unwrap();
+    let gui = Gui::new("Helix Example", &event_loop).unwrap();
 
     let handler = std::thread::spawn(move || {
         loop {
