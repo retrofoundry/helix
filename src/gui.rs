@@ -185,10 +185,6 @@ impl Gui {
             .update_delta_time(now - self.ui_state.last_frame);
         self.ui_state.last_frame = now;
 
-        self.imgui
-            .io_mut()
-            .update_delta_time(now - self.ui_state.last_frame);
-
         let frame = self.surface.get_current_texture()?;
         self.imgui_winit_platform
             .prepare_frame(self.imgui.io_mut(), &self.window)?;
