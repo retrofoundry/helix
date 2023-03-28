@@ -7,13 +7,13 @@
 extern "C" {
 #endif
 
-void* HLXTCPCreate(void);
-void* HLXTCPFree(void* stream);
+void* TCPCreate(void);
+void* TCPFree(void* stream);
 
-void HLXTCPConnect(void* stream, char* host, uint16_t port, void (*on_message_callback)(const char* data));
-void HLXTCPDisconnect(void* stream);
+void TCPConnect(void* stream, char* host, uint16_t port, void (*on_message_callback)(const char* data));
+void TCPDisconnect(void* stream);
 
-void HLXTCPSendMessage(void* stream, const char* data);
+void TCPSendMessage(void* stream, const char* data);
 
 #ifdef __cplusplus
 }

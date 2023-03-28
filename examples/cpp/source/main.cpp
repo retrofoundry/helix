@@ -27,8 +27,8 @@ void draw_main() {
 
 auto main() -> int
 {
-  auto event_loop = HLXGUICreateEventLoop();
-  auto gui = HLXGUICreate("Helix Example", event_loop, &draw_menu_bar, &draw_main);
+  auto event_loop = GUICreateEventLoop();
+  auto gui = GUICreate("Helix Example", event_loop, &draw_menu_bar, &draw_main);
 
   auto event_loop_thread = std::thread([] {
     while (true) {
@@ -37,7 +37,7 @@ auto main() -> int
     }
   });
 
-  HLXGUIStart(event_loop, gui);
+  GUIStart(event_loop, gui);
   event_loop_thread.join();
 
   return 0;

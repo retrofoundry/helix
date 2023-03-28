@@ -10,8 +10,8 @@
 extern "C" {
 #endif
 
-bool HLXSpeechFeatureEnabled(void);
-bool HLXNetworkFeatureEnabled(void);
+bool SpeechFeatureEnabled(void);
+bool NetworkFeatureEnabled(void);
 
 #ifdef __cplusplus
 }

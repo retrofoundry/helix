@@ -98,7 +98,7 @@ impl SpeechSynthesizer {
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXSpeechSynthesizerCreate() -> Box<SpeechSynthesizer> {
+pub extern "C" fn SpeechSynthesizerCreate() -> Box<SpeechSynthesizer> {
     match SpeechSynthesizer::new() {
         Ok(synthesizer) => Box::new(synthesizer),
         Err(e) => {
@@ -110,7 +110,7 @@ pub extern "C" fn HLXSpeechSynthesizerCreate() -> Box<SpeechSynthesizer> {
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXSpeechSynthesizerFree(synthesizer: Option<Box<SpeechSynthesizer>>) {
+pub extern "C" fn SpeechSynthesizerFree(synthesizer: Option<Box<SpeechSynthesizer>>) {
     if let Some(synthesizer) = synthesizer {
         drop(synthesizer);
     }
@@ -118,7 +118,7 @@ pub extern "C" fn HLXSpeechSynthesizerFree(synthesizer: Option<Box<SpeechSynthes
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXSpeechSynthesizerSetVolume(
+pub extern "C" fn SpeechSynthesizerSetVolume(
     synthesizer: Option<&mut SpeechSynthesizer>,
     volume: f32,
 ) {
@@ -132,7 +132,7 @@ pub extern "C" fn HLXSpeechSynthesizerSetVolume(
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXSpeechSynthesizerSetLanguage(
+pub extern "C" fn SpeechSynthesizerSetLanguage(
     synthesizer: Option<&mut SpeechSynthesizer>,
     language_raw: *const i8,
 ) {
@@ -149,7 +149,7 @@ pub extern "C" fn HLXSpeechSynthesizerSetLanguage(
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXSpeechSynthesizerSetGender(
+pub extern "C" fn SpeechSynthesizerSetGender(
     synthesizer: Option<&mut SpeechSynthesizer>,
     gender: SpeechSynthesizerGender,
 ) {
@@ -163,7 +163,7 @@ pub extern "C" fn HLXSpeechSynthesizerSetGender(
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXSpeechSynthesizerSpeak(
+pub extern "C" fn SpeechSynthesizerSpeak(
     synthesizer: Option<&mut SpeechSynthesizer>,
     text_raw: *const i8,
     interrupt: u8,

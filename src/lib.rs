@@ -9,7 +9,7 @@ pub use arie;
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXSpeechFeatureEnabled() -> bool {
+pub extern "C" fn SpeechFeatureEnabled() -> bool {
     #[cfg(feature = "speech")]
     return true;
     #[cfg(not(feature = "speech"))]
@@ -18,7 +18,7 @@ pub extern "C" fn HLXSpeechFeatureEnabled() -> bool {
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXNetworkFeatureEnabled() -> bool {
+pub extern "C" fn NetworkFeatureEnabled() -> bool {
     #[cfg(feature = "network")]
     return true;
     #[cfg(not(feature = "network"))]

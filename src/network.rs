@@ -91,13 +91,13 @@ impl TCPStream {
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXTCPCreate() -> Box<TCPStream> {
+pub extern "C" fn TCPCreate() -> Box<TCPStream> {
     Box::new(TCPStream::new())
 }
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXTCPFree(stream: Option<Box<TCPStream>>) {
+pub extern "C" fn TCPFree(stream: Option<Box<TCPStream>>) {
     if let Some(stream) = stream {
         drop(stream);
     }
@@ -108,7 +108,7 @@ type OnMessage = unsafe extern "C" fn(data: *const i8);
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXTCPConnect(
+pub extern "C" fn TCPConnect(
     mut stream: Option<&mut TCPStream>,
     host: *const i8,
     port: u16,
@@ -154,7 +154,7 @@ pub extern "C" fn HLXTCPConnect(
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXTCPDisconnect(stream: Option<Box<TCPStream>>) {
+pub extern "C" fn TCPDisconnect(stream: Option<Box<TCPStream>>) {
     match stream {
         Some(stream) => stream.disconnect(),
         None => eprintln!(
@@ -165,7 +165,7 @@ pub extern "C" fn HLXTCPDisconnect(stream: Option<Box<TCPStream>>) {
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXTCPSendMessage(stream: Option<&mut TCPStream>, message: *const i8) {
+pub extern "C" fn TCPSendMessage(stream: Option<&mut TCPStream>, message: *const i8) {
     if stream.is_none() {
         eprintln!("[TCPStream] Failed to connect to server: was given an invalid instance pointer");
         return;

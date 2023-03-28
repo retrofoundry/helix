@@ -294,7 +294,7 @@ impl Gui {
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXGUICreateEventLoop() -> Box<EventLoopWrapper> {
+pub extern "C" fn GUICreateEventLoop() -> Box<EventLoopWrapper> {
     let event_loop = Gui::create_event_loop();
     Box::new(event_loop)
 }
@@ -304,7 +304,7 @@ type OnDraw = unsafe extern "C" fn();
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXGUICreate(
+pub extern "C" fn GUICreate(
     title_raw: *const i8,
     event_loop: Option<&mut EventLoopWrapper>,
     draw_menu: Option<OnDraw>,
@@ -335,7 +335,7 @@ pub extern "C" fn HLXGUICreate(
 
 #[cfg(feature = "cpp")]
 #[no_mangle]
-pub extern "C" fn HLXGUIStart(event_loop: Option<Box<EventLoopWrapper>>, gui: Option<Box<Gui>>) {
+pub extern "C" fn GUIStart(event_loop: Option<Box<EventLoopWrapper>>, gui: Option<Box<Gui>>) {
     let event_loop = event_loop.unwrap();
     let gui = gui.unwrap();
     Gui::start(*event_loop, *gui);

@@ -18,7 +18,7 @@ The following API is provided:
 /**
  * Creates and sets up the event loop, returning a pointer to the instance or nullptr if creation failed
 **/
-void* HLXGUICreateEventLoop();
+void* GUICreateEventLoop();
 // Rust: let event_loop = Gui::create_event_loop();
 
 /**
@@ -26,13 +26,13 @@ void* HLXGUICreateEventLoop();
  * It takes two callbacks, one for drawing the menu and one for drawing the main screen and are called every frame.
  * ImGui is used for drawing, so you're free to use any ImGui functions in your callbacks.
 **/
-void* HLXGUICreate(const char* title, void* event_loop, void (*draw_menu_callback)(), void (*draw_main_callback)());
+void* GUICreate(const char* title, void* event_loop, void (*draw_menu_callback)(), void (*draw_main_callback)());
 // Rust: let mut gui = GUI::new("My Title", &event_loop, draw_menu_callback, draw_main_callback).unwrap();
 
 /**
  * Starts the rendering loop and returns when the window is closed.
 **/
-void* HLXGUIStart(void* event_loop, void* gui);
+void* GUIStart(void* event_loop, void* gui);
 // Rust: gui.start();
 ```
 
@@ -78,36 +78,36 @@ Helix provides an API for text-to-speech (TTS):
 /**
  * Creates and sets up the audio synthesizer, returning a pointer to the instance or nullptr if creation failed
 **/
-void* HLXSpeechSynthesizerCreate(void);
+void* SpeechSynthesizerCreate(void);
 // Rust: let mut speech_synthesizer = SpeechSynthesizer::new().unwrap();
 
 /**
  * Frees the speech synthesizer instance.
 **/
-void HLXSpeechSynthesizerFree(void* synthesizer);
+void SpeechSynthesizerFree(void* synthesizer);
 // Rust: no dedicated method, instance drop will deallocate it
 
 /**
  * Sets the volume for the synthesizer, scale from 0-1.
 **/
-void HLXSpeechSynthesizerSetVolume(void* synthesizer, float volume);
+void SpeechSynthesizerSetVolume(void* synthesizer, float volume);
 // Rust: speech_synthesizer.set_volume(volume: f32)
 
 /**
  * Sets the language of the speaker, takes in a en-US type locale.
 **/
-void HLXSpeechSynthesizerSetLanguage(void* synthesizer, const char* language);
+void SpeechSynthesizerSetLanguage(void* synthesizer, const char* language);
 // Rust: speech_synthesizer.set_language(language: &str)
 
 /**
- * Sets the gender of the speaker, accepted values: HLXSpeechSynthesizerGenderFemale/Male/Neutral.
+ * Sets the gender of the speaker, accepted values: SpeechSynthesizerGenderFemale/Male/Neutral.
 **/
-void HLXSpeechSynthesizerSetGender(void* synthesizer, HLXSpeechSynthesizerGender gender);
-// Rust: speech_synthesizer.set_gender(gender: HLXSpeechSynthesizerGender)
+void SpeechSynthesizerSetGender(void* synthesizer, SpeechSynthesizerGender gender);
+// Rust: speech_synthesizer.set_gender(gender: SpeechSynthesizerGender)
 
 /**
  * Dictates the given text, specifying whether previous utterances should be interrupted.
 **/
-void HLXSpeechSynthesizerSpeak(void* synthesizer, const char* text, uint8_t interrupt);
+void SpeechSynthesizerSpeak(void* synthesizer, const char* text, uint8_t interrupt);
 // Rust: speech_synthesizer.speak(text: &str, interrupt: bool)
 ```
