@@ -410,7 +410,7 @@
 <div class="highlight"><pre><span></span><code><span class="cm">/**</span>
 <span class="cm"> * Creates and sets up the event loop, returning a pointer to the instance or nullptr if creation failed</span>
 <span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">HLXGUICreateEventLoop</span><span class="p">();</span><span class="w"></span>
+<span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">GUICreateEventLoop</span><span class="p">();</span><span class="w"></span>
 <span class="c1">// Rust: let event_loop = Gui::create_event_loop();</span>
 
 <span class="cm">/**</span>
@@ -418,13 +418,13 @@
 <span class="cm"> * It takes two callbacks, one for drawing the menu and one for drawing the main screen and are called every frame.</span>
 <span class="cm"> * ImGui is used for drawing, so you&#39;re free to use any ImGui functions in your callbacks.</span>
 <span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">HLXGUICreate</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">title</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">event_loop</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">draw_menu_callback</span><span class="p">)(),</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">draw_main_callback</span><span class="p">)());</span><span class="w"></span>
+<span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">GUICreate</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">title</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">event_loop</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">draw_menu_callback</span><span class="p">)(),</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">draw_main_callback</span><span class="p">)());</span><span class="w"></span>
 <span class="c1">// Rust: let mut gui = GUI::new(&quot;My Title&quot;, &amp;event_loop, draw_menu_callback, draw_main_callback).unwrap();</span>
 
 <span class="cm">/**</span>
 <span class="cm"> * Starts the rendering loop and returns when the window is closed.</span>
 <span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">HLXGUIStart</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">event_loop</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">gui</span><span class="p">);</span><span class="w"></span>
+<span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">GUIStart</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">event_loop</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">gui</span><span class="p">);</span><span class="w"></span>
 <span class="c1">// Rust: gui.start();</span>
 </code></pre></div>
 <h2 id="audio">Audio<a class="headerlink" href="#audio" title="Permanent link">&para;</a></h2>
@@ -464,37 +464,37 @@
 <div class="highlight"><pre><span></span><code><span class="cm">/**</span>
 <span class="cm"> * Creates and sets up the audio synthesizer, returning a pointer to the instance or nullptr if creation failed</span>
 <span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">HLXSpeechSynthesizerCreate</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span><span class="w"></span>
+<span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">SpeechSynthesizerCreate</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span><span class="w"></span>
 <span class="c1">// Rust: let mut speech_synthesizer = SpeechSynthesizer::new().unwrap();</span>
 
 <span class="cm">/**</span>
 <span class="cm"> * Frees the speech synthesizer instance.</span>
 <span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="w"> </span><span class="nf">HLXSpeechSynthesizerFree</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">synthesizer</span><span class="p">);</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">SpeechSynthesizerFree</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">synthesizer</span><span class="p">);</span><span class="w"></span>
 <span class="c1">// Rust: no dedicated method, instance drop will deallocate it</span>
 
 <span class="cm">/**</span>
 <span class="cm"> * Sets the volume for the synthesizer, scale from 0-1.</span>
 <span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="w"> </span><span class="nf">HLXSpeechSynthesizerSetVolume</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">synthesizer</span><span class="p">,</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">volume</span><span class="p">);</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">SpeechSynthesizerSetVolume</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">synthesizer</span><span class="p">,</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">volume</span><span class="p">);</span><span class="w"></span>
 <span class="c1">// Rust: speech_synthesizer.set_volume(volume: f32)</span>
 
 <span class="cm">/**</span>
 <span class="cm"> * Sets the language of the speaker, takes in a en-US type locale.</span>
 <span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="w"> </span><span class="nf">HLXSpeechSynthesizerSetLanguage</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">synthesizer</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">language</span><span class="p">);</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">SpeechSynthesizerSetLanguage</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">synthesizer</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">language</span><span class="p">);</span><span class="w"></span>
 <span class="c1">// Rust: speech_synthesizer.set_language(language: &amp;str)</span>
 
 <span class="cm">/**</span>
-<span class="cm"> * Sets the gender of the speaker, accepted values: HLXSpeechSynthesizerGenderFemale/Male/Neutral.</span>
+<span class="cm"> * Sets the gender of the speaker, accepted values: SpeechSynthesizerGenderFemale/Male/Neutral.</span>
 <span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="w"> </span><span class="nf">HLXSpeechSynthesizerSetGender</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">synthesizer</span><span class="p">,</span><span class="w"> </span><span class="n">HLXSpeechSynthesizerGender</span><span class="w"> </span><span class="n">gender</span><span class="p">);</span><span class="w"></span>
-<span class="c1">// Rust: speech_synthesizer.set_gender(gender: HLXSpeechSynthesizerGender)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">SpeechSynthesizerSetGender</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">synthesizer</span><span class="p">,</span><span class="w"> </span><span class="n">SpeechSynthesizerGender</span><span class="w"> </span><span class="n">gender</span><span class="p">);</span><span class="w"></span>
+<span class="c1">// Rust: speech_synthesizer.set_gender(gender: SpeechSynthesizerGender)</span>
 
 <span class="cm">/**</span>
 <span class="cm"> * Dictates the given text, specifying whether previous utterances should be interrupted.</span>
 <span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="w"> </span><span class="nf">HLXSpeechSynthesizerSpeak</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">synthesizer</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">text</span><span class="p">,</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">interrupt</span><span class="p">);</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">SpeechSynthesizerSpeak</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">synthesizer</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">text</span><span class="p">,</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">interrupt</span><span class="p">);</span><span class="w"></span>
 <span class="c1">// Rust: speech_synthesizer.speak(text: &amp;str, interrupt: bool)</span>
 </code></pre></div>
 
