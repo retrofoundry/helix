@@ -89,13 +89,11 @@ impl TCPStream {
 
 // MARK: - C API
 
-#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn TCPCreate() -> Box<TCPStream> {
     Box::new(TCPStream::new())
 }
 
-#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn TCPFree(stream: Option<Box<TCPStream>>) {
     if let Some(stream) = stream {
@@ -103,10 +101,8 @@ pub extern "C" fn TCPFree(stream: Option<Box<TCPStream>>) {
     }
 }
 
-#[cfg(feature = "cpp")]
 type OnMessage = unsafe extern "C" fn(data: *const i8);
 
-#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn TCPConnect(
     mut stream: Option<&mut TCPStream>,
@@ -152,7 +148,6 @@ pub extern "C" fn TCPConnect(
     });
 }
 
-#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn TCPDisconnect(stream: Option<Box<TCPStream>>) {
     match stream {
@@ -163,7 +158,6 @@ pub extern "C" fn TCPDisconnect(stream: Option<Box<TCPStream>>) {
     }
 }
 
-#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn TCPSendMessage(stream: Option<&mut TCPStream>, message: *const i8) {
     if stream.is_none() {

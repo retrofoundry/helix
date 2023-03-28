@@ -8,9 +8,7 @@ use imgui_winit_support::winit::{
     window::{Window, WindowBuilder},
 };
 use pollster::block_on;
-#[cfg(feature = "cpp")]
 use std::ffi::CStr;
-#[cfg(feature = "cpp")]
 use std::str;
 use std::time::Instant;
 
@@ -292,17 +290,14 @@ impl Gui {
 
 // MARK: - C API
 
-#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn GUICreateEventLoop() -> Box<EventLoopWrapper> {
     let event_loop = Gui::create_event_loop();
     Box::new(event_loop)
 }
 
-#[cfg(feature = "cpp")]
 type OnDraw = unsafe extern "C" fn();
 
-#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn GUICreate(
     title_raw: *const i8,
@@ -333,7 +328,6 @@ pub extern "C" fn GUICreate(
     Box::new(gui)
 }
 
-#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn GUIStart(event_loop: Option<Box<EventLoopWrapper>>, gui: Option<Box<Gui>>) {
     let event_loop = event_loop.unwrap();

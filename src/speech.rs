@@ -1,7 +1,5 @@
 use anyhow::Result;
-#[cfg(feature = "cpp")]
 use std::ffi::CStr;
-#[cfg(feature = "cpp")]
 use std::str;
 use tts::{Gender, LanguageTag, Tts, Voice};
 
@@ -96,7 +94,6 @@ impl SpeechSynthesizer {
 
 // MARK: - C API
 
-#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn SpeechSynthesizerCreate() -> Box<SpeechSynthesizer> {
     match SpeechSynthesizer::new() {
@@ -108,7 +105,6 @@ pub extern "C" fn SpeechSynthesizerCreate() -> Box<SpeechSynthesizer> {
     }
 }
 
-#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn SpeechSynthesizerFree(synthesizer: Option<Box<SpeechSynthesizer>>) {
     if let Some(synthesizer) = synthesizer {
@@ -116,7 +112,6 @@ pub extern "C" fn SpeechSynthesizerFree(synthesizer: Option<Box<SpeechSynthesize
     }
 }
 
-#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn SpeechSynthesizerSetVolume(
     synthesizer: Option<&mut SpeechSynthesizer>,
@@ -130,7 +125,6 @@ pub extern "C" fn SpeechSynthesizerSetVolume(
     }
 }
 
-#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn SpeechSynthesizerSetLanguage(
     synthesizer: Option<&mut SpeechSynthesizer>,
@@ -147,7 +141,6 @@ pub extern "C" fn SpeechSynthesizerSetLanguage(
     }
 }
 
-#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn SpeechSynthesizerSetGender(
     synthesizer: Option<&mut SpeechSynthesizer>,
@@ -161,7 +154,6 @@ pub extern "C" fn SpeechSynthesizerSetGender(
     }
 }
 
-#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn SpeechSynthesizerSpeak(
     synthesizer: Option<&mut SpeechSynthesizer>,

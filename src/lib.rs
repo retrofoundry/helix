@@ -7,7 +7,6 @@ pub use arie;
 
 // MARK: - C API
 
-#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn SpeechFeatureEnabled() -> bool {
     #[cfg(feature = "speech")]
@@ -16,7 +15,6 @@ pub extern "C" fn SpeechFeatureEnabled() -> bool {
     return false;
 }
 
-#[cfg(feature = "cpp")]
 #[no_mangle]
 pub extern "C" fn NetworkFeatureEnabled() -> bool {
     #[cfg(feature = "network")]
