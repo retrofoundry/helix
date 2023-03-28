@@ -1,5 +1,5 @@
-#ifndef HELIX_LIB_AUDIO_H
-#define HELIX_LIB_AUDIO_H
+#ifndef ARIE_LIB_AUDIO_H
+#define ARIE_LIB_AUDIO_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -8,16 +8,19 @@
 extern "C" {
 #endif
 
-void* HLXAudioPlayerCreate(uint32_t sampleRate, uint16_t channels);
-void HLXAudioPlayerFree(void* player);
+void* AudioPlayerCreate(uint32_t sampleRate, uint16_t channels);
+void AudioPlayerFree(void* player);
 
-int32_t HLXAudioPlayerGetBuffered(void* player);
-int32_t HLXAudioPlayerGetDesiredBuffered(void* player);
+size_t AudioPlayerGetBufferredSampleCount(void* player);
+size_t AudioPlayerGetBufferSize(void* player);
 
-void HLXAudioPlayerPlayBuffer(void* player, const uint8_t* buf, size_t len);
+void AudioPlayerPlay(void* player);
+void AudioPlayerPause(void* player);
+
+void AudioPlayerQueueBuffer(void* player, const uint8_t* buf, size_t len);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* HELIX_LIB_AUDIO_H */
+#endif /* ARIE_LIB_AUDIO_H */
