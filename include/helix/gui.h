@@ -5,9 +5,10 @@
 extern "C" {
 #endif
 
-void* GUICreateEventLoop();
-void* GUICreate(const char* title, void* event_loop, void (*draw_menu_callback)(), void (*draw_main_callback)());
-void* GUIStart(void* event_loop, void* gui);
+void* GUICreate(const char* title, void (*draw_menu_callback)());
+void* GUIStartFrame(void* gui);
+void* GUIDrawLists(void* gui);
+void* GUIEndFrame(void* gui);
 
 #ifdef __cplusplus
 }

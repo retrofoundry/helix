@@ -20,15 +20,9 @@ void draw_menu_bar() {
   }
 }
 
-void draw_main() {
-  if (show_app_metrics)
-    ImGui::ShowMetricsWindow(&show_app_metrics);
-}
-
 auto main() -> int
 {
-  auto event_loop = GUICreateEventLoop();
-  auto gui = GUICreate("Helix Example", event_loop, &draw_menu_bar, &draw_main);
+  auto gui = GUICreate("Helix Example", &draw_menu_bar);
 
   auto event_loop_thread = std::thread([] {
     while (true) {
@@ -36,8 +30,13 @@ auto main() -> int
       std::this_thread::sleep_for(std::chrono::seconds(1));
     }
   });
+  
+  while (true) {
+    GUIStartFrame(gui);
+    GUIDrawLists(gui);
+    GUIEndFrame(gui);
+  }
 
-  GUIStart(event_loop, gui);
   event_loop_thread.join();
 
   return 0;
