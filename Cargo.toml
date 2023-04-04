@@ -8,7 +8,13 @@ name = "helix"
 crate-type = ["lib", "staticlib"]
 
 [features]
-default = []
+default = ["f3dex2"]
+
+# Graphics Features
+f3dex2 = []
+f3dzex2 = ["f3dex2"]
+
+# Additional Features
 speech = ["dep:tts"]
 network = ["dep:tokio"]
 

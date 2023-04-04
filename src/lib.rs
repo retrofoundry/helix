@@ -1,9 +1,11 @@
+pub use arie;
+mod graphics;
 pub mod gui;
 #[cfg(feature = "network")]
 pub mod network;
 #[cfg(feature = "speech")]
 pub mod speech;
-pub use arie;
+mod utils;
 
 // MARK: - C API
 
