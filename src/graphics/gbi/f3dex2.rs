@@ -1,6 +1,6 @@
 use super::super::{rdp::RDP, rsp::RSP};
-use super::utils::get_c0;
-use super::{defines::Gfx, GBIDefinition, GBIResult, GBI};
+use super::utils::{get_c0, get_segmented_address};
+use super::{GBIDefinition, GBIResult, GBI};
 
 pub enum F3DEX2 {
     // DMA
@@ -56,18 +56,31 @@ pub enum F3DEX2 {
 impl GBIDefinition for F3DEX2 {
     fn setup(gbi: &mut GBI) {
         gbi.register(F3DEX2::G_GEOMETRYMODE as usize, F3DEX2::gsp_geometry_mode);
+        gbi.register(F3DEX2::G_DL as usize, F3DEX2::sub_dl);
+        gbi.register(F3DEX2::G_ENDDL as usize, |_, _, _, _| { GBIResult::Return });
     }
 }
 
 impl F3DEX2 {
-    pub fn gsp_geometry_mode(_rdp: &mut RDP, rsp: &mut RSP, command: *const Gfx) -> GBIResult {
-        let clear_bits = unsafe { get_c0((*command).words.w0, 0, 24) };
-        let set_bits = unsafe { (*command).words.w1 };
+    pub fn gsp_geometry_mode(_rdp: &mut RDP, rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
+        let clear_bits = get_c0(w0, 0, 24);
+        let set_bits = w1;
 
         rsp.geometry_mode &= !clear_bits as u32;
         rsp.geometry_mode |= set_bits as u32;
         rsp.state_changed = true;
 
         GBIResult::Continue
+    }
+
+    pub fn sub_dl(_rdp: &mut RDP, _rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
+        if get_c0(w0, 16, 1) == 0 {
+            // Push return address
+            let new_addr = get_segmented_address(w1);
+            return GBIResult::Recurse(new_addr);
+        } else {
+            let new_addr = get_segmented_address(w1);
+            return GBIResult::SetAddress(new_addr);
+        }
     }
 }

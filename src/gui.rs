@@ -12,6 +12,8 @@ use sdl2::{
 use std::str;
 use std::{ffi::CStr, time::Instant};
 
+use crate::graphics::rcp::RCP;
+
 use self::imgui_sdl_support::SdlPlatform;
 
 pub struct Gui {
@@ -38,6 +40,9 @@ pub struct Gui {
 
     // draw callbacks
     draw_menu_callback: Box<dyn Fn(&Ui) + 'static>,
+
+    // game renderer
+    rcp: RCP,
 }
 
 pub struct UIState {
@@ -156,9 +161,10 @@ impl Gui {
             renderer,
             platform,
             event_pump,
-            imgui: imgui,
+            imgui,
             ui_state: UIState { last_frame },
             draw_menu_callback: Box::new(draw_menu),
+            rcp: RCP::new(),
         })
     }
 
@@ -287,8 +293,11 @@ impl Gui {
         Ok(())
     }
 
-    pub fn draw_lists(&mut self) -> Result<()> {
-        // send things over to the rcp
+    pub fn draw_lists(&mut self, commands: usize) -> Result<()> {
+        self.rcp.run(commands);
+        // TODO: Draw rendered game image
+        // let image = self.rcp.finish();
+
         self.render()?;
 
         Ok(())
@@ -323,9 +332,9 @@ pub extern "C" fn GUIStartFrame(gui: Option<&mut Gui>) {
 }
 
 #[no_mangle]
-pub extern "C" fn GUIDrawLists(gui: Option<&mut Gui>) {
+pub extern "C" fn GUIDrawLists(gui: Option<&mut Gui>, commands: u64) {
     let gui = gui.unwrap();
-    gui.draw_lists().unwrap();
+    gui.draw_lists(commands.try_into().unwrap()).unwrap();
 }
 
 #[no_mangle]

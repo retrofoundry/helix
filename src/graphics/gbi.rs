@@ -1,4 +1,3 @@
-use self::defines::Gfx;
 use super::{rdp::RDP, rsp::RSP};
 use std::collections::HashMap;
 
@@ -9,14 +8,13 @@ mod utils;
 
 pub enum GBIResult {
     Continue,
-    Decrease,
-    Increase,
-    SetAddressWithDecrease(usize),
-    Recurse(*const Gfx),
     Return,
+    SetAddress(usize),
+    Recurse(usize),
+    Unknown(usize),
 }
 
-pub type GBICommand = fn(dp: &mut RDP, rsp: &mut RSP, command: *const Gfx) -> GBIResult;
+pub type GBICommand = fn(dp: &mut RDP, rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult;
 
 pub struct GBI {
     pub gbi_opcode_table: HashMap<usize, GBICommand>,
@@ -47,13 +45,13 @@ impl GBI {
         self.gbi_opcode_table.insert(opcode, cmd);
     }
 
-    pub fn handle_command(&self, rdp: &mut RDP, rsp: &mut RSP, command: *const Gfx) -> GBIResult {
-        let opcode = unsafe { (*command).words.w0 } >> 24;
+    pub fn handle_command(&self, rdp: &mut RDP, rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
+        let opcode = w0 >> 24;
         let cmd = self.gbi_opcode_table.get(&opcode);
 
         match cmd {
-            Some(cmd) => cmd(rdp, rsp, command),
-            None => panic!("Unknown GBI opcode: {}", opcode),
+            Some(cmd) => cmd(rdp, rsp, w0, w1),
+            None => GBIResult::Unknown(opcode),
         }
     }
 }

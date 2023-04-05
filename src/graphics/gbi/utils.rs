@@ -4,6 +4,10 @@ pub fn get_c0(word: usize, pos: u32, width: u32) -> usize {
     (word >> pos) & ((1 << width) - 1)
 }
 
+pub fn get_segmented_address(w1: usize) -> usize {
+    return w1;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
