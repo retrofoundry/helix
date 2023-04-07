@@ -20,7 +20,9 @@ network = ["dep:tokio"]
 
 [dependencies]
 anyhow = "1.0.70"
+approx = "0.5.1"
 arie = "0.1.0"
+glam = { version = "0.23.0", features = ["approx"] }
 imgui = { version = "0.10.0", features = ["docking"] }
 imgui-wgpu = "0.22.0"
 libc = "0.2.139"
@@ -29,3 +31,4 @@ sdl2 = { git = "https://github.com/Rust-SDL2/rust-sdl2", revion = "31e830e", fea
 tokio = { version = "1.26.0", features = ["full"], optional = true }
 tts = { version = "0.25.0", optional = true }
 wgpu = "0.15.1"
+

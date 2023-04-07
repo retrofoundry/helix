@@ -1,4 +1,5 @@
 pub use arie;
+mod extensions;
 mod graphics;
 pub mod gui;
 #[cfg(feature = "network")]

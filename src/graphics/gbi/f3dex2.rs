@@ -1,6 +1,12 @@
+use glam::Mat4;
+use std::slice;
+
 use super::super::{rdp::RDP, rsp::RSP};
-use super::utils::{get_c0, get_segmented_address};
+use super::defines::G_MTX;
+use super::utils::{get_cmd, get_segmented_address};
 use super::{GBIDefinition, GBIResult, GBI};
+use crate::extensions::glam::FromFixedPoint;
+use crate::graphics::rsp::MATRIX_STACK_SIZE;
 
 pub enum F3DEX2 {
     // DMA
@@ -13,6 +19,7 @@ pub enum F3DEX2 {
     G_QUAD = 0x07,
     G_LINE3D = 0x08,
 
+    // RSP
     G_TEXTURE = 0xD7,
     G_POPMTX = 0xD8,
     G_GEOMETRYMODE = 0xD9,
@@ -55,26 +62,70 @@ pub enum F3DEX2 {
 
 impl GBIDefinition for F3DEX2 {
     fn setup(gbi: &mut GBI) {
+        gbi.register(F3DEX2::G_MTX as usize, F3DEX2::gsp_matrix);
         gbi.register(F3DEX2::G_GEOMETRYMODE as usize, F3DEX2::gsp_geometry_mode);
         gbi.register(F3DEX2::G_DL as usize, F3DEX2::sub_dl);
-        gbi.register(F3DEX2::G_ENDDL as usize, |_, _, _, _| { GBIResult::Return });
+        gbi.register(F3DEX2::G_ENDDL as usize, |_, _, _, _| GBIResult::Return);
     }
 }
 
 impl F3DEX2 {
+    pub fn gsp_matrix(_rdp: &mut RDP, rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
+        let params = get_cmd(w0, 0, 8) ^ G_MTX::PUSH as usize;
+
+        let addr = get_segmented_address(w1) as *const i32;
+        let slice = unsafe { slice::from_raw_parts(addr, 16) };
+        let matrix = Mat4::from_fixed_point(slice);
+
+        if params & G_MTX::PROJECTION as usize != 0 {
+            if (params & G_MTX::LOAD as usize) != 0 {
+                // Load the input matrix into the projection matrix
+                rsp.projection_matrix = matrix;
+            } else {
+                // Multiply the current projection matrix with the input matrix
+                rsp.projection_matrix *= matrix;
+            }
+        } else {
+            // Modelview matrix
+            if params & G_MTX::PUSH as usize != 0 && rsp.matrix_stack_index < MATRIX_STACK_SIZE {
+                // Push a copy of the current matrix onto the stack
+                {
+                    rsp.matrix_stack_index += 1;
+                    rsp.matrix_stack_index
+                };
+                let source = rsp.matrix_stack[rsp.matrix_stack_index - 2].clone();
+                rsp.matrix_stack[rsp.matrix_stack_index - 1].clone_from(&source);
+            }
+
+            if params & G_MTX::LOAD as usize != 0 {
+                // Load the input matrix into the current matrix
+                rsp.matrix_stack[rsp.matrix_stack_index - 1].clone_from(&matrix);
+            } else {
+                // Multiply the current matrix with the input matrix
+                rsp.matrix_stack[rsp.matrix_stack_index - 1] *= matrix;
+            }
+
+            rsp.clear_mvp_light_valid();
+        }
+
+        rsp.projection_matrix =
+            rsp.projection_matrix * rsp.matrix_stack[rsp.matrix_stack_index - 1];
+
+        GBIResult::Continue
+    }
+
     pub fn gsp_geometry_mode(_rdp: &mut RDP, rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
-        let clear_bits = get_c0(w0, 0, 24);
+        let clear_bits = get_cmd(w0, 0, 24);
         let set_bits = w1;
 
         rsp.geometry_mode &= !clear_bits as u32;
         rsp.geometry_mode |= set_bits as u32;
-        rsp.state_changed = true;
 
         GBIResult::Continue
     }
 
     pub fn sub_dl(_rdp: &mut RDP, _rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
-        if get_c0(w0, 16, 1) == 0 {
+        if get_cmd(w0, 16, 1) == 0 {
             // Push return address
             let new_addr = get_segmented_address(w1);
             return GBIResult::Recurse(new_addr);
