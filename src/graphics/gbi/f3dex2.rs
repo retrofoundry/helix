@@ -63,6 +63,7 @@ pub enum F3DEX2 {
 impl GBIDefinition for F3DEX2 {
     fn setup(gbi: &mut GBI) {
         gbi.register(F3DEX2::G_MTX as usize, F3DEX2::gsp_matrix);
+        gbi.register(F3DEX2::G_POPMTX as usize, F3DEX2::gsp_pop_matrix);
         gbi.register(F3DEX2::G_GEOMETRYMODE as usize, F3DEX2::gsp_geometry_mode);
         gbi.register(F3DEX2::G_DL as usize, F3DEX2::sub_dl);
         gbi.register(F3DEX2::G_ENDDL as usize, |_, _, _, _| GBIResult::Return);
@@ -89,10 +90,7 @@ impl F3DEX2 {
             // Modelview matrix
             if params & G_MTX::PUSH as usize != 0 && rsp.matrix_stack_index < MATRIX_STACK_SIZE {
                 // Push a copy of the current matrix onto the stack
-                {
-                    rsp.matrix_stack_index += 1;
-                    rsp.matrix_stack_index
-                };
+                rsp.matrix_stack_index += 1;
                 let source = rsp.matrix_stack[rsp.matrix_stack_index - 2].clone();
                 rsp.matrix_stack[rsp.matrix_stack_index - 1].clone_from(&source);
             }
@@ -105,11 +103,43 @@ impl F3DEX2 {
                 rsp.matrix_stack[rsp.matrix_stack_index - 1] *= matrix;
             }
 
+            // Clear the MVP light valid flag
             rsp.clear_mvp_light_valid();
         }
 
-        rsp.projection_matrix =
+        // Recalculate the modelview projection matrix
+        rsp.modelview_projection_matrix =
             rsp.projection_matrix * rsp.matrix_stack[rsp.matrix_stack_index - 1];
+
+        GBIResult::Continue
+    }
+
+    pub fn gsp_pop_matrix(_rdp: &mut RDP, rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
+        // Calculate the number of matrices to pop
+        let num_matrices_to_pop = w1 / 64;
+
+        // If no matrices to pop, return
+        if num_matrices_to_pop == 0 {
+            return GBIResult::Continue;
+        }
+
+        // Pop the specified number of matrices
+        for _ in 0..num_matrices_to_pop {
+            // Check if there are matrices left to pop
+            if rsp.matrix_stack_index > 0 {
+                // Decrement the matrix stack index
+                rsp.matrix_stack_index -= 1;
+            }
+        }
+
+        // Clear the MVP and light valid flag
+        rsp.clear_mvp_light_valid();
+
+        // Recalculate the modelview projection matrix
+        if rsp.matrix_stack_index > 0 {
+            rsp.modelview_projection_matrix =
+                rsp.projection_matrix * rsp.matrix_stack[rsp.matrix_stack_index - 1];
+        }
 
         GBIResult::Continue
     }
