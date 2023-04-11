@@ -2,11 +2,11 @@ use glam::Mat4;
 use std::slice;
 
 use super::super::{rdp::RDP, rsp::RSP};
-use super::defines::G_MTX;
+use super::defines::{Light, Viewport, G_MTX, G_MV};
 use super::utils::{get_cmd, get_segmented_address};
 use super::{GBIDefinition, GBIResult, GBI};
 use crate::extensions::glam::FromFixedPoint;
-use crate::graphics::rsp::MATRIX_STACK_SIZE;
+use crate::graphics::rsp::{MATRIX_STACK_SIZE, MAX_LIGHTS};
 
 pub enum F3DEX2 {
     // DMA
@@ -24,6 +24,8 @@ pub enum F3DEX2 {
     G_POPMTX = 0xD8,
     G_GEOMETRYMODE = 0xD9,
     G_MTX = 0xDA,
+    G_MOVEWORD = 0xDB,
+    G_MOVEMEM = 0xDC,
     G_LOAD_UCODE = 0xDD,
     G_DL = 0xDE,
     G_ENDDL = 0xDF,
@@ -64,6 +66,7 @@ impl GBIDefinition for F3DEX2 {
     fn setup(gbi: &mut GBI) {
         gbi.register(F3DEX2::G_MTX as usize, F3DEX2::gsp_matrix);
         gbi.register(F3DEX2::G_POPMTX as usize, F3DEX2::gsp_pop_matrix);
+        gbi.register(F3DEX2::G_MOVEMEM as usize, F3DEX2::gsp_movemem);
         gbi.register(F3DEX2::G_GEOMETRYMODE as usize, F3DEX2::gsp_geometry_mode);
         gbi.register(F3DEX2::G_DL as usize, F3DEX2::sub_dl);
         gbi.register(F3DEX2::G_ENDDL as usize, |_, _, _, _| GBIResult::Return);
@@ -88,19 +91,19 @@ impl F3DEX2 {
             }
         } else {
             // Modelview matrix
-            if params & G_MTX::PUSH as usize != 0 && rsp.matrix_stack_index < MATRIX_STACK_SIZE {
+            if params & G_MTX::PUSH as usize != 0 && rsp.matrix_stack_pointer < MATRIX_STACK_SIZE {
                 // Push a copy of the current matrix onto the stack
-                rsp.matrix_stack_index += 1;
-                let source = rsp.matrix_stack[rsp.matrix_stack_index - 2].clone();
-                rsp.matrix_stack[rsp.matrix_stack_index - 1].clone_from(&source);
+                rsp.matrix_stack_pointer += 1;
+                let source = rsp.matrix_stack[rsp.matrix_stack_pointer - 2].clone();
+                rsp.matrix_stack[rsp.matrix_stack_pointer - 1].clone_from(&source);
             }
 
             if params & G_MTX::LOAD as usize != 0 {
                 // Load the input matrix into the current matrix
-                rsp.matrix_stack[rsp.matrix_stack_index - 1].clone_from(&matrix);
+                rsp.matrix_stack[rsp.matrix_stack_pointer - 1].clone_from(&matrix);
             } else {
                 // Multiply the current matrix with the input matrix
-                rsp.matrix_stack[rsp.matrix_stack_index - 1] *= matrix;
+                rsp.matrix_stack[rsp.matrix_stack_pointer - 1] *= matrix;
             }
 
             // Clear the MVP light valid flag
@@ -108,8 +111,7 @@ impl F3DEX2 {
         }
 
         // Recalculate the modelview projection matrix
-        rsp.modelview_projection_matrix =
-            rsp.projection_matrix * rsp.matrix_stack[rsp.matrix_stack_index - 1];
+        rsp.calculate_mvp_matrix();
 
         GBIResult::Continue
     }
@@ -126,9 +128,9 @@ impl F3DEX2 {
         // Pop the specified number of matrices
         for _ in 0..num_matrices_to_pop {
             // Check if there are matrices left to pop
-            if rsp.matrix_stack_index > 0 {
+            if rsp.matrix_stack_pointer > 0 {
                 // Decrement the matrix stack index
-                rsp.matrix_stack_index -= 1;
+                rsp.matrix_stack_pointer -= 1;
             }
         }
 
@@ -136,9 +138,32 @@ impl F3DEX2 {
         rsp.clear_mvp_light_valid();
 
         // Recalculate the modelview projection matrix
-        if rsp.matrix_stack_index > 0 {
-            rsp.modelview_projection_matrix =
-                rsp.projection_matrix * rsp.matrix_stack[rsp.matrix_stack_index - 1];
+        rsp.calculate_mvp_matrix();
+
+        GBIResult::Continue
+    }
+
+    pub fn gsp_movemem(rdp: &mut RDP, rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
+        let index = get_cmd(w0, 0, 8);
+        let offset = get_cmd(w0, 8, 8) * 8;
+        let addr = get_segmented_address(w1);
+
+        match index {
+            index if index == G_MV::VIEWPORT as usize => {
+                let viewport_data = addr as *const Viewport;
+                let viewport = unsafe { &*viewport_data };
+                rdp.calculate_and_set_viewport(*viewport);
+            }
+            index if index == G_MV::LIGHT as usize => {
+                let light_index = offset / 24 - 2;
+                if light_index < MAX_LIGHTS {
+                    let light_data = addr as *const Light;
+                    let light = unsafe { &*light_data };
+                    rsp.lights[light_index] = *light;
+                }
+            }
+            // TODO: HANDLE G_MV_LOOKATY & G_MV_LOOKATX
+            _ => println!("Unknown movemem index: {}", index),
         }
 
         GBIResult::Continue
