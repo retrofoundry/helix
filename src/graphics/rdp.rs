@@ -33,6 +33,16 @@ impl OutputDimensions {
     };
 }
 
+pub struct RenderingState {
+    pub depth_test: bool,
+    pub depth_mask: bool,
+    pub decal_mode: bool,
+    pub alpha_blend: bool,
+    pub viewport: Rect,
+    pub scissor: Rect,
+    // shader program
+}
+
 pub struct RDP {
     pub viewport: Rect,
     pub output_dimensions: OutputDimensions,

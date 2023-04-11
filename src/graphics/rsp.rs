@@ -35,18 +35,20 @@ impl StagingVertex {
         clip_reject: 0,
     };
 }
-
+#[cfg(feature = "f3dex2")]
 pub enum RSPGeometry {
     G_ZBUFFER = 1 << 0,
     G_SHADE = 1 << 2,
+    G_TEXTURE_ENABLE = 0 << 0,
+    G_SHADING_SMOOTH = 1 << 21,
     G_CULL_FRONT = 1 << 9,
     G_CULL_BACK = 1 << 10,
-    G_CULL_BOTH = 1 << 9 | 1 << 10,
+    G_CULL_BOTH = Self::G_CULL_FRONT as isize | Self::G_CULL_BACK as isize,
     G_FOG = 1 << 16,
     G_LIGHTING = 1 << 17,
     G_TEXTURE_GEN = 1 << 18,
     G_TEXTURE_GEN_LINEAR = 1 << 19,
-    G_SHADING_SMOOTH = 1 << 21,
+    G_LOD = 1 << 20, /* NOT IMPLEMENTED */
     G_CLIPPING = 1 << 23,
 }
 

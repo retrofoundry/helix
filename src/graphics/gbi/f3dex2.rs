@@ -69,9 +69,10 @@ impl GBIDefinition for F3DEX2 {
         gbi.register(F3DEX2::G_MOVEMEM as usize, F3DEX2::gsp_movemem);
         gbi.register(F3DEX2::G_MOVEWORD as usize, F3DEX2::gsp_moveword);
         gbi.register(F3DEX2::G_TEXTURE as usize, F3DEX2::gsp_texture);
-        gbi.register(F3DEX2::G_TEXTURE as usize, F3DEX2::gsp_texture);
         gbi.register(F3DEX2::G_VTX as usize, F3DEX2::gsp_vertex);
         gbi.register(F3DEX2::G_DL as usize, F3DEX2::sub_dl);
+        gbi.register(F3DEX2::G_GEOMETRYMODE as usize, F3DEX2::gsp_geometry_mode);
+        gbi.register(F3DEX2::G_TRI1 as usize, F3DEX2::gsp_tri1);
         gbi.register(F3DEX2::G_ENDDL as usize, |_, _, _, _| GBIResult::Return);
     }
 }
@@ -387,6 +388,66 @@ impl F3DEX2 {
         GBIResult::Continue
     }
 
+    pub fn gsp_tri1(_rdp: &mut RDP, rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
+        let vertex_id1 = get_cmd(w0, 16, 8) / 2;
+        let vertex_id2 = get_cmd(w0, 8, 8) / 2;
+        let vertex_id3 = get_cmd(w0, 0, 8) / 2;
+
+        let vertex1 = &rsp.vertex_table[vertex_id1];
+        let vertex2 = &rsp.vertex_table[vertex_id2];
+        let vertex3 = &rsp.vertex_table[vertex_id3];
+        let vertex_array = [vertex1, vertex2, vertex3];
+
+        if (vertex1.clip_reject & vertex2.clip_reject & vertex3.clip_reject) > 0 {
+            // ...whole tri is offscreen, cull.
+            return GBIResult::Continue;
+        }
+
+        if (rsp.geometry_mode & RSPGeometry::G_CULL_BOTH as u32) > 0 {
+            let dx1 = vertex1.position[0] / vertex1.position[3]
+                - vertex2.position[0] / vertex2.position[3];
+            let dy1 = vertex1.position[1] / vertex1.position[3]
+                - vertex2.position[1] / vertex2.position[3];
+            let dx2 = vertex3.position[0] / vertex3.position[3]
+                - vertex2.position[0] / vertex2.position[3];
+            let dy2 = vertex3.position[1] / vertex3.position[3]
+                - vertex2.position[1] / vertex2.position[3];
+            let mut cross = dx1 * dy2 - dy1 * dx2;
+
+            // If any verts are past any clipping plane..
+            if (vertex1.position[3] < 0.0)
+                ^ (vertex2.position[3] < 0.0)
+                ^ (vertex3.position[3] < 0.0)
+            {
+                // If one vertex lies behind the eye, negating cross will give the correct result.
+                // If all vertices lie behind the eye, the triangle will be rejected anyway.
+                cross = -cross;
+            }
+
+            if (rsp.geometry_mode & RSPGeometry::G_CULL_BOTH as u32)
+                == RSPGeometry::G_CULL_FRONT as u32
+            {
+                if cross < 0.0 {
+                    return GBIResult::Continue;
+                }
+            } else if (rsp.geometry_mode & RSPGeometry::G_CULL_BOTH as u32)
+                == RSPGeometry::G_CULL_BACK as u32
+            {
+                if cross > 0.0 {
+                    return GBIResult::Continue;
+                }
+            } else {
+                // TODO: Safe to ignore?
+                return GBIResult::Continue;
+            }
+        }
+
+        // TODO: Produce draw calls for RDP to process later?
+        let depth_test = rsp.geometry_mode & RSPGeometry::G_ZBUFFER as u32 == RSPGeometry::G_ZBUFFER as u32;
+
+        GBIResult::Continue
+    }
+
     pub fn sub_dl(_rdp: &mut RDP, _rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
         if get_cmd(w0, 16, 1) == 0 {
             // Push return address
@@ -406,7 +467,7 @@ fn calculate_normal_dir(light: &Light, matrix: &Mat4, coeffs: &mut Vec3A) {
         light.dir[2] as f32 / 127.0,
     );
 
-    // transmpose and multiply by light dir
+    // transpose and multiply by light dir
     coeffs[0] = matrix.col(0).xyz().dot(light_dir.into());
     coeffs[1] = matrix.col(1).xyz().dot(light_dir.into());
     coeffs[2] = matrix.col(2).xyz().dot(light_dir.into());
