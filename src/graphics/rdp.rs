@@ -41,6 +41,7 @@ pub struct RenderingState {
     pub viewport: Rect,
     pub scissor: Rect,
     // shader program
+    
 }
 
 pub struct RDP {

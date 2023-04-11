@@ -6,8 +6,8 @@ use super::{
 
 pub struct RCP {
     gbi: GBI,
-    rdp: RDP,
-    rsp: RSP,
+    pub rdp: RDP,
+    pub rsp: RSP,
 }
 
 impl RCP {
@@ -68,4 +68,18 @@ impl RCP {
             commands = unsafe { commands.add(1) };
         }
     }
+}
+
+// MARK: C Bridge
+
+#[no_mangle]
+pub extern "C" fn RCPReset(rcp: Option<&mut RCP>) {
+    let rcp = rcp.unwrap();
+    rcp.reset();
+}
+
+#[no_mangle]
+pub extern "C" fn RCPCreate() -> Box<RCP> {
+    let rcp = RCP::new();
+    Box::new(rcp)
 }
