@@ -53,6 +53,14 @@ pub enum G_MTX {
     PROJECTION = 0x04,
 }
 
+/*
+ * MOVEMEM indices
+ *
+ * Each of these indexes an entry in a dmem table
+ * which points to a 1-4 word block of dmem in
+ * which to store a 1-4 word DMA.
+ *
+ */
 #[cfg(feature = "f3dex2")]
 #[derive(PartialEq, Eq)]
 pub enum G_MV {
@@ -61,4 +69,37 @@ pub enum G_MV {
     VIEWPORT = 8,
     LIGHT = 10,
     POINT = 12,
+    O_LOOKATX = 0 * 24,
+    O_LOOKATY = 1 * 24,
+    O_L0 = 2 * 24,
+    O_L1 = 3 * 24,
+    O_L2 = 4 * 24,
+    O_L3 = 5 * 24,
+    O_L4 = 6 * 24,
+    O_L5 = 7 * 24,
+    O_L6 = 8 * 24,
+    O_L7 = 9 * 24,
+}
+
+/*
+ * MOVEWORD indices
+ *
+ * Each of these indexes an entry in a dmem table
+ * which points to a word in dmem in dmem where
+ * an immediate word will be stored.
+ *
+ */
+#[derive(PartialEq, Eq)]
+pub enum G_MW {
+    MATRIX = 0x00, /* NOTE: also used by movemem */
+    NUMLIGHT = 0x02,
+    CLIP = 0x04,
+    SEGMENT = 0x06,
+    FOG = 0x08,
+    LIGHTCOL = 0x0A,
+    #[cfg(feature = "f3dex2")]
+    FORCEMTX = 0x0C,
+    #[cfg(not(feature = "f3dex2"))]
+    POINTS = 0x0C,
+    PERSPNORM = 0x0E,
 }

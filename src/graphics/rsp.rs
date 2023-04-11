@@ -18,7 +18,11 @@ pub struct RSP {
     pub modelview_projection_matrix: Mat4,
 
     pub lights_valid: bool,
+    pub num_lights: u8,
     pub lights: [Light; MAX_LIGHTS + 1],
+
+    pub fog_multiplier: i16,
+    pub fog_offset: i16,
 }
 
 impl RSP {
@@ -34,13 +38,17 @@ impl RSP {
             modelview_projection_matrix: Mat4::ZERO,
 
             lights_valid: true,
+            num_lights: 0,
             lights: [Light::ZERO; MAX_LIGHTS + 1],
+
+            fog_multiplier: 0,
+            fog_offset: 0,
         }
     }
 
     pub fn reset(&mut self) {
         self.matrix_stack_pointer = 1;
-        self.clear_mvp_light_valid();
+        self.set_num_lights(2);
     }
 
     pub fn clear_mvp_light_valid(&mut self) {
@@ -54,5 +62,10 @@ impl RSP {
                 self.projection_matrix * self.matrix_stack[self.matrix_stack_pointer - 1];
             self.mvp_valid = true;
         }
+    }
+
+    pub fn set_num_lights(&mut self, num_lights: u8) {
+        self.num_lights = num_lights;
+        self.lights_valid = false;
     }
 }

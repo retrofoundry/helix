@@ -2,7 +2,7 @@ use glam::Mat4;
 use std::slice;
 
 use super::super::{rdp::RDP, rsp::RSP};
-use super::defines::{Light, Viewport, G_MTX, G_MV};
+use super::defines::{Light, Viewport, G_MTX, G_MV, G_MW};
 use super::utils::{get_cmd, get_segmented_address};
 use super::{GBIDefinition, GBIResult, GBI};
 use crate::extensions::glam::FromFixedPoint;
@@ -67,6 +67,7 @@ impl GBIDefinition for F3DEX2 {
         gbi.register(F3DEX2::G_MTX as usize, F3DEX2::gsp_matrix);
         gbi.register(F3DEX2::G_POPMTX as usize, F3DEX2::gsp_pop_matrix);
         gbi.register(F3DEX2::G_MOVEMEM as usize, F3DEX2::gsp_movemem);
+        gbi.register(F3DEX2::G_MOVEWORD as usize, F3DEX2::gsp_moveword);
         gbi.register(F3DEX2::G_GEOMETRYMODE as usize, F3DEX2::gsp_geometry_mode);
         gbi.register(F3DEX2::G_DL as usize, F3DEX2::sub_dl);
         gbi.register(F3DEX2::G_ENDDL as usize, |_, _, _, _| GBIResult::Return);
@@ -144,25 +145,43 @@ impl F3DEX2 {
     }
 
     pub fn gsp_movemem(rdp: &mut RDP, rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
-        let index = get_cmd(w0, 0, 8);
-        let offset = get_cmd(w0, 8, 8) * 8;
-        let addr = get_segmented_address(w1);
+        let index: u8 = get_cmd(w0, 0, 8) as u8;
+        let offset: u8 = get_cmd(w0, 8, 8) as u8 * 8;
+        let data = get_segmented_address(w1);
 
         match index {
-            index if index == G_MV::VIEWPORT as usize => {
-                let viewport_data = addr as *const Viewport;
-                let viewport = unsafe { &*viewport_data };
+            index if index == G_MV::VIEWPORT as u8 => {
+                let viewport_ptr = data as *const Viewport;
+                let viewport = unsafe { &*viewport_ptr };
                 rdp.calculate_and_set_viewport(*viewport);
             }
-            index if index == G_MV::LIGHT as usize => {
-                let light_index = (offset as isize / 24) - 2;
+            index if index == G_MV::LIGHT as u8 => {
+                let light_index = (offset as i8 / 24) - 2;
                 if light_index >= 0 && (light_index as usize) < MAX_LIGHTS {
-                    let light_data = addr as *const Light;
-                    let light = unsafe { &*light_data };
+                    let light_ptr = data as *const Light;
+                    let light = unsafe { &*light_ptr };
                     rsp.lights[light_index as usize] = *light;
                 }
             }
             // TODO: HANDLE G_MV_LOOKATY & G_MV_LOOKATX
+            _ => println!("Unknown movemem index: {}", index),
+        }
+
+        GBIResult::Continue
+    }
+
+    pub fn gsp_moveword(_rdp: &mut RDP, rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
+        let index = get_cmd(w0, 16, 8) as u8;
+        let _offset: u16 = get_cmd(w0, 0, 16) as u16;
+        let data = get_segmented_address(w1);
+
+        match index {
+            index if index == G_MW::NUMLIGHT as u8 => rsp.set_num_lights((data / 24 + 1) as u8),
+            index if index == G_MW::FOG as u8 => {
+                rsp.fog_multiplier = (data >> 16) as i16;
+                rsp.fog_offset = data as i16;
+            }
+            // TODO: HANDLE G_MW_SEGMENT
             _ => println!("Unknown movemem index: {}", index),
         }
 
