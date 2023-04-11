@@ -68,6 +68,7 @@ impl GBIDefinition for F3DEX2 {
         gbi.register(F3DEX2::G_POPMTX as usize, F3DEX2::gsp_pop_matrix);
         gbi.register(F3DEX2::G_MOVEMEM as usize, F3DEX2::gsp_movemem);
         gbi.register(F3DEX2::G_MOVEWORD as usize, F3DEX2::gsp_moveword);
+        gbi.register(F3DEX2::G_TEXTURE as usize, F3DEX2::gsp_texture);
         gbi.register(F3DEX2::G_GEOMETRYMODE as usize, F3DEX2::gsp_geometry_mode);
         gbi.register(F3DEX2::G_DL as usize, F3DEX2::sub_dl);
         gbi.register(F3DEX2::G_ENDDL as usize, |_, _, _, _| GBIResult::Return);
@@ -184,6 +185,19 @@ impl F3DEX2 {
             // TODO: HANDLE G_MW_SEGMENT
             _ => println!("Unknown movemem index: {}", index),
         }
+
+        GBIResult::Continue
+    }
+
+    pub fn gsp_texture(_rdp: &mut RDP, rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
+        let scale_s = get_cmd(w1, 16, 16) as u16;
+        let scale_t = get_cmd(w1, 0, 16) as u16;
+        let _level = get_cmd(w0, 11, 3) as u8;
+        let _tile = get_cmd(w0, 8, 3) as u8;
+        let _on = get_cmd(w0, 1, 7) as u8;
+
+        rsp.texture_scaling_factor.scale_s = scale_s;
+        rsp.texture_scaling_factor.scale_t = scale_t;
 
         GBIResult::Continue
     }

@@ -7,6 +7,18 @@ pub const MATRIX_STACK_SIZE: usize = 11;
 // excluding ambient light
 pub const MAX_LIGHTS: usize = 7;
 
+pub struct TextureScalingFactor {
+    pub scale_s: u16,
+    pub scale_t: u16,
+}
+
+impl TextureScalingFactor {
+    pub const ZERO: Self = Self {
+        scale_s: 0,
+        scale_t: 0,
+    };
+}
+
 pub struct RSP {
     pub geometry_mode: u32,
     pub projection_matrix: Mat4,
@@ -23,6 +35,8 @@ pub struct RSP {
 
     pub fog_multiplier: i16,
     pub fog_offset: i16,
+
+    pub texture_scaling_factor: TextureScalingFactor,
 }
 
 impl RSP {
@@ -43,6 +57,8 @@ impl RSP {
 
             fog_multiplier: 0,
             fog_offset: 0,
+
+            texture_scaling_factor: TextureScalingFactor::ZERO,
         }
     }
 
