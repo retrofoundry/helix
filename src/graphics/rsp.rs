@@ -11,7 +11,7 @@ pub struct RSP {
     pub geometry_mode: u32,
     pub projection_matrix: Mat4,
 
-    pub matrix_stack: [Mat4; MATRIX_STACK_SIZE], // Make it fixed size
+    pub matrix_stack: [Mat4; MATRIX_STACK_SIZE],
     pub matrix_stack_pointer: usize,
 
     pub mvp_valid: bool,
@@ -38,7 +38,10 @@ impl RSP {
         }
     }
 
-    pub fn reset(&mut self) {}
+    pub fn reset(&mut self) {
+        self.matrix_stack_pointer = 1;
+        self.clear_mvp_light_valid();
+    }
 
     pub fn clear_mvp_light_valid(&mut self) {
         self.mvp_valid = false;

@@ -116,7 +116,7 @@ impl F3DEX2 {
         GBIResult::Continue
     }
 
-    pub fn gsp_pop_matrix(_rdp: &mut RDP, rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
+    pub fn gsp_pop_matrix(_rdp: &mut RDP, rsp: &mut RSP, _w0: usize, w1: usize) -> GBIResult {
         // Calculate the number of matrices to pop
         let num_matrices_to_pop = w1 / 64;
 
@@ -155,11 +155,11 @@ impl F3DEX2 {
                 rdp.calculate_and_set_viewport(*viewport);
             }
             index if index == G_MV::LIGHT as usize => {
-                let light_index = offset / 24 - 2;
-                if light_index < MAX_LIGHTS {
+                let light_index = (offset as isize / 24) - 2;
+                if light_index >= 0 && (light_index as usize) < MAX_LIGHTS {
                     let light_data = addr as *const Light;
                     let light = unsafe { &*light_data };
-                    rsp.lights[light_index] = *light;
+                    rsp.lights[light_index as usize] = *light;
                 }
             }
             // TODO: HANDLE G_MV_LOOKATY & G_MV_LOOKATX

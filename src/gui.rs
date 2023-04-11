@@ -46,7 +46,7 @@ pub struct Gui {
 }
 
 pub struct UIState {
-    last_frame: Instant,
+    last_frame_time: Instant,
 }
 
 impl Gui {
@@ -149,7 +149,7 @@ impl Gui {
         let renderer = Renderer::new(&mut imgui, &device, &queue, renderer_config);
 
         // Initial UI state
-        let last_frame = Instant::now();
+        let last_frame_time = Instant::now();
 
         Ok(Self {
             width,
@@ -162,7 +162,7 @@ impl Gui {
             platform,
             event_pump,
             imgui,
-            ui_state: UIState { last_frame },
+            ui_state: UIState { last_frame_time },
             draw_menu_callback: Box::new(draw_menu),
             rcp: RCP::new(),
         })
@@ -226,16 +226,17 @@ impl Gui {
         let now = Instant::now();
         self.imgui
             .io_mut()
-            .update_delta_time(now - self.ui_state.last_frame);
-        self.ui_state.last_frame = now;
+            .update_delta_time(now - self.ui_state.last_frame_time);
+        self.ui_state.last_frame_time = now;
 
         // Get the ImGui context and begin drawing the frame
         self.platform
             .prepare_frame(&mut self.imgui, &self.window, &self.event_pump);
+    }
 
+    fn render(&mut self) -> Result<()> {
         // Begin drawing UI
         let ui = self.imgui.frame();
-
         ui.main_menu_bar(|| {
             (self.draw_menu_callback)(ui);
         });
@@ -247,9 +248,7 @@ impl Gui {
         // Demo window for now
         let mut opened = true;
         ui.show_metrics_window(&mut opened);
-    }
 
-    fn render(&mut self) -> Result<()> {
         // Get the output frame
         let frame = self.surface.get_current_texture()?;
 
