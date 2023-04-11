@@ -45,6 +45,19 @@ impl FromFixedPoint for Mat4 {
     }
 }
 
+pub trait NormalizeInPlace {
+    fn normalize_in_place(&mut self);
+}
+
+impl NormalizeInPlace for glam::Vec3A {
+    fn normalize_in_place(&mut self) {
+        let magnitude = self.length();
+        self[0] /= magnitude;
+        self[1] /= magnitude;
+        self[2] /= magnitude;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use approx::assert_relative_eq;

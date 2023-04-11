@@ -71,6 +71,11 @@ impl RDP {
         self.viewport_or_scissor_changed = true;
     }
 
+    pub fn adjust_x_for_viewport(&self, x: f32) -> f32 {
+        x * (4.0 / 3.0)
+            / (self.output_dimensions.width as f32 / self.output_dimensions.height as f32)
+    }
+
     // MARK: - Helpers
 
     fn scaled_x(&self) -> f32 {

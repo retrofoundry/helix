@@ -1,8 +1,9 @@
-use glam::Mat4;
+use glam::{Mat4, Vec3A, Vec4};
 
 use super::gbi::defines::Light;
 
 pub const MATRIX_STACK_SIZE: usize = 11;
+const MAX_VERTICES: usize = 64;
 
 // excluding ambient light
 pub const MAX_LIGHTS: usize = 7;
@@ -17,6 +18,36 @@ impl TextureScalingFactor {
         scale_s: 0,
         scale_t: 0,
     };
+}
+
+pub struct StagingVertex {
+    pub position: Vec4,
+    pub uv: [f32; 2],
+    pub color: [u8; 4],
+    pub clip_reject: u8,
+}
+
+impl StagingVertex {
+    pub const ZERO: Self = Self {
+        position: Vec4::ZERO,
+        uv: [0.0; 2],
+        color: [0; 4],
+        clip_reject: 0,
+    };
+}
+
+pub enum RSPGeometry {
+    G_ZBUFFER = 1 << 0,
+    G_SHADE = 1 << 2,
+    G_CULL_FRONT = 1 << 9,
+    G_CULL_BACK = 1 << 10,
+    G_CULL_BOTH = 1 << 9 | 1 << 10,
+    G_FOG = 1 << 16,
+    G_LIGHTING = 1 << 17,
+    G_TEXTURE_GEN = 1 << 18,
+    G_TEXTURE_GEN_LINEAR = 1 << 19,
+    G_SHADING_SMOOTH = 1 << 21,
+    G_CLIPPING = 1 << 23,
 }
 
 pub struct RSP {
@@ -37,6 +68,11 @@ pub struct RSP {
     pub fog_offset: i16,
 
     pub texture_scaling_factor: TextureScalingFactor,
+
+    pub vertex_table: [StagingVertex; MAX_VERTICES],
+
+    pub lights_coeffs: [Vec3A; MAX_LIGHTS],
+    pub lookat_coeffs: [Vec3A; 2], // lookat_x, lookat_y
 }
 
 impl RSP {
@@ -59,6 +95,11 @@ impl RSP {
             fog_offset: 0,
 
             texture_scaling_factor: TextureScalingFactor::ZERO,
+
+            vertex_table: [StagingVertex::ZERO; MAX_VERTICES],
+
+            lights_coeffs: [Vec3A::ZERO; MAX_LIGHTS],
+            lookat_coeffs: [Vec3A::ZERO; 2],
         }
     }
 

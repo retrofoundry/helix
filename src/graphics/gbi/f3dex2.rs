@@ -1,12 +1,12 @@
-use glam::Mat4;
+use glam::{Mat4, Vec3A, Vec4, Vec4Swizzles};
 use std::slice;
 
 use super::super::{rdp::RDP, rsp::RSP};
-use super::defines::{Light, Viewport, G_MTX, G_MV, G_MW};
+use super::defines::{Light, Viewport, Vtx, G_MTX, G_MV, G_MW};
 use super::utils::{get_cmd, get_segmented_address};
 use super::{GBIDefinition, GBIResult, GBI};
-use crate::extensions::glam::FromFixedPoint;
-use crate::graphics::rsp::{MATRIX_STACK_SIZE, MAX_LIGHTS};
+use crate::extensions::glam::{FromFixedPoint, NormalizeInPlace};
+use crate::graphics::rsp::{RSPGeometry, MATRIX_STACK_SIZE, MAX_LIGHTS};
 
 pub enum F3DEX2 {
     // DMA
@@ -69,7 +69,8 @@ impl GBIDefinition for F3DEX2 {
         gbi.register(F3DEX2::G_MOVEMEM as usize, F3DEX2::gsp_movemem);
         gbi.register(F3DEX2::G_MOVEWORD as usize, F3DEX2::gsp_moveword);
         gbi.register(F3DEX2::G_TEXTURE as usize, F3DEX2::gsp_texture);
-        gbi.register(F3DEX2::G_GEOMETRYMODE as usize, F3DEX2::gsp_geometry_mode);
+        gbi.register(F3DEX2::G_TEXTURE as usize, F3DEX2::gsp_texture);
+        gbi.register(F3DEX2::G_VTX as usize, F3DEX2::gsp_vertex);
         gbi.register(F3DEX2::G_DL as usize, F3DEX2::sub_dl);
         gbi.register(F3DEX2::G_ENDDL as usize, |_, _, _, _| GBIResult::Return);
     }
@@ -196,8 +197,182 @@ impl F3DEX2 {
         let _tile = get_cmd(w0, 8, 3) as u8;
         let _on = get_cmd(w0, 1, 7) as u8;
 
+        // TODO: Handle using tile descriptors?
         rsp.texture_scaling_factor.scale_s = scale_s;
         rsp.texture_scaling_factor.scale_t = scale_t;
+
+        GBIResult::Continue
+    }
+
+    pub fn gsp_vertex(rdp: &mut RDP, rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
+        let vertex_count = get_cmd(w0, 12, 8);
+        let mut write_index = get_cmd(w0, 1, 7) - get_cmd(w0, 12, 8);
+        let vertices = get_segmented_address(w1) as *const Vtx;
+
+        for i in 0..vertex_count {
+            let vertex = unsafe { &(*vertices.offset(i as isize)).vertex };
+            let vertex_normal = unsafe { &(*vertices.offset(i as isize)).normal };
+            let staging_vertex = &mut rsp.vertex_table[write_index as usize];
+
+            let mut x = rsp.modelview_projection_matrix.row(0).dot(Vec4::new(
+                vertex.position[0] as f32,
+                vertex.position[1] as f32,
+                vertex.position[2] as f32,
+                1.0,
+            ));
+
+            let y = rsp.modelview_projection_matrix.row(1).dot(Vec4::new(
+                vertex.position[0] as f32,
+                vertex.position[1] as f32,
+                vertex.position[2] as f32,
+                1.0,
+            ));
+
+            let z = rsp.modelview_projection_matrix.row(2).dot(Vec4::new(
+                vertex.position[0] as f32,
+                vertex.position[1] as f32,
+                vertex.position[2] as f32,
+                1.0,
+            ));
+
+            let w = rsp.modelview_projection_matrix.row(3).dot(Vec4::new(
+                vertex.position[0] as f32,
+                vertex.position[1] as f32,
+                vertex.position[2] as f32,
+                1.0,
+            ));
+
+            x = rdp.adjust_x_for_viewport(x);
+
+            let mut U = ((vertex.texture_coords[0] as i32)
+                * (rsp.texture_scaling_factor.scale_s as i32)
+                >> 16) as i16;
+            let mut V = ((vertex.texture_coords[1] as i32)
+                * (rsp.texture_scaling_factor.scale_t as i32)
+                >> 16) as i16;
+
+            if rsp.geometry_mode & RSPGeometry::G_LIGHTING as u32 > 0 {
+                if !rsp.lights_valid {
+                    for i in 0..rsp.num_lights - 1 {
+                        calculate_normal_dir(
+                            &rsp.lights[i as usize],
+                            &rsp.matrix_stack[rsp.matrix_stack_pointer as usize - 1],
+                            &mut rsp.lights_coeffs[i as usize],
+                        );
+                    }
+
+                    static LOOKAT_X: Light = Light::new([0, 0, 0], [0, 0, 0], [127, 0, 0]);
+                    static LOOKAT_Y: Light = Light::new([0, 0, 0], [0, 0, 0], [0, 127, 0]);
+
+                    calculate_normal_dir(
+                        &LOOKAT_X,
+                        &rsp.matrix_stack[rsp.matrix_stack_pointer as usize - 1],
+                        &mut rsp.lookat_coeffs[0],
+                    );
+
+                    calculate_normal_dir(
+                        &LOOKAT_Y,
+                        &rsp.matrix_stack[rsp.matrix_stack_pointer as usize - 1],
+                        &mut rsp.lookat_coeffs[1],
+                    );
+
+                    rsp.lights_valid = true
+                }
+
+                let mut r = rsp.lights[rsp.num_lights as usize - 1].col[0] as f32;
+                let mut g = rsp.lights[rsp.num_lights as usize - 1].col[1] as f32;
+                let mut b = rsp.lights[rsp.num_lights as usize - 1].col[2] as f32;
+
+                for i in 0..rsp.num_lights - 1 {
+                    let mut intensity = rsp.lights_coeffs[i as usize].dot(Vec3A::new(
+                        vertex_normal.normal[0] as f32,
+                        vertex_normal.normal[1] as f32,
+                        vertex_normal.normal[2] as f32,
+                    ));
+
+                    intensity /= 127.0;
+
+                    if intensity > 0.0 {
+                        r += intensity * rsp.lights[i as usize].col[0] as f32;
+                        g += intensity * rsp.lights[i as usize].col[1] as f32;
+                        b += intensity * rsp.lights[i as usize].col[2] as f32;
+                    }
+                }
+
+                staging_vertex.color[0] = if r > 255.0 { 255 } else { r as u8 };
+                staging_vertex.color[1] = if g > 255.0 { 255 } else { g as u8 };
+                staging_vertex.color[2] = if b > 255.0 { 255 } else { b as u8 };
+
+                if rsp.geometry_mode & RSPGeometry::G_TEXTURE_GEN as u32 > 0 {
+                    let dotx = rsp.lookat_coeffs[0 as usize].dot(Vec3A::new(
+                        vertex_normal.normal[0] as f32,
+                        vertex_normal.normal[1] as f32,
+                        vertex_normal.normal[2] as f32,
+                    ));
+
+                    let doty = rsp.lookat_coeffs[1 as usize].dot(Vec3A::new(
+                        vertex_normal.normal[0] as f32,
+                        vertex_normal.normal[1] as f32,
+                        vertex_normal.normal[2] as f32,
+                    ));
+
+                    U = ((dotx / 127.0 + 1.0) / 4.0) as i16
+                        * rsp.texture_scaling_factor.scale_s as i16;
+                    V = ((doty / 127.0 + 1.0) / 4.0) as i16
+                        * rsp.texture_scaling_factor.scale_t as i16;
+                }
+            } else {
+                staging_vertex.color[0] = vertex.color[0];
+                staging_vertex.color[1] = vertex.color[1];
+                staging_vertex.color[2] = vertex.color[2];
+            }
+
+            staging_vertex.uv[0] = U as f32;
+            staging_vertex.uv[1] = V as f32;
+
+            // trivial clip rejection
+            staging_vertex.clip_reject = 0;
+            if x < -w {
+                staging_vertex.clip_reject |= 1;
+            }
+            if x > w {
+                staging_vertex.clip_reject |= 2;
+            }
+            if y < -w {
+                staging_vertex.clip_reject |= 4;
+            }
+            if y > w {
+                staging_vertex.clip_reject |= 8;
+            }
+            if z < -w {
+                staging_vertex.clip_reject |= 16;
+            }
+            if z > w {
+                staging_vertex.clip_reject |= 32;
+            }
+
+            staging_vertex.position[0] = x;
+            staging_vertex.position[1] = y;
+            staging_vertex.position[2] = z;
+            staging_vertex.position[3] = w;
+
+            if rsp.geometry_mode & RSPGeometry::G_FOG as u32 > 0 {
+                let w = if w.abs() < 0.001 { 0.001 } else { w };
+
+                let winv = 1.0 / w;
+                let winv = if winv < 0.0 { 32767.0 } else { winv };
+
+                let fog = z * winv * rsp.fog_multiplier as f32 + rsp.fog_offset as f32;
+                let fog = if fog < 0.0 { 0.0 } else { fog };
+                let fog = if fog > 255.0 { 255.0 } else { fog };
+
+                staging_vertex.color[3] = fog as u8;
+            } else {
+                staging_vertex.color[3] = vertex.color[3];
+            }
+
+            write_index += 1;
+        }
 
         GBIResult::Continue
     }
@@ -222,4 +397,19 @@ impl F3DEX2 {
             return GBIResult::SetAddress(new_addr);
         }
     }
+}
+
+fn calculate_normal_dir(light: &Light, matrix: &Mat4, coeffs: &mut Vec3A) {
+    let light_dir = Vec3A::new(
+        light.dir[0] as f32 / 127.0,
+        light.dir[1] as f32 / 127.0,
+        light.dir[2] as f32 / 127.0,
+    );
+
+    // transmpose and multiply by light dir
+    coeffs[0] = matrix.col(0).xyz().dot(light_dir.into());
+    coeffs[1] = matrix.col(1).xyz().dot(light_dir.into());
+    coeffs[2] = matrix.col(2).xyz().dot(light_dir.into());
+
+    coeffs.normalize_in_place();
 }

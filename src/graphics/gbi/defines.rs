@@ -23,11 +23,11 @@ pub struct Viewport {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Light {
-    pub col: [u8; 3],
+    pub col: [u8; 3], // diffuse light value (rgba)
     pad1: i8,
-    pub colc: [u8; 3],
+    pub colc: [u8; 3], // copy of diffuse light value (rgba)
     pad2: i8,
-    pub dir: [i8; 3],
+    pub dir: [i8; 3], // direction of light (normalized)
     pad3: i8,
 }
 
@@ -40,6 +40,44 @@ impl Light {
         dir: [0, 0, 0],
         pad3: 0,
     };
+
+    pub const fn new(col: [u8; 3], colc: [u8; 3], dir: [i8; 3]) -> Self {
+        Self {
+            col,
+            pad1: 0,
+            colc,
+            pad2: 0,
+            dir,
+            pad3: 0,
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union Vtx {
+    pub vertex: Vtx_t,
+    pub normal: Vtx_tn,
+    force_structure_alignment: i64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Vtx_t {
+    pub position: [i16; 3], // in object space
+    flag: u16,              // unused
+    pub texture_coords: [i16; 2],
+    pub color: [u8; 4],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Vtx_tn {
+    pub position: [i16; 3], // in object space
+    flag: u16,              // unused
+    pub texture_coords: [i16; 2],
+    pub normal: [i8; 3],
+    pub alpha: u8,
 }
 
 #[cfg(feature = "f3dex2")]
