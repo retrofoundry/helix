@@ -25,6 +25,8 @@ void RCPReset(void* rcp);
 
 // F3DEX2 Commands
 void F3DEX2_GSPMatrix(void* rcp, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GSPPopMatrix(void* rcp, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GSPVertex(void* rcp, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GSPMoveWord(void* rcp, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GSPMoveMem(void* rcp, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GSPTexture(void* rcp, uintptr_t w0, uintptr_t w1);
@@ -51,6 +53,10 @@ Light_t* RSPGetLightAtIndexPtr(void* rcp, uint8_t index);
 uint16_t RSPGetTextureScalingFactorS(void* rcp);
 uint16_t RSPGetTextureScalingFactorT(void* rcp);
 
+uintptr_t RSPGetMatrixStackPointer(void* rcp);
+float (*RSPGetMatrixAtIndex(void* rcp, uint8_t index))[4][4];
+float (*RSPGetModelViewProjectionMatrix(void* rcp))[4][4];
+
 // RDP Getters and Setters
 void RDPSetOutputDimensions(void* rcp, struct OutputDimensions dimensions);
 
@@ -60,7 +66,6 @@ void RDPSetViewportOrScissorChanged(void* rcp, bool value);
 struct Rect RDPGetViewport(void* rcp);
 struct Rect* RDPGetViewportPtr(void* rcp);
 void RDPSetViewport(void* rcp, struct Rect viewport);
-
 
 #ifdef __cplusplus
 }

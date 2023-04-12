@@ -1,5 +1,7 @@
 use glam::{Mat4, Vec3A, Vec4};
 
+use crate::extensions::matrix::matrix_multiply;
+
 use super::gbi::defines::Light;
 
 pub const MATRIX_STACK_SIZE: usize = 11;
@@ -54,13 +56,12 @@ pub enum RSPGeometry {
 
 pub struct RSP {
     pub geometry_mode: u32,
-    pub projection_matrix: Mat4,
+    pub projection_matrix: [[f32; 4]; 4],
 
-    pub matrix_stack: [Mat4; MATRIX_STACK_SIZE],
+    pub matrix_stack: [[[f32; 4]; 4]; MATRIX_STACK_SIZE],
     pub matrix_stack_pointer: usize,
 
-    pub mvp_valid: bool,
-    pub modelview_projection_matrix: Mat4,
+    pub modelview_projection_matrix: [[f32; 4]; 4],
 
     pub lights_valid: bool,
     pub num_lights: u8,
@@ -81,13 +82,12 @@ impl RSP {
     pub fn new() -> Self {
         RSP {
             geometry_mode: 0,
-            projection_matrix: Mat4::ZERO,
+            projection_matrix: [[0.0; 4]; 4],
 
-            matrix_stack: [Mat4::ZERO; MATRIX_STACK_SIZE],
+            matrix_stack: [[[0.0; 4]; 4]; MATRIX_STACK_SIZE],
             matrix_stack_pointer: 0,
 
-            mvp_valid: true,
-            modelview_projection_matrix: Mat4::ZERO,
+            modelview_projection_matrix: [[0.0; 4]; 4],
 
             lights_valid: true,
             num_lights: 0,
@@ -110,17 +110,12 @@ impl RSP {
         self.set_num_lights(2);
     }
 
-    pub fn clear_mvp_light_valid(&mut self) {
-        self.mvp_valid = false;
-        self.lights_valid = false;
-    }
-
-    pub fn calculate_mvp_matrix(&mut self) {
-        if !self.mvp_valid {
-            self.modelview_projection_matrix =
-                self.projection_matrix * self.matrix_stack[self.matrix_stack_pointer - 1];
-            self.mvp_valid = true;
-        }
+    pub fn recompute_mvp_matrix(&mut self) {
+        self.modelview_projection_matrix
+            .copy_from_slice(&matrix_multiply(
+                &self.matrix_stack[self.matrix_stack_pointer - 1],
+                &self.projection_matrix,
+            ));
     }
 
     pub fn set_num_lights(&mut self, num_lights: u8) {

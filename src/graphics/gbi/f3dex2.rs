@@ -1,11 +1,17 @@
 use glam::{Mat4, Vec3A, Vec4, Vec4Swizzles};
 use std::slice;
 
-use super::super::{rdp::RDP, rsp::{RSP, RSPGeometry, MATRIX_STACK_SIZE, MAX_LIGHTS}};
+use super::super::{
+    rdp::RDP,
+    rsp::{RSPGeometry, MATRIX_STACK_SIZE, MAX_LIGHTS, RSP},
+};
 use super::defines::{Light, Viewport, Vtx, G_MTX, G_MV, G_MW};
 use super::utils::{get_cmd, get_segmented_address};
 use super::{GBIDefinition, GBIResult, GBI};
-use crate::{extensions::glam::{FromFixedPoint, NormalizeInPlace}};
+use crate::extensions::{
+    glam::{FromFixedPoint, NormalizeInPlace},
+    matrix::{matrix_from_fixed_point, matrix_multiply},
+};
 
 pub enum F3DEX2 {
     // DMA
@@ -68,7 +74,7 @@ impl GBIDefinition for F3DEX2 {
         gbi.register(F3DEX2::G_MOVEMEM as usize, F3DEX2::gsp_movemem);
         gbi.register(F3DEX2::G_MOVEWORD as usize, F3DEX2::gsp_moveword);
         gbi.register(F3DEX2::G_TEXTURE as usize, F3DEX2::gsp_texture);
-        gbi.register(F3DEX2::G_VTX as usize, F3DEX2::gsp_vertex);
+        // gbi.register(F3DEX2::G_VTX as usize, F3DEX2::gsp_vertex);
         gbi.register(F3DEX2::G_DL as usize, F3DEX2::sub_dl);
         gbi.register(F3DEX2::G_GEOMETRYMODE as usize, F3DEX2::gsp_geometry_mode);
         gbi.register(F3DEX2::G_TRI1 as usize, F3DEX2::gsp_tri1);
@@ -78,53 +84,58 @@ impl GBIDefinition for F3DEX2 {
 
 impl F3DEX2 {
     pub fn gsp_matrix(_rdp: &mut RDP, rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
-        let params = get_cmd(w0, 0, 8) ^ G_MTX::PUSH as usize;
+        let params = get_cmd(w0, 0, 8) as u8 ^ G_MTX::PUSH as u8;
 
         let addr = get_segmented_address(w1) as *const i32;
         let slice = unsafe { slice::from_raw_parts(addr, 16) };
-        let matrix = Mat4::from_fixed_point(slice);
+        let matrix = matrix_from_fixed_point(slice);
 
-        if params & G_MTX::PROJECTION as usize != 0 {
-            if (params & G_MTX::LOAD as usize) != 0 {
+        if params & G_MTX::PROJECTION as u8 != 0 {
+            if (params & G_MTX::LOAD as u8) != 0 {
                 // Load the input matrix into the projection matrix
-                rsp.projection_matrix = matrix;
+                rsp.projection_matrix.copy_from_slice(&matrix);
             } else {
                 // Multiply the current projection matrix with the input matrix
-                rsp.projection_matrix *= matrix;
+                let result = matrix_multiply(&matrix, &rsp.projection_matrix);
+                rsp.projection_matrix.copy_from_slice(&result);
             }
         } else {
             // Modelview matrix
-            if params & G_MTX::PUSH as usize != 0 && rsp.matrix_stack_pointer < MATRIX_STACK_SIZE {
+            if params & G_MTX::PUSH as u8 != 0 && rsp.matrix_stack_pointer < MATRIX_STACK_SIZE {
                 // Push a copy of the current matrix onto the stack
                 rsp.matrix_stack_pointer += 1;
-                let source = rsp.matrix_stack[rsp.matrix_stack_pointer - 2].clone();
-                rsp.matrix_stack[rsp.matrix_stack_pointer - 1].clone_from(&source);
+
+                let src_index = rsp.matrix_stack_pointer - 2;
+                let dst_index = rsp.matrix_stack_pointer - 1;
+                let (left, right) = rsp.matrix_stack.split_at_mut(dst_index);
+                right[0].copy_from_slice(&left[src_index]);
             }
 
-            if params & G_MTX::LOAD as usize != 0 {
+            if params & G_MTX::LOAD as u8 != 0 {
                 // Load the input matrix into the current matrix
-                rsp.matrix_stack[rsp.matrix_stack_pointer - 1].clone_from(&matrix);
+                rsp.matrix_stack[rsp.matrix_stack_pointer - 1].copy_from_slice(&matrix);
             } else {
                 // Multiply the current matrix with the input matrix
-                rsp.matrix_stack[rsp.matrix_stack_pointer - 1] *= matrix;
+                let result =
+                    matrix_multiply(&matrix, &rsp.matrix_stack[rsp.matrix_stack_pointer - 1]);
+                rsp.matrix_stack[rsp.matrix_stack_pointer - 1].copy_from_slice(&result);
             }
 
-            // Clear the MVP light valid flag
-            rsp.clear_mvp_light_valid();
+            // Clear the lights_valid flag
+            rsp.lights_valid = false;
         }
 
         // Recalculate the modelview projection matrix
-        rsp.calculate_mvp_matrix();
+        rsp.recompute_mvp_matrix();
 
         GBIResult::Continue
     }
 
     pub fn gsp_pop_matrix(_rdp: &mut RDP, rsp: &mut RSP, _w0: usize, w1: usize) -> GBIResult {
-        // Calculate the number of matrices to pop
         let num_matrices_to_pop = w1 / 64;
 
         // If no matrices to pop, return
-        if num_matrices_to_pop == 0 {
+        if num_matrices_to_pop == 0 || rsp.matrix_stack_pointer == 0 {
             return GBIResult::Continue;
         }
 
@@ -137,11 +148,8 @@ impl F3DEX2 {
             }
         }
 
-        // Clear the MVP and light valid flag
-        rsp.clear_mvp_light_valid();
-
         // Recalculate the modelview projection matrix
-        rsp.calculate_mvp_matrix();
+        rsp.recompute_mvp_matrix();
 
         GBIResult::Continue
     }
@@ -203,178 +211,178 @@ impl F3DEX2 {
         GBIResult::Continue
     }
 
-    pub fn gsp_vertex(rdp: &mut RDP, rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
-        let vertex_count = get_cmd(w0, 12, 8);
-        let mut write_index = get_cmd(w0, 1, 7) - get_cmd(w0, 12, 8);
-        let vertices = get_segmented_address(w1) as *const Vtx;
+    // pub fn gsp_vertex(rdp: &mut RDP, rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
+    //     let vertex_count = get_cmd(w0, 12, 8);
+    //     let mut write_index = get_cmd(w0, 1, 7) - get_cmd(w0, 12, 8);
+    //     let vertices = get_segmented_address(w1) as *const Vtx;
 
-        for i in 0..vertex_count {
-            let vertex = unsafe { &(*vertices.offset(i as isize)).vertex };
-            let vertex_normal = unsafe { &(*vertices.offset(i as isize)).normal };
-            let staging_vertex = &mut rsp.vertex_table[write_index as usize];
+    //     for i in 0..vertex_count {
+    //         let vertex = unsafe { &(*vertices.offset(i as isize)).vertex };
+    //         let vertex_normal = unsafe { &(*vertices.offset(i as isize)).normal };
+    //         let staging_vertex = &mut rsp.vertex_table[write_index as usize];
 
-            let mut x = rsp.modelview_projection_matrix.row(0).dot(Vec4::new(
-                vertex.position[0] as f32,
-                vertex.position[1] as f32,
-                vertex.position[2] as f32,
-                1.0,
-            ));
+    //         let mut x = rsp.modelview_projection_matrix.row(0).dot(Vec4::new(
+    //             vertex.position[0] as f32,
+    //             vertex.position[1] as f32,
+    //             vertex.position[2] as f32,
+    //             1.0,
+    //         ));
 
-            let y = rsp.modelview_projection_matrix.row(1).dot(Vec4::new(
-                vertex.position[0] as f32,
-                vertex.position[1] as f32,
-                vertex.position[2] as f32,
-                1.0,
-            ));
+    //         let y = rsp.modelview_projection_matrix.row(1).dot(Vec4::new(
+    //             vertex.position[0] as f32,
+    //             vertex.position[1] as f32,
+    //             vertex.position[2] as f32,
+    //             1.0,
+    //         ));
 
-            let z = rsp.modelview_projection_matrix.row(2).dot(Vec4::new(
-                vertex.position[0] as f32,
-                vertex.position[1] as f32,
-                vertex.position[2] as f32,
-                1.0,
-            ));
+    //         let z = rsp.modelview_projection_matrix.row(2).dot(Vec4::new(
+    //             vertex.position[0] as f32,
+    //             vertex.position[1] as f32,
+    //             vertex.position[2] as f32,
+    //             1.0,
+    //         ));
 
-            let w = rsp.modelview_projection_matrix.row(3).dot(Vec4::new(
-                vertex.position[0] as f32,
-                vertex.position[1] as f32,
-                vertex.position[2] as f32,
-                1.0,
-            ));
+    //         let w = rsp.modelview_projection_matrix.row(3).dot(Vec4::new(
+    //             vertex.position[0] as f32,
+    //             vertex.position[1] as f32,
+    //             vertex.position[2] as f32,
+    //             1.0,
+    //         ));
 
-            x = rdp.adjust_x_for_viewport(x);
+    //         x = rdp.adjust_x_for_viewport(x);
 
-            let mut U = ((vertex.texture_coords[0] as i32)
-                * (rsp.texture_scaling_factor.scale_s as i32)
-                >> 16) as i16;
-            let mut V = ((vertex.texture_coords[1] as i32)
-                * (rsp.texture_scaling_factor.scale_t as i32)
-                >> 16) as i16;
+    //         let mut U = ((vertex.texture_coords[0] as i32)
+    //             * (rsp.texture_scaling_factor.scale_s as i32)
+    //             >> 16) as i16;
+    //         let mut V = ((vertex.texture_coords[1] as i32)
+    //             * (rsp.texture_scaling_factor.scale_t as i32)
+    //             >> 16) as i16;
 
-            if rsp.geometry_mode & RSPGeometry::G_LIGHTING as u32 > 0 {
-                if !rsp.lights_valid {
-                    for i in 0..rsp.num_lights - 1 {
-                        calculate_normal_dir(
-                            &rsp.lights[i as usize],
-                            &rsp.matrix_stack[rsp.matrix_stack_pointer as usize - 1],
-                            &mut rsp.lights_coeffs[i as usize],
-                        );
-                    }
+    //         if rsp.geometry_mode & RSPGeometry::G_LIGHTING as u32 > 0 {
+    //             if !rsp.lights_valid {
+    //                 for i in 0..rsp.num_lights - 1 {
+    //                     calculate_normal_dir(
+    //                         &rsp.lights[i as usize],
+    //                         &rsp.matrix_stack[rsp.matrix_stack_pointer as usize - 1],
+    //                         &mut rsp.lights_coeffs[i as usize],
+    //                     );
+    //                 }
 
-                    static LOOKAT_X: Light = Light::new([0, 0, 0], [0, 0, 0], [127, 0, 0]);
-                    static LOOKAT_Y: Light = Light::new([0, 0, 0], [0, 0, 0], [0, 127, 0]);
+    //                 static LOOKAT_X: Light = Light::new([0, 0, 0], [0, 0, 0], [127, 0, 0]);
+    //                 static LOOKAT_Y: Light = Light::new([0, 0, 0], [0, 0, 0], [0, 127, 0]);
 
-                    calculate_normal_dir(
-                        &LOOKAT_X,
-                        &rsp.matrix_stack[rsp.matrix_stack_pointer as usize - 1],
-                        &mut rsp.lookat_coeffs[0],
-                    );
+    //                 calculate_normal_dir(
+    //                     &LOOKAT_X,
+    //                     &rsp.matrix_stack[rsp.matrix_stack_pointer as usize - 1],
+    //                     &mut rsp.lookat_coeffs[0],
+    //                 );
 
-                    calculate_normal_dir(
-                        &LOOKAT_Y,
-                        &rsp.matrix_stack[rsp.matrix_stack_pointer as usize - 1],
-                        &mut rsp.lookat_coeffs[1],
-                    );
+    //                 calculate_normal_dir(
+    //                     &LOOKAT_Y,
+    //                     &rsp.matrix_stack[rsp.matrix_stack_pointer as usize - 1],
+    //                     &mut rsp.lookat_coeffs[1],
+    //                 );
 
-                    rsp.lights_valid = true
-                }
+    //                 rsp.lights_valid = true
+    //             }
 
-                let mut r = rsp.lights[rsp.num_lights as usize - 1].col[0] as f32;
-                let mut g = rsp.lights[rsp.num_lights as usize - 1].col[1] as f32;
-                let mut b = rsp.lights[rsp.num_lights as usize - 1].col[2] as f32;
+    //             let mut r = rsp.lights[rsp.num_lights as usize - 1].col[0] as f32;
+    //             let mut g = rsp.lights[rsp.num_lights as usize - 1].col[1] as f32;
+    //             let mut b = rsp.lights[rsp.num_lights as usize - 1].col[2] as f32;
 
-                for i in 0..rsp.num_lights - 1 {
-                    let mut intensity = rsp.lights_coeffs[i as usize].dot(Vec3A::new(
-                        vertex_normal.normal[0] as f32,
-                        vertex_normal.normal[1] as f32,
-                        vertex_normal.normal[2] as f32,
-                    ));
+    //             for i in 0..rsp.num_lights - 1 {
+    //                 let mut intensity = rsp.lights_coeffs[i as usize].dot(Vec3A::new(
+    //                     vertex_normal.normal[0] as f32,
+    //                     vertex_normal.normal[1] as f32,
+    //                     vertex_normal.normal[2] as f32,
+    //                 ));
 
-                    intensity /= 127.0;
+    //                 intensity /= 127.0;
 
-                    if intensity > 0.0 {
-                        r += intensity * rsp.lights[i as usize].col[0] as f32;
-                        g += intensity * rsp.lights[i as usize].col[1] as f32;
-                        b += intensity * rsp.lights[i as usize].col[2] as f32;
-                    }
-                }
+    //                 if intensity > 0.0 {
+    //                     r += intensity * rsp.lights[i as usize].col[0] as f32;
+    //                     g += intensity * rsp.lights[i as usize].col[1] as f32;
+    //                     b += intensity * rsp.lights[i as usize].col[2] as f32;
+    //                 }
+    //             }
 
-                staging_vertex.color[0] = if r > 255.0 { 255 } else { r as u8 };
-                staging_vertex.color[1] = if g > 255.0 { 255 } else { g as u8 };
-                staging_vertex.color[2] = if b > 255.0 { 255 } else { b as u8 };
+    //             staging_vertex.color[0] = if r > 255.0 { 255 } else { r as u8 };
+    //             staging_vertex.color[1] = if g > 255.0 { 255 } else { g as u8 };
+    //             staging_vertex.color[2] = if b > 255.0 { 255 } else { b as u8 };
 
-                if rsp.geometry_mode & RSPGeometry::G_TEXTURE_GEN as u32 > 0 {
-                    let dotx = rsp.lookat_coeffs[0 as usize].dot(Vec3A::new(
-                        vertex_normal.normal[0] as f32,
-                        vertex_normal.normal[1] as f32,
-                        vertex_normal.normal[2] as f32,
-                    ));
+    //             if rsp.geometry_mode & RSPGeometry::G_TEXTURE_GEN as u32 > 0 {
+    //                 let dotx = rsp.lookat_coeffs[0 as usize].dot(Vec3A::new(
+    //                     vertex_normal.normal[0] as f32,
+    //                     vertex_normal.normal[1] as f32,
+    //                     vertex_normal.normal[2] as f32,
+    //                 ));
 
-                    let doty = rsp.lookat_coeffs[1 as usize].dot(Vec3A::new(
-                        vertex_normal.normal[0] as f32,
-                        vertex_normal.normal[1] as f32,
-                        vertex_normal.normal[2] as f32,
-                    ));
+    //                 let doty = rsp.lookat_coeffs[1 as usize].dot(Vec3A::new(
+    //                     vertex_normal.normal[0] as f32,
+    //                     vertex_normal.normal[1] as f32,
+    //                     vertex_normal.normal[2] as f32,
+    //                 ));
 
-                    U = ((dotx / 127.0 + 1.0) / 4.0) as i16
-                        * rsp.texture_scaling_factor.scale_s as i16;
-                    V = ((doty / 127.0 + 1.0) / 4.0) as i16
-                        * rsp.texture_scaling_factor.scale_t as i16;
-                }
-            } else {
-                staging_vertex.color[0] = vertex.color[0];
-                staging_vertex.color[1] = vertex.color[1];
-                staging_vertex.color[2] = vertex.color[2];
-            }
+    //                 U = ((dotx / 127.0 + 1.0) / 4.0) as i16
+    //                     * rsp.texture_scaling_factor.scale_s as i16;
+    //                 V = ((doty / 127.0 + 1.0) / 4.0) as i16
+    //                     * rsp.texture_scaling_factor.scale_t as i16;
+    //             }
+    //         } else {
+    //             staging_vertex.color[0] = vertex.color[0];
+    //             staging_vertex.color[1] = vertex.color[1];
+    //             staging_vertex.color[2] = vertex.color[2];
+    //         }
 
-            staging_vertex.uv[0] = U as f32;
-            staging_vertex.uv[1] = V as f32;
+    //         staging_vertex.uv[0] = U as f32;
+    //         staging_vertex.uv[1] = V as f32;
 
-            // trivial clip rejection
-            staging_vertex.clip_reject = 0;
-            if x < -w {
-                staging_vertex.clip_reject |= 1;
-            }
-            if x > w {
-                staging_vertex.clip_reject |= 2;
-            }
-            if y < -w {
-                staging_vertex.clip_reject |= 4;
-            }
-            if y > w {
-                staging_vertex.clip_reject |= 8;
-            }
-            if z < -w {
-                staging_vertex.clip_reject |= 16;
-            }
-            if z > w {
-                staging_vertex.clip_reject |= 32;
-            }
+    //         // trivial clip rejection
+    //         staging_vertex.clip_reject = 0;
+    //         if x < -w {
+    //             staging_vertex.clip_reject |= 1;
+    //         }
+    //         if x > w {
+    //             staging_vertex.clip_reject |= 2;
+    //         }
+    //         if y < -w {
+    //             staging_vertex.clip_reject |= 4;
+    //         }
+    //         if y > w {
+    //             staging_vertex.clip_reject |= 8;
+    //         }
+    //         if z < -w {
+    //             staging_vertex.clip_reject |= 16;
+    //         }
+    //         if z > w {
+    //             staging_vertex.clip_reject |= 32;
+    //         }
 
-            staging_vertex.position[0] = x;
-            staging_vertex.position[1] = y;
-            staging_vertex.position[2] = z;
-            staging_vertex.position[3] = w;
+    //         staging_vertex.position[0] = x;
+    //         staging_vertex.position[1] = y;
+    //         staging_vertex.position[2] = z;
+    //         staging_vertex.position[3] = w;
 
-            if rsp.geometry_mode & RSPGeometry::G_FOG as u32 > 0 {
-                let w = if w.abs() < 0.001 { 0.001 } else { w };
+    //         if rsp.geometry_mode & RSPGeometry::G_FOG as u32 > 0 {
+    //             let w = if w.abs() < 0.001 { 0.001 } else { w };
 
-                let winv = 1.0 / w;
-                let winv = if winv < 0.0 { 32767.0 } else { winv };
+    //             let winv = 1.0 / w;
+    //             let winv = if winv < 0.0 { 32767.0 } else { winv };
 
-                let fog = z * winv * rsp.fog_multiplier as f32 + rsp.fog_offset as f32;
-                let fog = if fog < 0.0 { 0.0 } else { fog };
-                let fog = if fog > 255.0 { 255.0 } else { fog };
+    //             let fog = z * winv * rsp.fog_multiplier as f32 + rsp.fog_offset as f32;
+    //             let fog = if fog < 0.0 { 0.0 } else { fog };
+    //             let fog = if fog > 255.0 { 255.0 } else { fog };
 
-                staging_vertex.color[3] = fog as u8;
-            } else {
-                staging_vertex.color[3] = vertex.color[3];
-            }
+    //             staging_vertex.color[3] = fog as u8;
+    //         } else {
+    //             staging_vertex.color[3] = vertex.color[3];
+    //         }
 
-            write_index += 1;
-        }
+    //         write_index += 1;
+    //     }
 
-        GBIResult::Continue
-    }
+    //     GBIResult::Continue
+    // }
 
     pub fn gsp_geometry_mode(_rdp: &mut RDP, rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
         let clear_bits = get_cmd(w0, 0, 24);
@@ -441,8 +449,8 @@ impl F3DEX2 {
         }
 
         // TODO: Produce draw calls for RDP to process later?
-        let depth_test = rsp.geometry_mode & RSPGeometry::G_ZBUFFER as u32 == RSPGeometry::G_ZBUFFER as u32;
-
+        let depth_test =
+            rsp.geometry_mode & RSPGeometry::G_ZBUFFER as u32 == RSPGeometry::G_ZBUFFER as u32;
 
         GBIResult::Continue
     }
@@ -459,7 +467,7 @@ impl F3DEX2 {
     }
 }
 
-fn calculate_normal_dir(light: &Light, matrix: &Mat4, coeffs: &mut Vec3A) {
+pub fn calculate_normal_dir(light: &Light, matrix: &Mat4, coeffs: &mut Vec3A) {
     let light_dir = Vec3A::new(
         light.dir[0] as f32 / 127.0,
         light.dir[1] as f32 / 127.0,
@@ -476,8 +484,8 @@ fn calculate_normal_dir(light: &Light, matrix: &Mat4, coeffs: &mut Vec3A) {
 
 #[cfg(test)]
 mod tests {
-    use crate::graphics::{rsp::RSP, rdp::RDP};
     use super::F3DEX2;
+    use crate::graphics::{rdp::RDP, rsp::RSP};
 
     #[test]
     fn test_moveword() {
@@ -490,7 +498,7 @@ mod tests {
 
         F3DEX2::gsp_moveword(&mut rdp, &mut rsp, w0, w1);
         assert!(rsp.num_lights == 2);
-        
+
         // FOG
         let w0: usize = 3674734592;
         let w1: usize = 279638102;

@@ -1,10 +1,26 @@
-use super::{f3dex2::F3DEX2, defines::Light};
-use super::super::{rcp::RCP, rdp::{OutputDimensions, Rect}};
+use super::super::{
+    rcp::RCP,
+    rdp::{OutputDimensions, Rect},
+};
+use super::f3dex2::calculate_normal_dir;
+use super::{defines::Light, f3dex2::F3DEX2};
 
 #[no_mangle]
 pub extern "C" fn F3DEX2_GSPMatrix(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
     let rcp = rcp.unwrap();
     F3DEX2::gsp_matrix(&mut rcp.rdp, &mut rcp.rsp, w0, w1);
+}
+
+#[no_mangle]
+pub extern "C" fn F3DEX2_GSPPopMatrix(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
+    let rcp = rcp.unwrap();
+    F3DEX2::gsp_pop_matrix(&mut rcp.rdp, &mut rcp.rsp, w0, w1);
+}
+
+#[no_mangle]
+pub extern "C" fn F3DEX2_GSPVertex(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
+    let rcp = rcp.unwrap();
+    // F3DEX2::gsp_vertex(&mut rcp.rdp, &mut rcp.rsp, w0, w1);
 }
 
 #[no_mangle]
@@ -103,6 +119,24 @@ pub extern "C" fn RSPGetTextureScalingFactorS(rcp: Option<&mut RCP>) -> u16 {
 pub extern "C" fn RSPGetTextureScalingFactorT(rcp: Option<&mut RCP>) -> u16 {
     let rcp = rcp.unwrap();
     rcp.rsp.texture_scaling_factor.scale_t
+}
+
+#[no_mangle]
+pub extern "C" fn RSPGetMatrixStackPointer(rcp: Option<&mut RCP>) -> usize {
+    let rcp = rcp.unwrap();
+    rcp.rsp.matrix_stack_pointer
+}
+
+#[no_mangle]
+pub extern "C" fn RSPGetMatrixAtIndex(rcp: Option<&mut RCP>, index: usize) -> *mut [[f32; 4]; 4] {
+    let rcp = rcp.unwrap();
+    &mut rcp.rsp.matrix_stack[index]
+}
+
+#[no_mangle]
+pub extern "C" fn RSPGetModelViewProjectionMatrix(rcp: Option<&mut RCP>) -> *mut [[f32; 4]; 4] {
+    let rcp = rcp.unwrap();
+    &mut rcp.rsp.modelview_projection_matrix
 }
 
 // RDP Getters and Setters
