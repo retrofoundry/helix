@@ -13,7 +13,7 @@ pub union Gfx {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Viewport {
     pub vscale: [i16; 4], // scale, 2 bits fraction
     pub vtrans: [i16; 4], // translate, 2 bits fraction

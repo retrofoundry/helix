@@ -3,6 +3,8 @@ use super::gbi::defines::Viewport;
 const SCREEN_WIDTH: f32 = 320.0;
 const SCREEN_HEIGHT: f32 = 240.0;
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
 pub struct Rect {
     pub x: u16,
     pub y: u16,
@@ -17,8 +19,19 @@ impl Rect {
         width: 0,
         height: 0,
     };
+
+    pub fn new(x: u16, y: u16, width: u16, height: u16) -> Self {
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
+    }
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
 pub struct OutputDimensions {
     pub width: u32,
     pub height: u32,
@@ -41,7 +54,7 @@ pub struct RenderingState {
     pub viewport: Rect,
     pub scissor: Rect,
     // shader program
-    
+
 }
 
 pub struct RDP {
@@ -90,10 +103,10 @@ impl RDP {
     // MARK: - Helpers
 
     fn scaled_x(&self) -> f32 {
-        self.viewport.width as f32 / SCREEN_WIDTH
+        self.output_dimensions.width as f32 / SCREEN_WIDTH
     }
 
     fn scaled_y(&self) -> f32 {
-        self.viewport.height as f32 / SCREEN_HEIGHT
+        self.output_dimensions.height as f32 / SCREEN_HEIGHT
     }
 }

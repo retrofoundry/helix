@@ -1,11 +1,11 @@
 use glam::{Mat4, Vec3A, Vec4, Vec4Swizzles};
 use std::slice;
 
-use super::super::{rdp::RDP, rsp::{RSP, RSPGeometry, MATRIX_STACK_SIZE, MAX_LIGHTS}, rcp::RCP};
+use super::super::{rdp::RDP, rsp::{RSP, RSPGeometry, MATRIX_STACK_SIZE, MAX_LIGHTS}};
 use super::defines::{Light, Viewport, Vtx, G_MTX, G_MV, G_MW};
 use super::utils::{get_cmd, get_segmented_address};
 use super::{GBIDefinition, GBIResult, GBI};
-use crate::extensions::glam::{FromFixedPoint, NormalizeInPlace};
+use crate::{extensions::glam::{FromFixedPoint, NormalizeInPlace}};
 
 pub enum F3DEX2 {
     // DMA
@@ -476,86 +476,3 @@ fn calculate_normal_dir(light: &Light, matrix: &Mat4, coeffs: &mut Vec3A) {
 
     coeffs.normalize_in_place();
 }
-
-// MARK: - C Bridge
-
-#[no_mangle]
-pub extern "C" fn F3DEX2_GSPMatrix(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
-    let rcp = rcp.unwrap();
-    F3DEX2::gsp_matrix(&mut rcp.rdp, &mut rcp.rsp, w0, w1);
-}
-
-#[no_mangle]
-pub extern "C" fn F3DEX2_GSPMoveWord(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
-    let rcp = rcp.unwrap();
-    F3DEX2::gsp_moveword(&mut rcp.rdp, &mut rcp.rsp, w0, w1);
-}
-
-#[no_mangle]
-pub extern "C" fn F3DEX2_GSPGeometryMode(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
-    let rcp = rcp.unwrap();
-    F3DEX2::gsp_geometry_mode(&mut rcp.rdp, &mut rcp.rsp, w0, w1);
-}
-
-// RSP Getters and Setters
-
-#[no_mangle]
-pub extern "C" fn RSPGetGeometryMode(rcp: Option<&mut RCP>) -> u32 {
-    let rcp = rcp.unwrap();
-    return rcp.rsp.geometry_mode;
-}
-
-#[no_mangle]
-pub extern "C" fn RSPSetGeometryMode(rcp: Option<&mut RCP>, value: u32) {
-    let rcp = rcp.unwrap();
-    rcp.rsp.geometry_mode = value;
-}
-
-#[no_mangle]
-pub extern "C" fn RSPGetLightsValid(rcp: Option<&mut RCP>) -> bool {
-    let rcp = rcp.unwrap();
-    rcp.rsp.lights_valid
-}
-
-#[no_mangle]
-pub extern "C" fn RSPSetLightsValid(rcp: Option<&mut RCP>, value: bool) {
-    let rcp = rcp.unwrap();
-    rcp.rsp.lights_valid = value;
-}
-
-#[no_mangle]
-pub extern "C" fn RSPGetNumLights(rcp: Option<&mut RCP>) -> u8 {
-    let rcp = rcp.unwrap();
-    rcp.rsp.num_lights
-}
-
-#[no_mangle]
-pub extern "C" fn RSPSetNumLights(rcp: Option<&mut RCP>, value: u8) {
-    let rcp = rcp.unwrap();
-    rcp.rsp.num_lights = value;
-}
-
-#[no_mangle]
-pub extern "C" fn RSPGetFogMultiplier(rcp: Option<&mut RCP>) -> i16 {
-    let rcp = rcp.unwrap();
-    rcp.rsp.fog_multiplier
-}
-
-#[no_mangle]
-pub extern "C" fn RSPSetFogMultiplier(rcp: Option<&mut RCP>, value: i16) {
-    let rcp = rcp.unwrap();
-    rcp.rsp.fog_multiplier = value;
-}
-
-#[no_mangle]
-pub extern "C" fn RSPGetFogOffset(rcp: Option<&mut RCP>) -> i16 {
-    let rcp = rcp.unwrap();
-    rcp.rsp.fog_offset
-}
-
-#[no_mangle]
-pub extern "C" fn RSPSetFogOffset(rcp: Option<&mut RCP>, value: i16) {
-    let rcp = rcp.unwrap();
-    rcp.rsp.fog_offset = value;
-}
-
