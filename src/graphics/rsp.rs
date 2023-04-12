@@ -1,5 +1,3 @@
-use glam::{Mat4, Vec3A, Vec4};
-
 use crate::extensions::matrix::matrix_multiply;
 
 use super::gbi::defines::Light;
@@ -22,8 +20,9 @@ impl TextureScalingFactor {
     };
 }
 
+#[repr(C)]
 pub struct StagingVertex {
-    pub position: Vec4,
+    pub position: [f32; 4],
     pub uv: [f32; 2],
     pub color: [u8; 4],
     pub clip_reject: u8,
@@ -31,12 +30,13 @@ pub struct StagingVertex {
 
 impl StagingVertex {
     pub const ZERO: Self = Self {
-        position: Vec4::ZERO,
+        position: [0.0; 4],
         uv: [0.0; 2],
         color: [0; 4],
         clip_reject: 0,
     };
 }
+
 #[cfg(feature = "f3dex2")]
 pub enum RSPGeometry {
     G_ZBUFFER = 1 << 0,
@@ -72,10 +72,10 @@ pub struct RSP {
 
     pub texture_scaling_factor: TextureScalingFactor,
 
-    pub vertex_table: [StagingVertex; MAX_VERTICES],
+    pub vertex_table: [StagingVertex; MAX_VERTICES + 4],
 
-    pub lights_coeffs: [Vec3A; MAX_LIGHTS],
-    pub lookat_coeffs: [Vec3A; 2], // lookat_x, lookat_y
+    pub lights_coeffs: [[f32; 3]; MAX_LIGHTS],
+    pub lookat_coeffs: [[f32; 3]; 2], // lookat_x, lookat_y
 }
 
 impl RSP {
@@ -98,10 +98,10 @@ impl RSP {
 
             texture_scaling_factor: TextureScalingFactor::ZERO,
 
-            vertex_table: [StagingVertex::ZERO; MAX_VERTICES],
+            vertex_table: [StagingVertex::ZERO; MAX_VERTICES + 4],
 
-            lights_coeffs: [Vec3A::ZERO; MAX_LIGHTS],
-            lookat_coeffs: [Vec3A::ZERO; 2],
+            lights_coeffs: [[0.0; 3]; MAX_LIGHTS],
+            lookat_coeffs: [[0.0; 3]; 2],
         }
     }
 

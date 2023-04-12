@@ -1,8 +1,9 @@
+use crate::graphics::rsp::StagingVertex;
+
 use super::super::{
     rcp::RCP,
     rdp::{OutputDimensions, Rect},
 };
-use super::f3dex2::calculate_normal_dir;
 use super::{defines::Light, f3dex2::F3DEX2};
 
 #[no_mangle]
@@ -20,7 +21,7 @@ pub extern "C" fn F3DEX2_GSPPopMatrix(rcp: Option<&mut RCP>, w0: usize, w1: usiz
 #[no_mangle]
 pub extern "C" fn F3DEX2_GSPVertex(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
     let rcp = rcp.unwrap();
-    // F3DEX2::gsp_vertex(&mut rcp.rdp, &mut rcp.rsp, w0, w1);
+    F3DEX2::gsp_vertex(&mut rcp.rdp, &mut rcp.rsp, w0, w1);
 }
 
 #[no_mangle]
@@ -131,6 +132,12 @@ pub extern "C" fn RSPGetMatrixAtIndex(rcp: Option<&mut RCP>, index: usize) -> *m
 pub extern "C" fn RSPGetModelViewProjectionMatrix(rcp: Option<&mut RCP>) -> *mut [[f32; 4]; 4] {
     let rcp = rcp.unwrap();
     &mut rcp.rsp.modelview_projection_matrix
+}
+
+#[no_mangle]
+pub extern "C" fn RSPGetStagingVertexAtIndexPtr(rcp: Option<&mut RCP>, index: usize) -> *mut StagingVertex {
+    let rcp = rcp.unwrap();
+    &mut rcp.rsp.vertex_table[index] as *mut StagingVertex
 }
 
 // RDP Getters and Setters

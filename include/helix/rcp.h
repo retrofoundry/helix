@@ -16,6 +16,17 @@ struct OutputDimensions {
     float aspect_ratio;
 };
 
+struct RGBA {
+    uint8_t r, g, b, a;
+};
+
+struct StagingVertex {
+    float x, y, z, w;
+    float u, v;
+    struct RGBA color;
+    uint8_t clip_reject;
+};
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -53,6 +64,8 @@ uint16_t RSPGetTextureScalingFactorT(void* rcp);
 uintptr_t RSPGetMatrixStackPointer(void* rcp);
 float (*RSPGetMatrixAtIndex(void* rcp, uint8_t index))[4][4];
 float (*RSPGetModelViewProjectionMatrix(void* rcp))[4][4];
+
+struct StagingVertex* RSPGetStagingVertexAtIndexPtr(void* rcp, uint8_t index);
 
 // RDP Getters and Setters
 void RDPSetOutputDimensions(void* rcp, struct OutputDimensions dimensions);

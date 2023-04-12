@@ -62,8 +62,11 @@ pub union Vtx {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Vtx_t {
+    #[cfg(feature = "gbifloats")]
+    pub position: [f32; 3], // in object space
+    #[cfg(not(feature = "gbifloats"))]
     pub position: [i16; 3], // in object space
     flag: u16,              // unused
     pub texture_coords: [i16; 2],
@@ -71,8 +74,11 @@ pub struct Vtx_t {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Vtx_tn {
+    #[cfg(feature = "gbifloats")]
+    pub position: [f32; 3], // in object space
+    #[cfg(not(feature = "gbifloats"))]
     pub position: [i16; 3], // in object space
     flag: u16,              // unused
     pub texture_coords: [i16; 2],
