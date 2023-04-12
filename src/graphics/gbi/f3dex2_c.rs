@@ -80,12 +80,6 @@ pub extern "C" fn RSPGetNumLights(rcp: Option<&mut RCP>) -> u8 {
 }
 
 #[no_mangle]
-pub extern "C" fn RSPSetNumLights(rcp: Option<&mut RCP>, value: u8) {
-    let rcp = rcp.unwrap();
-    rcp.rsp.num_lights = value;
-}
-
-#[no_mangle]
 pub extern "C" fn RSPGetFogMultiplier(rcp: Option<&mut RCP>) -> i16 {
     let rcp = rcp.unwrap();
     rcp.rsp.fog_multiplier

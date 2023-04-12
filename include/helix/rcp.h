@@ -40,12 +40,9 @@ bool RSPGetLightsValid(void* rcp);
 void RSPSetLightsValid(void* rcp, bool value);
 
 uint8_t RSPGetNumLights(void* rcp);
-void RSPSetNumLights(void* rcp, uint8_t value);
 
 int16_t RSPGetFogMultiplier(void* rcp);
-void RSPSetFogMultiplier(void* rcp, int16_t value);
 int16_t RSPGetFogOffset(void* rcp);
-void RSPSetFogOffset(void* rcp, int16_t value);
 
 Light_t RSPGetLightAtIndex(void* rcp, uint8_t index);
 Light_t* RSPGetLightAtIndexPtr(void* rcp, uint8_t index);
