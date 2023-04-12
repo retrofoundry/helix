@@ -86,9 +86,21 @@ impl F3DEX2 {
     pub fn gsp_matrix(_rdp: &mut RDP, rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
         let params = get_cmd(w0, 0, 8) as u8 ^ G_MTX::PUSH as u8;
 
-        let addr = get_segmented_address(w1) as *const i32;
-        let slice = unsafe { slice::from_raw_parts(addr, 16) };
-        let matrix = matrix_from_fixed_point(slice);
+        let matrix: [[f32; 4]; 4];
+
+        if cfg!(feature = "gbifloats") {
+            let addr = get_segmented_address(w1) as *const f32;
+            matrix = unsafe { slice::from_raw_parts(addr, 16) }
+                .chunks(4)
+                .map(|row| [row[0], row[1], row[2], row[3]])
+                .collect::<Vec<[f32; 4]>>()
+                .try_into()
+                .unwrap();
+        } else {
+            let addr = get_segmented_address(w1) as *const i32;
+            let slice = unsafe { slice::from_raw_parts(addr, 16) };
+            matrix = matrix_from_fixed_point(slice);
+        }
 
         if params & G_MTX::PROJECTION as u8 != 0 {
             if (params & G_MTX::LOAD as u8) != 0 {
