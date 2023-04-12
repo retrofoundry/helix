@@ -175,15 +175,12 @@ impl F3DEX2 {
     pub fn gsp_moveword(_rdp: &mut RDP, rsp: &mut RSP, w0: usize, w1: usize) -> GBIResult {
         let index = get_cmd(w0, 16, 8) as u8;
         let _offset: u16 = get_cmd(w0, 0, 16) as u16;
-        let data = get_segmented_address(w1);
 
         match index {
-            index if index == G_MW::NUMLIGHT as u8 => {
-                rsp.set_num_lights(data as u8 / 24 + 1)
-            }
+            index if index == G_MW::NUMLIGHT as u8 => rsp.set_num_lights(w1 as u8 / 24 + 1),
             index if index == G_MW::FOG as u8 => {
-                rsp.fog_multiplier = (data >> 16) as i16;
-                rsp.fog_offset = data as i16;
+                rsp.fog_multiplier = (w1 >> 16) as i16;
+                rsp.fog_offset = w1 as i16;
             }
             // TODO: HANDLE G_MW_SEGMENT
             _ => {}
@@ -475,4 +472,34 @@ fn calculate_normal_dir(light: &Light, matrix: &Mat4, coeffs: &mut Vec3A) {
     coeffs[2] = matrix.col(2).xyz().dot(light_dir.into());
 
     coeffs.normalize_in_place();
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::graphics::{rsp::RSP, rdp::RDP};
+    use super::F3DEX2;
+
+    #[test]
+    fn test_moveword() {
+        // NUM_LIGHT
+        let w0: usize = 3674341376;
+        let w1: usize = 24;
+
+        let mut rsp = RSP::new();
+        let mut rdp = RDP::new();
+
+        F3DEX2::gsp_moveword(&mut rdp, &mut rsp, w0, w1);
+        assert!(rsp.num_lights == 2);
+        
+        // FOG
+        let w0: usize = 3674734592;
+        let w1: usize = 279638102;
+
+        let mut rsp = RSP::new();
+        let mut rdp = RDP::new();
+
+        F3DEX2::gsp_moveword(&mut rdp, &mut rsp, w0, w1);
+        assert!(rsp.fog_multiplier == 4266);
+        assert!(rsp.fog_offset == -4010);
+    }
 }

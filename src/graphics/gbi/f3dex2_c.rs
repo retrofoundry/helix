@@ -76,21 +76,9 @@ pub extern "C" fn RSPGetFogMultiplier(rcp: Option<&mut RCP>) -> i16 {
 }
 
 #[no_mangle]
-pub extern "C" fn RSPSetFogMultiplier(rcp: Option<&mut RCP>, value: i16) {
-    let rcp = rcp.unwrap();
-    rcp.rsp.fog_multiplier = value;
-}
-
-#[no_mangle]
 pub extern "C" fn RSPGetFogOffset(rcp: Option<&mut RCP>) -> i16 {
     let rcp = rcp.unwrap();
     rcp.rsp.fog_offset
-}
-
-#[no_mangle]
-pub extern "C" fn RSPSetFogOffset(rcp: Option<&mut RCP>, value: i16) {
-    let rcp = rcp.unwrap();
-    rcp.rsp.fog_offset = value;
 }
 
 #[no_mangle]
