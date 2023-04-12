@@ -27,6 +27,7 @@ void RCPReset(void* rcp);
 void F3DEX2_GSPMatrix(void* rcp, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GSPMoveWord(void* rcp, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GSPMoveMem(void* rcp, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GSPTexture(void* rcp, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GSPGeometryMode(void* rcp, uintptr_t w0, uintptr_t w1);
 
 // RSP Getters and Setters
@@ -46,6 +47,9 @@ void RSPSetFogOffset(void* rcp, int16_t value);
 
 Light_t RSPGetLightAtIndex(void* rcp, uint8_t index);
 Light_t* RSPGetLightAtIndexPtr(void* rcp, uint8_t index);
+
+uint16_t RSPGetTextureScalingFactorS(void* rcp);
+uint16_t RSPGetTextureScalingFactorT(void* rcp);
 
 // RDP Getters and Setters
 void RDPSetOutputDimensions(void* rcp, struct OutputDimensions dimensions);

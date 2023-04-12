@@ -20,6 +20,12 @@ pub extern "C" fn F3DEX2_GSPMoveMem(rcp: Option<&mut RCP>, w0: usize, w1: usize)
 }
 
 #[no_mangle]
+pub extern "C" fn F3DEX2_GSPTexture(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
+    let rcp = rcp.unwrap();
+    F3DEX2::gsp_texture(&mut rcp.rdp, &mut rcp.rsp, w0, w1);
+}
+
+#[no_mangle]
 pub extern "C" fn F3DEX2_GSPGeometryMode(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
     let rcp = rcp.unwrap();
     F3DEX2::gsp_geometry_mode(&mut rcp.rdp, &mut rcp.rsp, w0, w1);
@@ -97,6 +103,18 @@ pub extern "C" fn RSPGetLightAtIndex(rcp: Option<&mut RCP>, index: usize) -> Lig
 pub extern "C" fn RSPGetLightAtIndexPtr(rcp: Option<&mut RCP>, index: usize) -> *mut Light {
     let rcp = rcp.unwrap();
     &mut rcp.rsp.lights[index] as *mut Light
+}
+
+#[no_mangle]
+pub extern "C" fn RSPGetTextureScalingFactorS(rcp: Option<&mut RCP>) -> u16 {
+    let rcp = rcp.unwrap();
+    rcp.rsp.texture_scaling_factor.scale_s
+}
+
+#[no_mangle]
+pub extern "C" fn RSPGetTextureScalingFactorT(rcp: Option<&mut RCP>) -> u16 {
+    let rcp = rcp.unwrap();
+    rcp.rsp.texture_scaling_factor.scale_t
 }
 
 // RDP Getters and Setters
