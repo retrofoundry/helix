@@ -47,24 +47,6 @@ void F3DEX2_GSPGeometryMode(void* rcp, uintptr_t w0, uintptr_t w1);
 uint32_t RSPGetGeometryMode(void* rcp);
 void RSPSetGeometryMode(void* rcp, uint32_t value);
 
-bool RSPGetLightsValid(void* rcp);
-void RSPSetLightsValid(void* rcp, bool value);
-
-uint8_t RSPGetNumLights(void* rcp);
-
-int16_t RSPGetFogMultiplier(void* rcp);
-int16_t RSPGetFogOffset(void* rcp);
-
-Light_t RSPGetLightAtIndex(void* rcp, uint8_t index);
-Light_t* RSPGetLightAtIndexPtr(void* rcp, uint8_t index);
-
-uint16_t RSPGetTextureScalingFactorS(void* rcp);
-uint16_t RSPGetTextureScalingFactorT(void* rcp);
-
-uintptr_t RSPGetMatrixStackPointer(void* rcp);
-float (*RSPGetMatrixAtIndex(void* rcp, uint8_t index))[4][4];
-float (*RSPGetModelViewProjectionMatrix(void* rcp))[4][4];
-
 struct StagingVertex* RSPGetStagingVertexAtIndexPtr(void* rcp, uint8_t index);
 
 // RDP Getters and Setters

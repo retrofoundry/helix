@@ -4,7 +4,7 @@ use super::super::{
     rcp::RCP,
     rdp::{OutputDimensions, Rect},
 };
-use super::{defines::Light, f3dex2::F3DEX2};
+use super::f3dex2::F3DEX2;
 
 #[no_mangle]
 pub extern "C" fn F3DEX2_GSPMatrix(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
@@ -63,79 +63,10 @@ pub extern "C" fn RSPSetGeometryMode(rcp: Option<&mut RCP>, value: u32) {
 }
 
 #[no_mangle]
-pub extern "C" fn RSPGetLightsValid(rcp: Option<&mut RCP>) -> bool {
-    let rcp = rcp.unwrap();
-    rcp.rsp.lights_valid
-}
-
-#[no_mangle]
-pub extern "C" fn RSPSetLightsValid(rcp: Option<&mut RCP>, value: bool) {
-    let rcp = rcp.unwrap();
-    rcp.rsp.lights_valid = value;
-}
-
-#[no_mangle]
-pub extern "C" fn RSPGetNumLights(rcp: Option<&mut RCP>) -> u8 {
-    let rcp = rcp.unwrap();
-    rcp.rsp.num_lights
-}
-
-#[no_mangle]
-pub extern "C" fn RSPGetFogMultiplier(rcp: Option<&mut RCP>) -> i16 {
-    let rcp = rcp.unwrap();
-    rcp.rsp.fog_multiplier
-}
-
-#[no_mangle]
-pub extern "C" fn RSPGetFogOffset(rcp: Option<&mut RCP>) -> i16 {
-    let rcp = rcp.unwrap();
-    rcp.rsp.fog_offset
-}
-
-#[no_mangle]
-pub extern "C" fn RSPGetLightAtIndex(rcp: Option<&mut RCP>, index: usize) -> Light {
-    let rcp = rcp.unwrap();
-    rcp.rsp.lights[index]
-}
-
-#[no_mangle]
-pub extern "C" fn RSPGetLightAtIndexPtr(rcp: Option<&mut RCP>, index: usize) -> *mut Light {
-    let rcp = rcp.unwrap();
-    &mut rcp.rsp.lights[index] as *mut Light
-}
-
-#[no_mangle]
-pub extern "C" fn RSPGetTextureScalingFactorS(rcp: Option<&mut RCP>) -> u16 {
-    let rcp = rcp.unwrap();
-    rcp.rsp.texture_scaling_factor.scale_s
-}
-
-#[no_mangle]
-pub extern "C" fn RSPGetTextureScalingFactorT(rcp: Option<&mut RCP>) -> u16 {
-    let rcp = rcp.unwrap();
-    rcp.rsp.texture_scaling_factor.scale_t
-}
-
-#[no_mangle]
-pub extern "C" fn RSPGetMatrixStackPointer(rcp: Option<&mut RCP>) -> usize {
-    let rcp = rcp.unwrap();
-    rcp.rsp.matrix_stack_pointer
-}
-
-#[no_mangle]
-pub extern "C" fn RSPGetMatrixAtIndex(rcp: Option<&mut RCP>, index: usize) -> *mut [[f32; 4]; 4] {
-    let rcp = rcp.unwrap();
-    &mut rcp.rsp.matrix_stack[index]
-}
-
-#[no_mangle]
-pub extern "C" fn RSPGetModelViewProjectionMatrix(rcp: Option<&mut RCP>) -> *mut [[f32; 4]; 4] {
-    let rcp = rcp.unwrap();
-    &mut rcp.rsp.modelview_projection_matrix
-}
-
-#[no_mangle]
-pub extern "C" fn RSPGetStagingVertexAtIndexPtr(rcp: Option<&mut RCP>, index: usize) -> *mut StagingVertex {
+pub extern "C" fn RSPGetStagingVertexAtIndexPtr(
+    rcp: Option<&mut RCP>,
+    index: usize,
+) -> *mut StagingVertex {
     let rcp = rcp.unwrap();
     &mut rcp.rsp.vertex_table[index] as *mut StagingVertex
 }

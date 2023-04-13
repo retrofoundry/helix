@@ -1,4 +1,3 @@
-use glam::{Mat4, Vec3A, Vec4, Vec4Swizzles};
 use std::slice;
 
 use super::super::{
@@ -8,10 +7,7 @@ use super::super::{
 use super::defines::{Light, Viewport, Vtx, G_MTX, G_MV, G_MW};
 use super::utils::{get_cmd, get_segmented_address};
 use super::{GBIDefinition, GBIResult, GBI};
-use crate::extensions::{
-    glam::{FromFixedPoint, NormalizeInPlace},
-    matrix::{calculate_normal_dir, matrix_from_fixed_point, matrix_multiply},
-};
+use crate::extensions::matrix::{calculate_normal_dir, matrix_from_fixed_point, matrix_multiply};
 
 pub enum F3DEX2 {
     // DMA
@@ -74,7 +70,7 @@ impl GBIDefinition for F3DEX2 {
         gbi.register(F3DEX2::G_MOVEMEM as usize, F3DEX2::gsp_movemem);
         gbi.register(F3DEX2::G_MOVEWORD as usize, F3DEX2::gsp_moveword);
         gbi.register(F3DEX2::G_TEXTURE as usize, F3DEX2::gsp_texture);
-        // gbi.register(F3DEX2::G_VTX as usize, F3DEX2::gsp_vertex);
+        gbi.register(F3DEX2::G_VTX as usize, F3DEX2::gsp_vertex);
         gbi.register(F3DEX2::G_DL as usize, F3DEX2::sub_dl);
         gbi.register(F3DEX2::G_GEOMETRYMODE as usize, F3DEX2::gsp_geometry_mode);
         gbi.register(F3DEX2::G_TRI1 as usize, F3DEX2::gsp_tri1);

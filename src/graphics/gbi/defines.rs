@@ -68,7 +68,7 @@ pub struct Vtx_t {
     pub position: [f32; 3], // in object space
     #[cfg(not(feature = "gbifloats"))]
     pub position: [i16; 3], // in object space
-    flag: u16,              // unused
+    flag: u16, // unused
     pub texture_coords: [i16; 2],
     pub color: [u8; 4],
 }
@@ -80,7 +80,7 @@ pub struct Vtx_tn {
     pub position: [f32; 3], // in object space
     #[cfg(not(feature = "gbifloats"))]
     pub position: [i16; 3], // in object space
-    flag: u16,              // unused
+    flag: u16, // unused
     pub texture_coords: [i16; 2],
     pub normal: [i8; 3],
     pub alpha: u8,
