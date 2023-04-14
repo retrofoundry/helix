@@ -1,4 +1,3 @@
-
 #[repr(C)]
 pub struct ShaderProgram;
 
@@ -57,12 +56,7 @@ impl GfxDevice {
         unsafe { ((*self.storage).lookup_shader)(id) }
     }
 
-    pub fn shader_get_info(
-        &self,
-        shader: *mut ShaderProgram,
-        info: *mut u8,
-        info_size: [bool; 2],
-    ) {
+    pub fn shader_get_info(&self, shader: *mut ShaderProgram, info: *mut u8, info_size: [bool; 2]) {
         unsafe { ((*self.storage).shader_get_info)(shader, info, info_size) }
     }
 

@@ -35,6 +35,16 @@ struct GfxDevice {
     void (*finish_render)(void);
 };
 
+struct TextureCacheValue {
+    uintptr_t texture_addr;
+    uint8_t fmt, size;
+
+    uint32_t texture_id;
+    uint8_t cms, cmt;
+
+    bool linear_filter;
+};
+
 extern struct Light_t;
 
 struct Rect {
@@ -65,6 +75,7 @@ void* RCPCreate(struct GfxDevice *rapi);
 void RCPReset(void* rcp);
 
 struct GfxDevice* RCPGetGfxDevice(void* rcp);
+bool TextureCacheLookup(void* rcp, int tile, const uint8_t *orig_addr, uint32_t fmt, uint32_t size, struct TextureCacheValue **value);
 
 // F3DEX2 Commands
 void F3DEX2_GSPMatrix(void* rcp, uintptr_t w0, uintptr_t w1);

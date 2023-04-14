@@ -1,5 +1,6 @@
 pub mod gbi;
+mod gfx_device;
 pub mod rcp;
 mod rdp;
 mod rsp;
-mod gfx_device;
+mod utils;

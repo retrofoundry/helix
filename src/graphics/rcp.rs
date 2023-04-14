@@ -1,7 +1,8 @@
 use super::{
     gbi::{defines::Gfx, GBIResult, GBI},
+    gfx_device::{self, C_GfxDevice, GfxDevice},
     rdp::RDP,
-    rsp::RSP, gfx_device::{GfxDevice, C_GfxDevice, self},
+    rsp::RSP,
 };
 
 pub struct RCP {

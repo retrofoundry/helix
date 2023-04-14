@@ -7,7 +7,10 @@ use super::super::{
 use super::defines::{Light, Viewport, Vtx, G_MTX, G_MV, G_MW};
 use super::utils::{get_cmd, get_segmented_address};
 use super::{GBIDefinition, GBIResult, GBI};
-use crate::{extensions::matrix::{calculate_normal_dir, matrix_from_fixed_point, matrix_multiply}, graphics::gfx_device::GfxDevice};
+use crate::{
+    extensions::matrix::{calculate_normal_dir, matrix_from_fixed_point, matrix_multiply},
+    graphics::gfx_device::GfxDevice,
+};
 
 pub enum F3DEX2 {
     // DMA
@@ -79,7 +82,13 @@ impl GBIDefinition for F3DEX2 {
 }
 
 impl F3DEX2 {
-    pub fn gsp_matrix(_rdp: &mut RDP, rsp: &mut RSP, _gfx_device: &GfxDevice, w0: usize, w1: usize) -> GBIResult {
+    pub fn gsp_matrix(
+        _rdp: &mut RDP,
+        rsp: &mut RSP,
+        _gfx_device: &GfxDevice,
+        w0: usize,
+        w1: usize,
+    ) -> GBIResult {
         let params = get_cmd(w0, 0, 8) as u8 ^ G_MTX::PUSH as u8;
 
         let matrix: [[f32; 4]; 4];
@@ -139,7 +148,13 @@ impl F3DEX2 {
         GBIResult::Continue
     }
 
-    pub fn gsp_pop_matrix(_rdp: &mut RDP, rsp: &mut RSP, _gfx_device: &GfxDevice, _w0: usize, w1: usize) -> GBIResult {
+    pub fn gsp_pop_matrix(
+        _rdp: &mut RDP,
+        rsp: &mut RSP,
+        _gfx_device: &GfxDevice,
+        _w0: usize,
+        w1: usize,
+    ) -> GBIResult {
         let num_matrices_to_pop = w1 / 64;
 
         // If no matrices to pop, return
@@ -162,7 +177,13 @@ impl F3DEX2 {
         GBIResult::Continue
     }
 
-    pub fn gsp_movemem(rdp: &mut RDP, rsp: &mut RSP, _gfx_device: &GfxDevice, w0: usize, w1: usize) -> GBIResult {
+    pub fn gsp_movemem(
+        rdp: &mut RDP,
+        rsp: &mut RSP,
+        _gfx_device: &GfxDevice,
+        w0: usize,
+        w1: usize,
+    ) -> GBIResult {
         let index: u8 = get_cmd(w0, 0, 8) as u8;
         let offset: u8 = get_cmd(w0, 8, 8) as u8 * 8;
         let data = get_segmented_address(w1);
@@ -188,7 +209,13 @@ impl F3DEX2 {
         GBIResult::Continue
     }
 
-    pub fn gsp_moveword(_rdp: &mut RDP, rsp: &mut RSP, _gfx_device: &GfxDevice, w0: usize, w1: usize) -> GBIResult {
+    pub fn gsp_moveword(
+        _rdp: &mut RDP,
+        rsp: &mut RSP,
+        _gfx_device: &GfxDevice,
+        w0: usize,
+        w1: usize,
+    ) -> GBIResult {
         let index = get_cmd(w0, 16, 8) as u8;
         let _offset: u16 = get_cmd(w0, 0, 16) as u16;
 
@@ -205,7 +232,13 @@ impl F3DEX2 {
         GBIResult::Continue
     }
 
-    pub fn gsp_texture(_rdp: &mut RDP, rsp: &mut RSP, _gfx_device: &GfxDevice, w0: usize, w1: usize) -> GBIResult {
+    pub fn gsp_texture(
+        _rdp: &mut RDP,
+        rsp: &mut RSP,
+        _gfx_device: &GfxDevice,
+        w0: usize,
+        w1: usize,
+    ) -> GBIResult {
         let scale_s = get_cmd(w1, 16, 16) as u16;
         let scale_t = get_cmd(w1, 0, 16) as u16;
         let _level = get_cmd(w0, 11, 3) as u8;
@@ -219,7 +252,13 @@ impl F3DEX2 {
         GBIResult::Continue
     }
 
-    pub fn gsp_vertex(rdp: &mut RDP, rsp: &mut RSP, _gfx_device: &GfxDevice, w0: usize, w1: usize) -> GBIResult {
+    pub fn gsp_vertex(
+        rdp: &mut RDP,
+        rsp: &mut RSP,
+        _gfx_device: &GfxDevice,
+        w0: usize,
+        w1: usize,
+    ) -> GBIResult {
         let vertex_count = get_cmd(w0, 12, 8) as u8;
         let mut write_index = get_cmd(w0, 1, 7) as u8 - get_cmd(w0, 12, 8) as u8;
         let vertices = get_segmented_address(w1) as *const Vtx;
@@ -379,7 +418,13 @@ impl F3DEX2 {
         GBIResult::Continue
     }
 
-    pub fn gsp_geometry_mode(_rdp: &mut RDP, rsp: &mut RSP, _gfx_device: &GfxDevice, w0: usize, w1: usize) -> GBIResult {
+    pub fn gsp_geometry_mode(
+        _rdp: &mut RDP,
+        rsp: &mut RSP,
+        _gfx_device: &GfxDevice,
+        w0: usize,
+        w1: usize,
+    ) -> GBIResult {
         let clear_bits = get_cmd(w0, 0, 24);
         let set_bits = w1;
 
@@ -389,7 +434,13 @@ impl F3DEX2 {
         GBIResult::Continue
     }
 
-    pub fn gsp_tri1(_rdp: &mut RDP, rsp: &mut RSP, _gfx_device: &GfxDevice, w0: usize, _w1: usize) -> GBIResult {
+    pub fn gsp_tri1(
+        _rdp: &mut RDP,
+        rsp: &mut RSP,
+        _gfx_device: &GfxDevice,
+        w0: usize,
+        _w1: usize,
+    ) -> GBIResult {
         let vertex_id1 = get_cmd(w0, 16, 8) / 2;
         let vertex_id2 = get_cmd(w0, 8, 8) / 2;
         let vertex_id3 = get_cmd(w0, 0, 8) / 2;
@@ -450,7 +501,13 @@ impl F3DEX2 {
         GBIResult::Continue
     }
 
-    pub fn sub_dl(_rdp: &mut RDP, _rsp: &mut RSP, _gfx_device: &GfxDevice, w0: usize, w1: usize) -> GBIResult {
+    pub fn sub_dl(
+        _rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gfx_device: &GfxDevice,
+        w0: usize,
+        w1: usize,
+    ) -> GBIResult {
         if get_cmd(w0, 16, 1) == 0 {
             // Push return address
             let new_addr = get_segmented_address(w1);

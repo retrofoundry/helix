@@ -1,4 +1,4 @@
-use super::{rdp::RDP, rsp::RSP, gfx_device::GfxDevice};
+use super::{gfx_device::GfxDevice, rdp::RDP, rsp::RSP};
 use std::collections::HashMap;
 
 pub mod defines;
@@ -15,7 +15,8 @@ pub enum GBIResult {
     Unknown(usize),
 }
 
-pub type GBICommand = fn(dp: &mut RDP, rsp: &mut RSP, gfx_device: &GfxDevice, w0: usize, w1: usize) -> GBIResult;
+pub type GBICommand =
+    fn(dp: &mut RDP, rsp: &mut RSP, gfx_device: &GfxDevice, w0: usize, w1: usize) -> GBIResult;
 
 pub struct GBI {
     pub gbi_opcode_table: HashMap<usize, GBICommand>,
@@ -46,7 +47,14 @@ impl GBI {
         self.gbi_opcode_table.insert(opcode, cmd);
     }
 
-    pub fn handle_command(&self, rdp: &mut RDP, rsp: &mut RSP, gfx_device: &GfxDevice, w0: usize, w1: usize) -> GBIResult {
+    pub fn handle_command(
+        &self,
+        rdp: &mut RDP,
+        rsp: &mut RSP,
+        gfx_device: &GfxDevice,
+        w0: usize,
+        w1: usize,
+    ) -> GBIResult {
         let opcode = w0 >> 24;
         let cmd = self.gbi_opcode_table.get(&opcode);
 
