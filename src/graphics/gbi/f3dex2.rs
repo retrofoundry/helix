@@ -1,5 +1,7 @@
 use std::slice;
 
+use log::trace;
+
 use super::super::{
     rdp::RDP,
     rsp::{RSPGeometry, MATRIX_STACK_SIZE, MAX_LIGHTS, RSP},
@@ -203,7 +205,7 @@ impl F3DEX2 {
                 }
             }
             // TODO: HANDLE G_MV_LOOKATY & G_MV_LOOKATX
-            _ => println!("Unknown movemem index: {}", index),
+            _ => trace!("Unknown movemem index: {}", index),
         }
 
         GBIResult::Continue

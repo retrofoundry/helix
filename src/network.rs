@@ -1,3 +1,4 @@
+use log::{error, trace};
 use std::ffi::CStr;
 use std::io::{Read, Write};
 use std::net::TcpStream as Stream;
@@ -80,7 +81,7 @@ impl TCPStream {
     pub fn send_message(&self, message: &str) {
         if let Some(backend) = &self.backend {
             if let Err(error) = backend.sender.send(message.to_string()) {
-                eprintln!("[TCPStream] Failed to send message: {error}");
+                warn!("Failed to send message: {error}");
             }
         }
     }
@@ -110,7 +111,7 @@ pub extern "C" fn TCPConnect(
     on_message: OnMessage,
 ) {
     if stream.is_none() {
-        eprintln!("[TCPStream] Failed to connect to server: was given an invalid instance pointer");
+        warn!("Failed to connect to server: was given an invalid instance pointer");
         return;
     }
 
@@ -138,7 +139,7 @@ pub extern "C" fn TCPConnect(
                     match std::ffi::CString::new(message) {
                         Ok(message) => unsafe { on_message(message.as_ptr()) },
                         Err(error) => {
-                            eprintln!("[TCPStream] Failed to convert message to string: {error}")
+                            warn!("[TCPStream] Failed to convert message to string: {error}")
                         }
                     }
                 })
@@ -151,16 +152,14 @@ pub extern "C" fn TCPConnect(
 pub extern "C" fn TCPDisconnect(stream: Option<Box<TCPStream>>) {
     match stream {
         Some(stream) => stream.disconnect(),
-        None => eprintln!(
-            "[TCPStream] Failed to disconnect from server: was given an invalid instance pointer"
-        ),
+        None => warn!("Failed to disconnect from server: was given an invalid instance pointer"),
     }
 }
 
 #[no_mangle]
 pub extern "C" fn TCPSendMessage(stream: Option<&mut TCPStream>, message: *const i8) {
     if stream.is_none() {
-        eprintln!("[TCPStream] Failed to connect to server: was given an invalid instance pointer");
+        warn!("Failed to connect to server: was given an invalid instance pointer");
         return;
     }
 

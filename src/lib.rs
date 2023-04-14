@@ -1,4 +1,5 @@
 pub use arie;
+use env_logger::Builder;
 mod extensions;
 mod graphics;
 pub mod gui;
@@ -8,7 +9,23 @@ pub mod network;
 pub mod speech;
 mod utils;
 
+pub fn init() {
+    env_logger::init();
+}
+
 // MARK: - C API
+
+#[no_mangle]
+pub extern "C" fn HelixInit() {
+    let mut builder = Builder::from_default_env();
+
+    #[cfg(debug_assertions)]
+    builder.filter_level(log::LevelFilter::Trace);
+    #[cfg(not(debug_assertions))]
+    builder.filter_level(log::LevelFilter::Info);
+
+    builder.init();
+}
 
 #[no_mangle]
 pub extern "C" fn SpeechFeatureEnabled() -> bool {

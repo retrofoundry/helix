@@ -1,3 +1,5 @@
+use log::trace;
+
 use super::{
     gbi::{defines::Gfx, GBIResult, GBI},
     gfx_device::{self, C_GfxDevice, GfxDevice},
@@ -76,7 +78,7 @@ impl RCP {
                     return;
                 }
                 GBIResult::Unknown(opcode) => {
-                    println!("Unknown GBI command: {:#x}", opcode);
+                    trace!("Unknown GBI command: {:#x}", opcode);
                 }
                 _ => {}
             }

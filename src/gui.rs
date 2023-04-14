@@ -3,6 +3,7 @@ mod imgui_sdl_support;
 use anyhow::Result;
 use imgui::{Context, FontSource, Ui};
 use imgui_wgpu::{Renderer, RendererConfig};
+use log::trace;
 use pollster::block_on;
 use sdl2::{
     event::{Event, WindowEvent},
@@ -170,7 +171,7 @@ impl Gui {
 
     fn recreate_swapchain(&mut self) -> Result<()> {
         let (width, height) = self.window.size();
-        println!("Recreating swapchain: {}x{}", width, height);
+        trace!("Recreating swapchain: {}x{}", width, height);
         self.width = width;
         self.height = height;
 

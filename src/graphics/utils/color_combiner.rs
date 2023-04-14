@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-
 use crate::graphics::{gfx_device::ShaderProgram, rcp::RCP};
+use log::trace;
+use std::collections::HashMap;
 
 pub struct ColorCombinerManager {
     combiners: HashMap<u32, ColorCombiner>,
@@ -23,10 +23,10 @@ impl ColorCombinerManager {
     pub fn get_combiner(&mut self, cc_id: u32) -> Option<&mut ColorCombiner> {
         if let Some(cc) = self.combiners.get_mut(&cc_id) {
             self.current_combiner = Some(cc_id);
-            println!("[ColorCombinerManager] Found combiner with id {}", cc_id);
+            trace!("Found combiner with id {}", cc_id);
             Some(cc)
         } else {
-            println!("[ColorCombinerManager] No combiner with id {}", cc_id);
+            trace!("No combiner with id {}", cc_id);
             None
         }
     }

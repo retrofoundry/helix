@@ -1,4 +1,5 @@
 use anyhow::Result;
+use log::error;
 use std::ffi::CStr;
 use std::str;
 use tts::{Gender, LanguageTag, Tts, Voice};
@@ -50,9 +51,7 @@ impl SpeechSynthesizer {
                 self.language = language.into();
                 self.set_voice();
             }
-            Err(e) => {
-                eprintln!("[Speech Synthesizer] Error parsing language: {e}",);
-            }
+            Err(e) => warn!("Error parsing language: {e}"),
         }
     }
 
@@ -99,7 +98,7 @@ pub extern "C" fn SpeechSynthesizerCreate() -> Box<SpeechSynthesizer> {
     match SpeechSynthesizer::new() {
         Ok(synthesizer) => Box::new(synthesizer),
         Err(e) => {
-            eprintln!("[Speech Synthesizer] Error creating synthesizer: {e}",);
+            warn!("Error creating synthesizer: {e}",);
             unsafe { Box::from_raw(std::ptr::null_mut()) }
         }
     }
@@ -119,9 +118,7 @@ pub extern "C" fn SpeechSynthesizerSetVolume(
 ) {
     match synthesizer {
         Some(synthesizer) => synthesizer.set_volume(volume),
-        None => eprintln!(
-            "[Speech Synthesizer] Error setting volume: was given an invalid instance pointer",
-        ),
+        None => warn!("Error setting volume: was given an invalid instance pointer",),
     }
 }
 
@@ -135,9 +132,7 @@ pub extern "C" fn SpeechSynthesizerSetLanguage(
 
     match synthesizer {
         Some(synthesizer) => synthesizer.set_language(language),
-        None => eprintln!(
-            "[Speech Synthesizer] Error setting language: was given an invalid instance pointer",
-        ),
+        None => warn!("Error setting language: was given an invalid instance pointer",),
     }
 }
 
@@ -148,9 +143,7 @@ pub extern "C" fn SpeechSynthesizerSetGender(
 ) {
     match synthesizer {
         Some(synthesizer) => synthesizer.set_gender(gender),
-        None => eprintln!(
-            "[Speech Synthesizer] Error setting gender: was given an invalid instance pointer",
-        ),
+        None => warn!("Error setting gender: was given an invalid instance pointer",),
     }
 }
 
@@ -166,7 +159,7 @@ pub extern "C" fn SpeechSynthesizerSpeak(
     match synthesizer {
         Some(synthesizer) => synthesizer.speak(text, interrupt != 0),
         None => {
-            eprintln!("[Speech Synthesizer] Error speaking: was given an invalid instance pointer",)
+            warn!("Error speaking: was given an invalid instance pointer",)
         }
     }
 }
