@@ -1,13 +1,14 @@
 use super::{
     gbi::{defines::Gfx, GBIResult, GBI},
     rdp::RDP,
-    rsp::RSP,
+    rsp::RSP, gfx_device::{GfxDevice, C_GfxDevice, self},
 };
 
 pub struct RCP {
     gbi: GBI,
     pub rdp: RDP,
     pub rsp: RSP,
+    pub gfx_device: Option<GfxDevice>,
 }
 
 impl RCP {
@@ -19,6 +20,19 @@ impl RCP {
             gbi,
             rdp: RDP::new(),
             rsp: RSP::new(),
+            gfx_device: None,
+        }
+    }
+
+    pub fn bridge(gfx_device: GfxDevice) -> Self {
+        let mut gbi = GBI::new();
+        gbi.setup();
+
+        RCP {
+            gbi,
+            rdp: RDP::new(),
+            rsp: RSP::new(),
+            gfx_device: Some(gfx_device),
         }
     }
 
@@ -44,10 +58,11 @@ impl RCP {
         loop {
             let w0 = unsafe { (*commands).words.w0 };
             let w1 = unsafe { (*commands).words.w1 };
+            let gfx_device = self.gfx_device.as_ref().unwrap();
 
             match self
                 .gbi
-                .handle_command(&mut self.rdp, &mut self.rsp, w0, w1)
+                .handle_command(&mut self.rdp, &mut self.rsp, gfx_device, w0, w1)
             {
                 GBIResult::Recurse(new_commands) => {
                     self.run_dl(new_commands);
@@ -79,7 +94,14 @@ pub extern "C" fn RCPReset(rcp: Option<&mut RCP>) {
 }
 
 #[no_mangle]
-pub extern "C" fn RCPCreate() -> Box<RCP> {
-    let rcp = RCP::new();
+pub extern "C" fn RCPCreate(gfx_device: *mut C_GfxDevice) -> Box<RCP> {
+    let gfx_device = GfxDevice::new(gfx_device);
+    let rcp = RCP::bridge(gfx_device);
     Box::new(rcp)
+}
+
+#[no_mangle]
+pub extern "C" fn RCPGetGfxDevice(rcp: Option<&mut RCP>) -> *mut C_GfxDevice {
+    let rcp = rcp.unwrap();
+    rcp.gfx_device.as_mut().unwrap().storage
 }
