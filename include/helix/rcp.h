@@ -35,7 +35,7 @@ struct GfxDevice {
     void (*finish_render)(void);
 };
 
-struct TextureCacheValue {
+struct Texture {
     uintptr_t texture_addr;
     uint8_t fmt, size;
 
@@ -43,6 +43,12 @@ struct TextureCacheValue {
     uint8_t cms, cmt;
 
     bool linear_filter;
+};
+
+struct ColorCombiner {
+    uint32_t cc_id;
+    struct ShaderProgram *prg;
+    uint8_t shader_input_mapping[2][4];
 };
 
 extern struct Light_t;
@@ -75,7 +81,13 @@ void* RCPCreate(struct GfxDevice *rapi);
 void RCPReset(void* rcp);
 
 struct GfxDevice* RCPGetGfxDevice(void* rcp);
-bool TextureCacheLookup(void* rcp, int tile, const uint8_t *orig_addr, uint32_t fmt, uint32_t size, struct TextureCacheValue **value);
+
+bool RSPLookupTexture(void* rcp, int tile, const uint8_t *orig_addr, uint32_t fmt, uint32_t size, struct Texture **value);
+
+struct ColorCombiner* RSPGetCurrentColorCombiner(void* rcp);
+void RSPAddColorCombiner(void* rcp, struct ColorCombiner *combiner);
+struct ColorCombiner* RSPGetColorCombiner(void* rcp, uint32_t cc_id);
+struct ColorCombiner* RSPCreateAndInsertEmptyColorCombiner(void* rcp, uint32_t cc_id);
 
 // F3DEX2 Commands
 void F3DEX2_GSPMatrix(void* rcp, uintptr_t w0, uintptr_t w1);

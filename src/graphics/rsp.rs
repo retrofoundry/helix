@@ -1,6 +1,12 @@
 use crate::extensions::matrix::matrix_multiply;
 
-use super::{gbi::defines::Light, utils::texture_cache::TextureCache};
+use super::{
+    gbi::defines::Light,
+    utils::{
+        color_combiner::{ColorCombiner, ColorCombinerManager},
+        texture::TextureManager,
+    },
+};
 
 pub const MATRIX_STACK_SIZE: usize = 11;
 const MAX_VERTICES: usize = 64;
@@ -78,7 +84,8 @@ pub struct RSP {
     pub lights_coeffs: [[f32; 3]; MAX_LIGHTS],
     pub lookat_coeffs: [[f32; 3]; 2], // lookat_x, lookat_y
 
-    pub texture_cache: TextureCache,
+    pub texture_manager: TextureManager,
+    pub color_combiner_manager: ColorCombinerManager,
 }
 
 impl RSP {
@@ -106,7 +113,8 @@ impl RSP {
             lights_coeffs: [[0.0; 3]; MAX_LIGHTS],
             lookat_coeffs: [[0.0; 3]; 2],
 
-            texture_cache: TextureCache::new(TEXTURE_CACHE_MAX_SIZE),
+            texture_manager: TextureManager::new(TEXTURE_CACHE_MAX_SIZE),
+            color_combiner_manager: ColorCombinerManager::new(),
         }
     }
 
