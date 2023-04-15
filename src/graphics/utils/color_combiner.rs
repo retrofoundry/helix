@@ -1,7 +1,4 @@
-use crate::graphics::{
-    gfx_device::{GfxDevice, ShaderProgram},
-    rcp::RCP,
-};
+use crate::graphics::{gfx_device::ShaderProgram, rcp::RCP};
 use std::collections::HashMap;
 
 #[derive(PartialEq, Eq)]

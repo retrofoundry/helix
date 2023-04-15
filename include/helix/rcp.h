@@ -91,6 +91,9 @@ void F3DEX2_GSPMoveMem(void* rcp, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GSPTexture(void* rcp, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GSPGeometryMode(void* rcp, uintptr_t w0, uintptr_t w1);
 
+void F3DEX2_GDPOtherModeL(void* rcp, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPOtherModeH(void* rcp, uintptr_t w0, uintptr_t w1);
+
 // RSP Getters and Setters
 uint32_t RSPGetGeometryMode(void* rcp);
 void RSPSetGeometryMode(void* rcp, uint32_t value);
@@ -142,6 +145,11 @@ struct Texture* RDPGetRenderingStateTextureAtIndex(void* rcp, int index);
 bool RDPViewportDoesNotEqualRenderingStateViewport(void* rcp);
 bool RDPScissorDoesNotEqualRenderingStateScissor(void* rcp, struct Rect scissor);
 
+
+u_int32_t RDPGetOtherModeL(void* rcp);
+u_int32_t RDPGetOtherModeH(void* rcp);
+void RDPSetOtherModeL(void* rcp, uint32_t value);
+void RDPSetOtherModeH(void* rcp, uint32_t value);
 
 #ifdef __cplusplus
 }

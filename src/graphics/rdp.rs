@@ -91,6 +91,9 @@ pub struct RDP {
 
     pub viewport_or_scissor_changed: bool,
 
+    pub other_mode_l: u32,
+    pub other_mode_h: u32,
+
     pub buf_vbo: [f32; MAX_VBO_SIZE * (26 * 3)], // 3 vertices in a triangle and 26 floats per vtx
     pub buf_vbo_len: usize,
     pub buf_vbo_num_tris: usize,
@@ -107,6 +110,9 @@ impl RDP {
             color_combiner_manager: ColorCombinerManager::new(),
 
             viewport_or_scissor_changed: false,
+
+            other_mode_l: 0,
+            other_mode_h: 0,
 
             buf_vbo: [0.0; MAX_VBO_SIZE * (26 * 3)],
             buf_vbo_len: 0,
@@ -375,4 +381,28 @@ pub extern "C" fn RDPScissorDoesNotEqualRenderingStateScissor(
 ) -> bool {
     let rcp = rcp.unwrap();
     rcp.rdp.rendering_state.scissor != scissor
+}
+
+#[no_mangle]
+pub extern "C" fn RDPGetOtherModeL(rcp: Option<&mut RCP>) -> u32 {
+    let rcp = rcp.unwrap();
+    rcp.rdp.other_mode_l
+}
+
+#[no_mangle]
+pub extern "C" fn RDPGetOtherModeH(rcp: Option<&mut RCP>) -> u32 {
+    let rcp = rcp.unwrap();
+    rcp.rdp.other_mode_h
+}
+
+#[no_mangle]
+pub extern "C" fn RDPSetOtherModeL(rcp: Option<&mut RCP>, value: u32) {
+    let rcp = rcp.unwrap();
+    rcp.rdp.other_mode_l = value;
+}
+
+#[no_mangle]
+pub extern "C" fn RDPSetOtherModeH(rcp: Option<&mut RCP>, value: u32) {
+    let rcp = rcp.unwrap();
+    rcp.rdp.other_mode_h = value;
 }

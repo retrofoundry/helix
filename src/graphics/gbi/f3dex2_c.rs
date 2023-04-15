@@ -90,6 +90,30 @@ pub extern "C" fn F3DEX2_GSPGeometryMode(rcp: Option<&mut RCP>, w0: usize, w1: u
     );
 }
 
+#[no_mangle]
+pub extern "C" fn F3DEX2_GDPOtherModeL(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
+    let rcp = rcp.unwrap();
+    F3DEX2::gdp_other_mode_l(
+        &mut rcp.rdp,
+        &mut rcp.rsp,
+        rcp.gfx_device.as_ref().unwrap(),
+        w0,
+        w1,
+    );
+}
+
+#[no_mangle]
+pub extern "C" fn F3DEX2_GDPOtherModeH(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
+    let rcp = rcp.unwrap();
+    F3DEX2::gdp_other_mode_h(
+        &mut rcp.rdp,
+        &mut rcp.rsp,
+        rcp.gfx_device.as_ref().unwrap(),
+        w0,
+        w1,
+    );
+}
+
 // RSP Getters and Setters
 
 #[no_mangle]

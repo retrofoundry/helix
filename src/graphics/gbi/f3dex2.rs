@@ -80,6 +80,9 @@ impl GBIDefinition for F3DEX2 {
         gbi.register(F3DEX2::G_GEOMETRYMODE as usize, F3DEX2::gsp_geometry_mode);
         gbi.register(F3DEX2::G_TRI1 as usize, F3DEX2::gsp_tri1);
         gbi.register(F3DEX2::G_ENDDL as usize, |_, _, _, _, _| GBIResult::Return);
+
+        gbi.register(F3DEX2::G_SETOTHERMODE_L as usize, F3DEX2::gdp_other_mode_l);
+        gbi.register(F3DEX2::G_SETOTHERMODE_H as usize, F3DEX2::gdp_other_mode_h);
     }
 }
 
@@ -518,6 +521,45 @@ impl F3DEX2 {
             let new_addr = get_segmented_address(w1);
             return GBIResult::SetAddress(new_addr);
         }
+    }
+
+    pub fn gdp_other_mode_l(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gfx_device: &GfxDevice,
+        w0: usize,
+        w1: usize,
+    ) -> GBIResult {
+        let shift = 31 - get_cmd(w0, 8, 8) - get_cmd(w0, 0, 8);
+        let mask = get_cmd(w0, 0, 8) + 1;
+        let mode = w1;
+
+        F3DEX2::gdp_other_mode(rdp, shift, mask, mode as u64)
+    }
+
+    pub fn gdp_other_mode_h(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gfx_device: &GfxDevice,
+        w0: usize,
+        w1: usize,
+    ) -> GBIResult {
+        let shift = 63 - get_cmd(w0, 8, 8) - get_cmd(w0, 0, 8);
+        let mask = get_cmd(w0, 0, 8) + 1;
+        let mode = (w1 as u64) << 32;
+
+        F3DEX2::gdp_other_mode(rdp, shift, mask, mode)
+    }
+
+    pub fn gdp_other_mode(rdp: &mut RDP, shift: usize, mask: usize, mode: u64) -> GBIResult {
+        let mask = (((1 as u64) << (mask as u64)) - 1) << shift as u64;
+        let mut om = rdp.other_mode_l as u64 | ((rdp.other_mode_h as u64) << 32);
+        om = (om & !mask) | mode as u64;
+
+        rdp.other_mode_l = om as u32;
+        rdp.other_mode_h = (om >> 32) as u32;
+
+        GBIResult::Continue
     }
 }
 
