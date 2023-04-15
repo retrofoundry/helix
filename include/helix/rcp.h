@@ -97,15 +97,6 @@ void RSPSetGeometryMode(void* rcp, uint32_t value);
 
 struct StagingVertex* RSPGetStagingVertexAtIndexPtr(void* rcp, uint8_t index);
 
-bool RSPLookupTexture(void* rcp, int tile, const uint8_t *orig_addr, uint32_t fmt, uint32_t size, struct Texture **value);
-
-struct ColorCombiner* RSPGetCurrentColorCombiner(void* rcp);
-void RSPAddColorCombiner(void* rcp, struct ColorCombiner *combiner);
-struct ColorCombiner* RSPGetColorCombiner(void* rcp, uint32_t cc_id);
-struct ColorCombiner* RSPCreateAndInsertEmptyColorCombiner(void* rcp, uint32_t cc_id);
-
-u_int32_t RSPGenerateColorCombiner(void* rcp, uint32_t cc_id);
-
 // RDP Getters and Setters
 void RDPSetOutputDimensions(void* rcp, struct OutputDimensions dimensions);
 
@@ -114,12 +105,43 @@ void RDPSetViewportOrScissorChanged(void* rcp, bool value);
 
 struct Rect RDPGetViewport(void* rcp);
 struct Rect* RDPGetViewportPtr(void* rcp);
+void RDPSetRenderingStateViewport(void* rcp, struct Rect viewport);
 void RDPSetViewport(void* rcp, struct Rect viewport);
+
+void RDPSetRenderingStateScissor(void* rcp, struct Rect scissor);
 
 void RDPFlush(void* rcp);
 
 void RDPAddToVBOAndIncrement(void* rcp, float value);
 size_t RDPIncrementTriangleCountAndReturn(void* rcp);
+
+bool RDPLookupTexture(void* rcp, int tile, const uint8_t *orig_addr, uint32_t fmt, uint32_t size);
+
+void RDPLookupOrCreateColorCombiner(void* rcp, uint32_t cc_id);
+struct ColorCombiner* RDPGetColorCombiner(void* rcp, uint32_t cc_id);
+
+void RDPLookupOrCreateShaderProgram(void* rcp, uint32_t shader_id);
+
+bool RDPGetRenderingStateDepthTest(void* rcp);
+void RDPSetRenderingStateDepthTest(void* rcp, bool value);
+
+bool RDPGetRenderingStateDepthMask(void* rcp);
+void RDPSetRenderingStateDepthMask(void* rcp, bool value);
+
+bool RDPGetRenderingStateZModeDecal(void* rcp);
+void RDPSetRenderingStateZModeDecal(void* rcp, bool value);
+
+bool RDPGetRenderingStateUseAlpha(void* rcp);
+void RDPSetRenderingStateUseAlpha(void* rcp, bool value);
+
+struct ShaderProgram* RDPGetRenderingStateShaderProgram(void* rcp);
+void RDPSetRenderingStateShaderProgram(void* rcp, struct ShaderProgram *prg);
+
+struct Texture* RDPGetRenderingStateTextureAtIndex(void* rcp, int index);
+
+bool RDPViewportDoesNotEqualRenderingStateViewport(void* rcp);
+bool RDPScissorDoesNotEqualRenderingStateScissor(void* rcp, struct Rect scissor);
+
 
 #ifdef __cplusplus
 }

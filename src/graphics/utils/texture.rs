@@ -81,25 +81,36 @@ pub struct Texture {
     linear_filter: bool,
 }
 
+impl Texture {
+    pub const EMPTY: Self = Self {
+        texture_addr: 0,
+        fmt: 0,
+        size: 0,
+        texture_id: 0,
+        cms: 0,
+        cmt: 0,
+        linear_filter: false,
+    };
+}
+
 #[no_mangle]
-pub extern "C" fn RSPLookupTexture(
+pub extern "C" fn RDPLookupTexture(
     rcp: Option<&mut RCP>,
     tile: i32,
     orig_addr: *const u8,
     fmt: u8,
     siz: u8,
-    output: *mut *mut Texture,
 ) -> bool {
     let rcp = rcp.unwrap();
     let gfx_device = rcp.gfx_device.as_ref().unwrap();
-    let texture_cache = &mut rcp.rsp.texture_manager;
+    let texture_cache = &mut rcp.rdp.texture_manager;
     if let Some(value) = texture_cache.lookup(gfx_device, tile, orig_addr as usize, fmt, siz) {
-        unsafe { *output = value };
+        rcp.rdp.rendering_state.textures[tile as usize] = *value;
         true
     } else {
         let value =
             texture_cache.insert_if_not_found(gfx_device, tile, orig_addr as usize, fmt, siz);
-        unsafe { *output = value };
+        rcp.rdp.rendering_state.textures[tile as usize] = *value;
         false
     }
 }
