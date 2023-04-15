@@ -11,7 +11,7 @@ use super::utils::{get_cmd, get_segmented_address};
 use super::{GBIDefinition, GBIResult, GBI};
 use crate::{
     extensions::matrix::{calculate_normal_dir, matrix_from_fixed_point, matrix_multiply},
-    graphics::gfx_device::GfxDevice,
+    graphics::{gfx_device::GfxDevice, rdp::SCREEN_HEIGHT},
 };
 
 pub enum F3DEX2 {
@@ -81,8 +81,9 @@ impl GBIDefinition for F3DEX2 {
         gbi.register(F3DEX2::G_TRI1 as usize, F3DEX2::gsp_tri1);
         gbi.register(F3DEX2::G_ENDDL as usize, |_, _, _, _, _| GBIResult::Return);
 
-        gbi.register(F3DEX2::G_SETOTHERMODE_L as usize, F3DEX2::gdp_other_mode_l);
-        gbi.register(F3DEX2::G_SETOTHERMODE_H as usize, F3DEX2::gdp_other_mode_h);
+        gbi.register(F3DEX2::G_SETOTHERMODE_L as usize, F3DEX2::gdp_set_other_mode_l);
+        gbi.register(F3DEX2::G_SETOTHERMODE_H as usize, F3DEX2::gdp_set_other_mode_h);
+        gbi.register(F3DEX2::G_SETSCISSOR as usize, F3DEX2::gdp_set_scissor);
     }
 }
 
@@ -523,7 +524,7 @@ impl F3DEX2 {
         }
     }
 
-    pub fn gdp_other_mode_l(
+    pub fn gdp_set_other_mode_l(
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gfx_device: &GfxDevice,
@@ -537,7 +538,7 @@ impl F3DEX2 {
         F3DEX2::gdp_other_mode(rdp, shift, mask, mode as u64)
     }
 
-    pub fn gdp_other_mode_h(
+    pub fn gdp_set_other_mode_h(
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gfx_device: &GfxDevice,
@@ -559,6 +560,34 @@ impl F3DEX2 {
         rdp.other_mode_l = om as u32;
         rdp.other_mode_h = (om >> 32) as u32;
 
+        GBIResult::Continue
+    }
+
+    // gdp_set_scissor
+    pub fn gdp_set_scissor(
+        rdp: &mut RDP,
+        rsp: &mut RSP,
+        _gfx_device: &GfxDevice,
+        w0: usize,
+        w1: usize,
+    ) -> GBIResult {
+        let _mode = get_cmd(w1, 24, 2);
+        let ulx = get_cmd(w0, 12, 12);
+        let uly = get_cmd(w0, 0, 12);
+        let lrx = get_cmd(w1, 12, 12);
+        let lry = get_cmd(w1, 0, 12);
+
+        let x = ulx as f32 / 4.0 * rdp.scaled_x();
+        let y = (SCREEN_HEIGHT - lry as f32 / 4.0) * rdp.scaled_y();
+        let width = (lrx as f32 - ulx as f32) / 4.0 * rdp.scaled_x();
+        let height = (lry as f32 - uly as f32) / 4.0 * rdp.scaled_y();
+
+        rdp.scissor.x = x as u16;
+        rdp.scissor.y = y as u16;
+        rdp.scissor.width = width as u16;
+        rdp.scissor.height = height as u16;
+
+        rdp.viewport_or_scissor_changed = true;
         GBIResult::Continue
     }
 }

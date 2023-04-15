@@ -91,9 +91,9 @@ pub extern "C" fn F3DEX2_GSPGeometryMode(rcp: Option<&mut RCP>, w0: usize, w1: u
 }
 
 #[no_mangle]
-pub extern "C" fn F3DEX2_GDPOtherModeL(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
+pub extern "C" fn F3DEX2_GDPSetOtherModeL(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
     let rcp = rcp.unwrap();
-    F3DEX2::gdp_other_mode_l(
+    F3DEX2::gdp_set_other_mode_l(
         &mut rcp.rdp,
         &mut rcp.rsp,
         rcp.gfx_device.as_ref().unwrap(),
@@ -103,9 +103,22 @@ pub extern "C" fn F3DEX2_GDPOtherModeL(rcp: Option<&mut RCP>, w0: usize, w1: usi
 }
 
 #[no_mangle]
-pub extern "C" fn F3DEX2_GDPOtherModeH(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
+pub extern "C" fn F3DEX2_GDPSetOtherModeH(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
     let rcp = rcp.unwrap();
-    F3DEX2::gdp_other_mode_h(
+    F3DEX2::gdp_set_other_mode_h(
+        &mut rcp.rdp,
+        &mut rcp.rsp,
+        rcp.gfx_device.as_ref().unwrap(),
+        w0,
+        w1,
+    );
+}
+
+// F3DEX2_GDPSetScissor
+#[no_mangle]
+pub extern "C" fn F3DEX2_GDPSetScissor(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
+    let rcp = rcp.unwrap();
+    F3DEX2::gdp_set_scissor(
         &mut rcp.rdp,
         &mut rcp.rsp,
         rcp.gfx_device.as_ref().unwrap(),
@@ -173,4 +186,10 @@ pub extern "C" fn RDPGetViewportPtr(rcp: Option<&mut RCP>) -> *mut Rect {
 pub extern "C" fn RDPSetViewport(rcp: Option<&mut RCP>, viewport: Rect) {
     let rcp = rcp.unwrap();
     rcp.rdp.viewport = viewport;
+}
+
+#[no_mangle]
+pub extern "C" fn RDPGetScissorPtr(rcp: Option<&mut RCP>) -> *mut Rect {
+    let rcp = rcp.unwrap();
+    &mut rcp.rdp.scissor as *mut Rect
 }

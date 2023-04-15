@@ -9,8 +9,8 @@ use super::{
 };
 use crate::graphics::gfx_device::ShaderProgram;
 
-const SCREEN_WIDTH: f32 = 320.0;
-const SCREEN_HEIGHT: f32 = 240.0;
+pub const SCREEN_WIDTH: f32 = 320.0;
+pub const SCREEN_HEIGHT: f32 = 240.0;
 const MAX_VBO_SIZE: usize = 256;
 const TEXTURE_CACHE_MAX_SIZE: usize = 500;
 
@@ -82,13 +82,14 @@ impl RenderingState {
 }
 
 pub struct RDP {
-    pub viewport: Rect,
     pub output_dimensions: OutputDimensions,
     pub rendering_state: RenderingState,
 
     pub texture_manager: TextureManager,
     pub color_combiner_manager: ColorCombinerManager,
 
+    pub viewport: Rect,
+    pub scissor: Rect,
     pub viewport_or_scissor_changed: bool,
 
     pub other_mode_l: u32,
@@ -102,13 +103,14 @@ pub struct RDP {
 impl RDP {
     pub fn new() -> Self {
         RDP {
-            viewport: Rect::ZERO,
             output_dimensions: OutputDimensions::ZERO,
             rendering_state: RenderingState::EMPTY,
 
             texture_manager: TextureManager::new(TEXTURE_CACHE_MAX_SIZE),
             color_combiner_manager: ColorCombinerManager::new(),
 
+            viewport: Rect::ZERO,
+            scissor: Rect::ZERO,
             viewport_or_scissor_changed: false,
 
             other_mode_l: 0,
@@ -239,11 +241,11 @@ impl RDP {
 
     // MARK: - Helpers
 
-    fn scaled_x(&self) -> f32 {
+    pub fn scaled_x(&self) -> f32 {
         self.output_dimensions.width as f32 / SCREEN_WIDTH
     }
 
-    fn scaled_y(&self) -> f32 {
+    pub fn scaled_y(&self) -> f32 {
         self.output_dimensions.height as f32 / SCREEN_HEIGHT
     }
 }
@@ -375,12 +377,9 @@ pub extern "C" fn RDPViewportDoesNotEqualRenderingStateViewport(rcp: Option<&mut
 }
 
 #[no_mangle]
-pub extern "C" fn RDPScissorDoesNotEqualRenderingStateScissor(
-    rcp: Option<&mut RCP>,
-    scissor: Rect,
-) -> bool {
+pub extern "C" fn RDPScissorDoesNotEqualRenderingStateScissor(rcp: Option<&mut RCP>) -> bool {
     let rcp = rcp.unwrap();
-    rcp.rdp.rendering_state.scissor != scissor
+    rcp.rdp.rendering_state.scissor != rcp.rdp.scissor
 }
 
 #[no_mangle]

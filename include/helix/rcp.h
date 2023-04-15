@@ -91,8 +91,9 @@ void F3DEX2_GSPMoveMem(void* rcp, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GSPTexture(void* rcp, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GSPGeometryMode(void* rcp, uintptr_t w0, uintptr_t w1);
 
-void F3DEX2_GDPOtherModeL(void* rcp, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GDPOtherModeH(void* rcp, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPSetOtherModeL(void* rcp, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPSetOtherModeH(void* rcp, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPSetScissor(void* rcp, uintptr_t w0, uintptr_t w1);
 
 // RSP Getters and Setters
 uint32_t RSPGetGeometryMode(void* rcp);
@@ -110,6 +111,7 @@ struct Rect RDPGetViewport(void* rcp);
 struct Rect* RDPGetViewportPtr(void* rcp);
 void RDPSetRenderingStateViewport(void* rcp, struct Rect viewport);
 void RDPSetViewport(void* rcp, struct Rect viewport);
+struct Rect* RDPGetScissorPtr(void* rcp);
 
 void RDPSetRenderingStateScissor(void* rcp, struct Rect scissor);
 
@@ -143,7 +145,7 @@ void RDPSetRenderingStateShaderProgram(void* rcp, struct ShaderProgram *prg);
 struct Texture* RDPGetRenderingStateTextureAtIndex(void* rcp, int index);
 
 bool RDPViewportDoesNotEqualRenderingStateViewport(void* rcp);
-bool RDPScissorDoesNotEqualRenderingStateScissor(void* rcp, struct Rect scissor);
+bool RDPScissorDoesNotEqualRenderingStateScissor(void* rcp);
 
 
 u_int32_t RDPGetOtherModeL(void* rcp);
