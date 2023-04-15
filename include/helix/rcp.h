@@ -82,16 +82,6 @@ void RCPReset(void* rcp);
 
 struct GfxDevice* RCPGetGfxDevice(void* rcp);
 
-bool RSPLookupTexture(void* rcp, int tile, const uint8_t *orig_addr, uint32_t fmt, uint32_t size, struct Texture **value);
-
-struct ColorCombiner* RSPGetCurrentColorCombiner(void* rcp);
-void RSPAddColorCombiner(void* rcp, struct ColorCombiner *combiner);
-struct ColorCombiner* RSPGetColorCombiner(void* rcp, uint32_t cc_id);
-struct ColorCombiner* RSPCreateAndInsertEmptyColorCombiner(void* rcp, uint32_t cc_id);
-
-
-u_int32_t RSPGenerateColorCombiner(void* rcp, uint32_t cc_id);
-
 // F3DEX2 Commands
 void F3DEX2_GSPMatrix(void* rcp, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GSPPopMatrix(void* rcp, uintptr_t w0, uintptr_t w1);
@@ -107,6 +97,15 @@ void RSPSetGeometryMode(void* rcp, uint32_t value);
 
 struct StagingVertex* RSPGetStagingVertexAtIndexPtr(void* rcp, uint8_t index);
 
+bool RSPLookupTexture(void* rcp, int tile, const uint8_t *orig_addr, uint32_t fmt, uint32_t size, struct Texture **value);
+
+struct ColorCombiner* RSPGetCurrentColorCombiner(void* rcp);
+void RSPAddColorCombiner(void* rcp, struct ColorCombiner *combiner);
+struct ColorCombiner* RSPGetColorCombiner(void* rcp, uint32_t cc_id);
+struct ColorCombiner* RSPCreateAndInsertEmptyColorCombiner(void* rcp, uint32_t cc_id);
+
+u_int32_t RSPGenerateColorCombiner(void* rcp, uint32_t cc_id);
+
 // RDP Getters and Setters
 void RDPSetOutputDimensions(void* rcp, struct OutputDimensions dimensions);
 
@@ -116,6 +115,11 @@ void RDPSetViewportOrScissorChanged(void* rcp, bool value);
 struct Rect RDPGetViewport(void* rcp);
 struct Rect* RDPGetViewportPtr(void* rcp);
 void RDPSetViewport(void* rcp, struct Rect viewport);
+
+void RDPFlush(void* rcp);
+
+void RDPAddToVBOAndIncrement(void* rcp, float value);
+size_t RDPIncrementTriangleCountAndReturn(void* rcp);
 
 #ifdef __cplusplus
 }
