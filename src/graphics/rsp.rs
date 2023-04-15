@@ -2,8 +2,9 @@ use crate::extensions::matrix::matrix_multiply;
 
 use super::{
     gbi::defines::Light,
+    rcp::RCP,
     utils::{
-        color_combiner::{ColorCombiner, ColorCombinerManager},
+        color_combiner::{ColorCombiner, ColorCombinerManager, CC, SHADER},
         texture::TextureManager,
     },
 };
@@ -135,4 +136,56 @@ impl RSP {
         self.num_lights = num_lights;
         self.lights_valid = false;
     }
+
+    pub fn generate_color_combiner(&mut self, cc_id: u32) -> u32 {
+        let mut c = [[0u8; 4]; 2];
+        for i in 0..4 {
+            c[0][i] = ((cc_id >> (i * 3)) & 7) as u8;
+            c[1][i] = ((cc_id >> (12 + i * 3)) & 7) as u8;
+        }
+
+        let mut shader_id = (cc_id >> 24) << 24;
+        let mut shader_input_mapping = [[0u8; 4]; 2];
+        for i in 0..2 {
+            if c[i][0] == c[i][1] || c[i][2] == CC::NIL as u8 {
+                c[i][0] = 0;
+                c[i][1] = 0;
+                c[i][2] = 0;
+            }
+            let mut input_number = [0u8; 8];
+            let mut next_input_number = SHADER::INPUT_1 as u8;
+            for j in 0..4 {
+                let mut val = 0;
+                match c[i][j] {
+                    x if x == CC::NIL as u8 => {}
+                    x if x == CC::TEXEL0 as u8 => val = SHADER::TEXEL0 as u8,
+                    x if x == CC::TEXEL1 as u8 => val = SHADER::TEXEL1 as u8,
+                    x if x == CC::TEXEL0A as u8 => val = SHADER::TEXEL0A as u8,
+                    x if [CC::PRIM, CC::SHADE, CC::ENV, CC::LOD]
+                        .contains(&CC::from_u8(x).unwrap()) =>
+                    {
+                        if input_number[c[i][j] as usize] == 0 {
+                            shader_input_mapping[i][(next_input_number - 1) as usize] = c[i][j];
+                            input_number[c[i][j] as usize] = next_input_number;
+                            next_input_number += 1;
+                        }
+                        val = input_number[c[i][j] as usize];
+                    }
+                    _ => {}
+                }
+                shader_id |= (val as u32) << (i * 12 + j * 3);
+            }
+        }
+
+        let combiner = ColorCombiner::new(cc_id, shader_input_mapping);
+        self.color_combiner_manager.add_combiner(combiner);
+        shader_id
+    }
+}
+
+// MARK: - C Bridge
+#[no_mangle]
+pub extern "C" fn RSPGenerateColorCombiner(rcp: Option<&mut RCP>, cc_id: u32) -> u32 {
+    let rcp = rcp.unwrap();
+    rcp.rsp.generate_color_combiner(cc_id)
 }

@@ -89,6 +89,9 @@ void RSPAddColorCombiner(void* rcp, struct ColorCombiner *combiner);
 struct ColorCombiner* RSPGetColorCombiner(void* rcp, uint32_t cc_id);
 struct ColorCombiner* RSPCreateAndInsertEmptyColorCombiner(void* rcp, uint32_t cc_id);
 
+
+u_int32_t RSPGenerateColorCombiner(void* rcp, uint32_t cc_id);
+
 // F3DEX2 Commands
 void F3DEX2_GSPMatrix(void* rcp, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GSPPopMatrix(void* rcp, uintptr_t w0, uintptr_t w1);

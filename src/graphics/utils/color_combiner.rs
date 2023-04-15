@@ -2,6 +2,45 @@ use crate::graphics::{gfx_device::ShaderProgram, rcp::RCP};
 use log::trace;
 use std::collections::HashMap;
 
+#[derive(PartialEq, Eq)]
+pub enum CC {
+    NIL,
+    TEXEL0,
+    TEXEL1,
+    PRIM,
+    SHADE,
+    ENV,
+    TEXEL0A,
+    LOD,
+}
+
+impl CC {
+    pub fn from_u8(val: u8) -> Option<Self> {
+        match val {
+            x if x == CC::NIL as u8 => Some(CC::NIL),
+            x if x == CC::TEXEL0 as u8 => Some(CC::TEXEL0),
+            x if x == CC::TEXEL1 as u8 => Some(CC::TEXEL1),
+            x if x == CC::PRIM as u8 => Some(CC::PRIM),
+            x if x == CC::SHADE as u8 => Some(CC::SHADE),
+            x if x == CC::ENV as u8 => Some(CC::ENV),
+            x if x == CC::TEXEL0A as u8 => Some(CC::TEXEL0A),
+            x if x == CC::LOD as u8 => Some(CC::LOD),
+            _ => None,
+        }
+    }
+}
+
+pub enum SHADER {
+    NIL,
+    INPUT_1,
+    INPUT_2,
+    INPUT_3,
+    INPUT_4,
+    TEXEL0,
+    TEXEL0A,
+    TEXEL1,
+}
+
 pub struct ColorCombinerManager {
     combiners: HashMap<u32, ColorCombiner>,
     current_combiner: Option<u32>,
@@ -49,11 +88,17 @@ pub struct ColorCombiner {
 }
 
 impl ColorCombiner {
-    pub fn new() -> Self {
+    pub const ZERO: Self = Self {
+        cc_id: 0,
+        prg: std::ptr::null_mut(),
+        shader_input_mapping: [[0; 4]; 2],
+    };
+
+    pub fn new(shader_id: u32, shader_input_mapping: [[u8; 4]; 2]) -> Self {
         Self {
-            cc_id: 0,
+            cc_id: shader_id,
             prg: std::ptr::null_mut(),
-            shader_input_mapping: [[0; 4]; 2],
+            shader_input_mapping,
         }
     }
 }
@@ -100,7 +145,7 @@ pub unsafe extern "C" fn RSPCreateAndInsertEmptyColorCombiner(
 ) -> *mut ColorCombiner {
     let rcp = rcp.unwrap();
 
-    let mut combiner = ColorCombiner::new();
+    let mut combiner = ColorCombiner::ZERO;
     combiner.cc_id = cc_id;
     rcp.rsp.color_combiner_manager.add_combiner(combiner);
 
