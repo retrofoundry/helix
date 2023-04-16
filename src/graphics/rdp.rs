@@ -3,7 +3,9 @@ use super::{
     gfx_device::GfxDevice,
     rcp::RCP,
     utils::{
-        color_combiner::{ColorCombiner, ColorCombinerManager, CC, SHADER},
+        color_combiner::{
+            ColorCombiner, ColorCombinerManager, CombineParams, ACMUX, CCMUX, SHADER,
+        },
         texture::{Texture, TextureManager},
     },
 };
@@ -80,7 +82,6 @@ impl RenderingState {
         textures: [Texture::EMPTY; 2],
     };
 }
-
 pub struct RDP {
     pub output_dimensions: OutputDimensions,
     pub rendering_state: RenderingState,
@@ -92,6 +93,7 @@ pub struct RDP {
     pub scissor: Rect,
     pub viewport_or_scissor_changed: bool,
 
+    pub combine: CombineParams,
     pub other_mode_l: u32,
     pub other_mode_h: u32,
 
@@ -113,6 +115,7 @@ impl RDP {
             scissor: Rect::ZERO,
             viewport_or_scissor_changed: false,
 
+            combine: CombineParams::ZERO,
             other_mode_l: 0,
             other_mode_h: 0,
 
@@ -193,47 +196,66 @@ impl RDP {
     }
 
     pub fn generate_color_combiner(&mut self, gfx_device: &GfxDevice, cc_id: u32) {
-        let mut c = [[0u8; 4]; 2];
-        for i in 0..4 {
-            c[0][i] = ((cc_id >> (i * 3)) & 7) as u8;
-            c[1][i] = ((cc_id >> (12 + i * 3)) & 7) as u8;
-        }
-
         let mut shader_id = (cc_id >> 24) << 24;
         let mut shader_input_mapping = [[0u8; 4]; 2];
-        for i in 0..2 {
-            if c[i][0] == c[i][1] || c[i][2] == CC::NIL as u8 {
-                c[i][0] = 0;
-                c[i][1] = 0;
-                c[i][2] = 0;
-            }
+
+        // parse the color combine pass
+        {
             let mut input_number = [0u8; 8];
             let mut next_input_number = SHADER::INPUT_1 as u8;
-            for j in 0..4 {
+
+            for i in 0..4 {
                 let mut val = 0;
-                match c[i][j] {
-                    x if x == CC::NIL as u8 => {}
-                    x if x == CC::TEXEL0 as u8 => val = SHADER::TEXEL0 as u8,
-                    x if x == CC::TEXEL1 as u8 => val = SHADER::TEXEL1 as u8,
-                    x if x == CC::TEXEL0A as u8 => val = SHADER::TEXEL0A as u8,
-                    x if [CC::PRIM, CC::SHADE, CC::ENV, CC::LOD]
-                        .contains(&CC::from_u8(x).unwrap()) =>
-                    {
-                        if input_number[c[i][j] as usize] == 0 {
-                            shader_input_mapping[i][(next_input_number - 1) as usize] = c[i][j];
-                            input_number[c[i][j] as usize] = next_input_number;
+                match self.combine.c0.get(i) {
+                    CCMUX::TEXEL0 => val = SHADER::TEXEL0 as u8,
+                    CCMUX::TEXEL1 => val = SHADER::TEXEL1 as u8,
+                    CCMUX::TEXEL0_ALPHA => val = SHADER::TEXEL0A as u8,
+                    CCMUX::PRIMITIVE | CCMUX::SHADE | CCMUX::ENVIRONMENT | CCMUX::LOD_FRACTION => {
+                        let property = self.combine.c0.get(i) as u8;
+
+                        if input_number[property as usize] == 0 {
+                            shader_input_mapping[0][(next_input_number - 1) as usize] = property;
+                            input_number[property as usize] = next_input_number;
                             next_input_number += 1;
                         }
-                        val = input_number[c[i][j] as usize];
+                        val = input_number[property as usize];
                     }
                     _ => {}
                 }
-                shader_id |= (val as u32) << (i * 12 + j * 3);
+
+                shader_id |= (val as u32) << (i * 3);
+            }
+        }
+
+        // parse the alpha combine pass
+        {
+            let mut input_number = [0u8; 8];
+            let mut next_input_number = SHADER::INPUT_1 as u8;
+
+            for i in 0..4 {
+                let mut val = 0;
+                match self.combine.a0.get(i) {
+                    ACMUX::TEXEL0 => val = SHADER::TEXEL0 as u8,
+                    ACMUX::TEXEL1 => val = SHADER::TEXEL1 as u8,
+                    ACMUX::PRIMITIVE | ACMUX::SHADE | ACMUX::ENVIRONMENT => {
+                        let property = self.combine.a0.get(i) as u8;
+
+                        if input_number[property as usize] == 0 {
+                            shader_input_mapping[1][(next_input_number - 1) as usize] = property;
+                            input_number[property as usize] = next_input_number;
+                            next_input_number += 1;
+                        }
+                        val = input_number[property as usize];
+                    }
+                    _ => {}
+                }
+
+                shader_id |= (val as u32) << (12 + i * 3);
             }
         }
 
         let shader_program = self.lookup_or_create_shader_program(gfx_device, shader_id);
-        let combiner = ColorCombiner::new(cc_id, shader_program, shader_input_mapping);
+        let combiner = ColorCombiner::new(shader_id, shader_program, shader_input_mapping);
         self.color_combiner_manager
             .combiners
             .insert(cc_id, combiner);
@@ -404,4 +426,22 @@ pub extern "C" fn RDPSetOtherModeL(rcp: Option<&mut RCP>, value: u32) {
 pub extern "C" fn RDPSetOtherModeH(rcp: Option<&mut RCP>, value: u32) {
     let rcp = rcp.unwrap();
     rcp.rdp.other_mode_h = value;
+}
+
+#[no_mangle]
+pub extern "C" fn RDPGetCombineU32(rcp: Option<&mut RCP>) -> u32 {
+    let rcp = rcp.unwrap();
+    rcp.rdp.combine.to_u32()
+}
+
+#[no_mangle]
+pub extern "C" fn RDPGetCombine(rcp: Option<&mut RCP>) -> *const CombineParams {
+    let rcp = rcp.unwrap();
+    Box::into_raw(Box::new(rcp.rdp.combine))
+}
+
+#[no_mangle]
+pub extern "C" fn RDPSetCombine(rcp: Option<&mut RCP>, value: *mut CombineParams) {
+    let rcp = rcp.unwrap();
+    rcp.rdp.combine = unsafe { *value };
 }

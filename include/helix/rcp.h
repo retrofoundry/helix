@@ -94,6 +94,7 @@ void F3DEX2_GSPGeometryMode(void* rcp, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GDPSetOtherModeL(void* rcp, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GDPSetOtherModeH(void* rcp, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GDPSetScissor(void* rcp, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPSetCombine(void* rcp, uintptr_t w0, uintptr_t w1);
 
 // RSP Getters and Setters
 uint32_t RSPGetGeometryMode(void* rcp);
@@ -152,6 +153,10 @@ u_int32_t RDPGetOtherModeL(void* rcp);
 u_int32_t RDPGetOtherModeH(void* rcp);
 void RDPSetOtherModeL(void* rcp, uint32_t value);
 void RDPSetOtherModeH(void* rcp, uint32_t value);
+
+u_int32_t RDPGetCombineU32(void* rcp);
+void* RDPGetCombine(void* rcp);
+void RDPSetCombine(void* rcp, void* value);
 
 #ifdef __cplusplus
 }

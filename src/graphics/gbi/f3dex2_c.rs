@@ -114,11 +114,22 @@ pub extern "C" fn F3DEX2_GDPSetOtherModeH(rcp: Option<&mut RCP>, w0: usize, w1: 
     );
 }
 
-// F3DEX2_GDPSetScissor
 #[no_mangle]
 pub extern "C" fn F3DEX2_GDPSetScissor(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
     let rcp = rcp.unwrap();
     F3DEX2::gdp_set_scissor(
+        &mut rcp.rdp,
+        &mut rcp.rsp,
+        rcp.gfx_device.as_ref().unwrap(),
+        w0,
+        w1,
+    );
+}
+
+#[no_mangle]
+pub extern "C" fn F3DEX2_GDPSetCombine(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
+    let rcp = rcp.unwrap();
+    F3DEX2::gdp_set_combine(
         &mut rcp.rdp,
         &mut rcp.rsp,
         rcp.gfx_device.as_ref().unwrap(),

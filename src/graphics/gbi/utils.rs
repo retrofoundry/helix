@@ -1,7 +1,7 @@
 use crate::utils::I32MathExt;
 
-pub fn get_cmd(word: usize, pos: u32, width: u32) -> usize {
-    (word >> pos) & ((1 << width) - 1)
+pub fn get_cmd(val: usize, start_bit: u32, num_bits: u32) -> usize {
+    (val >> start_bit) & ((1 << num_bits) - 1)
 }
 
 pub fn get_segmented_address(w1: usize) -> usize {

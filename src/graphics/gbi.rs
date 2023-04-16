@@ -5,7 +5,7 @@ pub mod defines;
 mod f3dex2;
 mod f3dex2_c;
 mod f3dzex2;
-mod utils;
+pub mod utils;
 
 pub enum GBIResult {
     Continue,

@@ -11,7 +11,7 @@ use super::utils::{get_cmd, get_segmented_address};
 use super::{GBIDefinition, GBIResult, GBI};
 use crate::{
     extensions::matrix::{calculate_normal_dir, matrix_from_fixed_point, matrix_multiply},
-    graphics::{gfx_device::GfxDevice, rdp::SCREEN_HEIGHT},
+    graphics::{gfx_device::GfxDevice, rdp::SCREEN_HEIGHT, utils::color_combiner::CombineParams},
 };
 
 pub enum F3DEX2 {
@@ -81,9 +81,16 @@ impl GBIDefinition for F3DEX2 {
         gbi.register(F3DEX2::G_TRI1 as usize, F3DEX2::gsp_tri1);
         gbi.register(F3DEX2::G_ENDDL as usize, |_, _, _, _, _| GBIResult::Return);
 
-        gbi.register(F3DEX2::G_SETOTHERMODE_L as usize, F3DEX2::gdp_set_other_mode_l);
-        gbi.register(F3DEX2::G_SETOTHERMODE_H as usize, F3DEX2::gdp_set_other_mode_h);
+        gbi.register(
+            F3DEX2::G_SETOTHERMODE_L as usize,
+            F3DEX2::gdp_set_other_mode_l,
+        );
+        gbi.register(
+            F3DEX2::G_SETOTHERMODE_H as usize,
+            F3DEX2::gdp_set_other_mode_h,
+        );
         gbi.register(F3DEX2::G_SETSCISSOR as usize, F3DEX2::gdp_set_scissor);
+        gbi.register(F3DEX2::G_SETCOMBINE as usize, F3DEX2::gdp_set_combine);
     }
 }
 
@@ -588,6 +595,18 @@ impl F3DEX2 {
         rdp.scissor.height = height as u16;
 
         rdp.viewport_or_scissor_changed = true;
+        GBIResult::Continue
+    }
+
+    pub fn gdp_set_combine(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gfx_device: &GfxDevice,
+        w0: usize,
+        w1: usize,
+    ) -> GBIResult {
+        rdp.combine = CombineParams::decode(w0, w1);
+
         GBIResult::Continue
     }
 }
