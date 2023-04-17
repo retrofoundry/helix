@@ -15,7 +15,7 @@ pub struct C_GfxDevice {
     pub set_sampler_parameters: extern "C" fn(i32, bool, u32, u32),
     pub set_depth_test: extern "C" fn(bool),
     pub set_depth_compare: extern "C" fn(u8),
-    pub set_depth_mask: extern "C" fn(bool),
+    pub set_depth_write: extern "C" fn(bool),
     pub set_zmode_decal: extern "C" fn(bool),
     pub set_viewport: extern "C" fn(i32, i32, i32, i32),
     pub set_scissor: extern "C" fn(i32, i32, i32, i32),
@@ -85,8 +85,8 @@ impl GfxDevice {
         unsafe { ((*self.storage).set_depth_compare)(compare) }
     }
 
-    pub fn set_depth_mask(&self, enable: bool) {
-        unsafe { ((*self.storage).set_depth_mask)(enable) }
+    pub fn set_depth_write(&self, enable: bool) {
+        unsafe { ((*self.storage).set_depth_write)(enable) }
     }
 
     pub fn set_zmode_decal(&self, enable: bool) {

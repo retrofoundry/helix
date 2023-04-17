@@ -65,9 +65,9 @@ impl OutputDimensions {
 
 pub struct RenderingState {
     pub depth_compare: CompareFunction,
-    pub depth_test: bool, // TODO: remove in favor of depth_compare
+    pub depth_test: bool,
+    pub depth_write: bool,
 
-    pub depth_mask: bool,
     pub decal_mode: bool,
     pub alpha_blend: bool,
     pub viewport: Rect,
@@ -80,7 +80,7 @@ impl RenderingState {
     pub const EMPTY: Self = Self {
         depth_compare: CompareFunction::Always,
         depth_test: false,
-        depth_mask: false,
+        depth_write: false,
         decal_mode: false,
         alpha_blend: false,
         viewport: Rect::ZERO,
@@ -329,6 +329,7 @@ impl RDP {
         let dst_color = render_mode >> OtherModeLayoutL::M_2 as u32 & 0x03;
         let dst_factor = render_mode >> OtherModeLayoutL::B_2 as u32 & 0x03;
 
+        // handle depth compare
         if self.other_mode_l & (1 << OtherModeLayoutL::Z_CMP as u32) != 0 {
             let zmode = self.other_mode_l >> (OtherModeLayoutL::ZMODE as u32) & 0x03;
             let depth_compare = match zmode {
@@ -345,6 +346,14 @@ impl RDP {
                 self.rendering_state.depth_compare = depth_compare;
             }
         }
+
+        // handle depth write
+        let depth_write = render_mode & (1 << OtherModeLayoutL::Z_UPD as u32) != 0;
+        if depth_write != self.rendering_state.depth_write {
+            self.flush(&gfx_device);
+            gfx_device.set_depth_write(depth_write);
+            self.rendering_state.depth_write = depth_write;
+        }
     }
 
     pub fn update_render_state(
@@ -353,7 +362,6 @@ impl RDP {
         geometry_mode: u32,
         vertices: &[&StagingVertex; 3],
     ) {
-        // TODO: Base this off Z_CMP and Z_MODE?
         let depth_test = geometry_mode & RSPGeometry::G_ZBUFFER as u32 != 0;
         if depth_test != self.rendering_state.depth_test {
             self.flush(gfx_device);
@@ -468,27 +476,9 @@ pub extern "C" fn RDPLookupOrCreateShaderProgram(rcp: Option<&mut RCP>, shader_i
 }
 
 #[no_mangle]
-pub extern "C" fn RDPGetRenderingStateDepthTest(rcp: Option<&mut RCP>) -> bool {
-    let rcp = rcp.unwrap();
-    rcp.rdp.rendering_state.depth_test
-}
-
-#[no_mangle]
-pub extern "C" fn RDPSetRenderingStateDepthTest(rcp: Option<&mut RCP>, value: bool) {
-    let rcp = rcp.unwrap();
-    rcp.rdp.rendering_state.depth_test = value;
-}
-
-#[no_mangle]
-pub extern "C" fn RDPGetRenderingStateDepthMask(rcp: Option<&mut RCP>) -> bool {
-    let rcp = rcp.unwrap();
-    rcp.rdp.rendering_state.depth_mask
-}
-
-#[no_mangle]
 pub extern "C" fn RDPSetRenderingStateDepthMask(rcp: Option<&mut RCP>, value: bool) {
     let rcp = rcp.unwrap();
-    rcp.rdp.rendering_state.depth_mask = value;
+    rcp.rdp.rendering_state.depth_write = value;
 }
 
 #[no_mangle]

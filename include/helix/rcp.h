@@ -21,9 +21,9 @@ struct GfxDevice {
     void (*select_texture)(int tile, uint32_t texture_id);
     void (*upload_texture)(const uint8_t *rgba32_buf, int width, int height);
     void (*set_sampler_parameters)(int sampler, bool linear_filter, uint32_t cms, uint32_t cmt);
-    void (*set_depth_test)(bool depth_test);
+    void (*set_depth_test)(bool enable);
     void (*set_depth_compare)(uint8_t function);
-    void (*set_depth_mask)(bool z_upd);
+    void (*set_depth_write)(bool enable);
     void (*set_zmode_decal)(bool zmode_decal);
     void (*set_viewport)(int x, int y, int width, int height);
     void (*set_scissor)(int x, int y, int width, int height);
@@ -129,10 +129,6 @@ struct ColorCombiner* RDPGetColorCombiner(void* rcp, uint32_t cc_id);
 
 void RDPLookupOrCreateShaderProgram(void* rcp, uint32_t shader_id);
 
-bool RDPGetRenderingStateDepthTest(void* rcp);
-void RDPSetRenderingStateDepthTest(void* rcp, bool value);
-
-bool RDPGetRenderingStateDepthMask(void* rcp);
 void RDPSetRenderingStateDepthMask(void* rcp, bool value);
 
 bool RDPGetRenderingStateZModeDecal(void* rcp);
