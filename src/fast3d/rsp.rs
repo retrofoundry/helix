@@ -1,6 +1,6 @@
 use crate::extensions::matrix::matrix_multiply;
 
-use super::gbi::defines::Light;
+use super::{gbi::defines::Light, rcp::RCP};
 
 pub const MATRIX_STACK_SIZE: usize = 11;
 const MAX_VERTICES: usize = 64;
@@ -122,4 +122,27 @@ impl RSP {
         self.num_lights = num_lights;
         self.lights_valid = false;
     }
+}
+
+// MARK: - C Bridge
+
+#[no_mangle]
+pub extern "C" fn RSPGetGeometryMode(rcp: Option<&mut RCP>) -> u32 {
+    let rcp = rcp.unwrap();
+    return rcp.rsp.geometry_mode;
+}
+
+#[no_mangle]
+pub extern "C" fn RSPSetGeometryMode(rcp: Option<&mut RCP>, value: u32) {
+    let rcp = rcp.unwrap();
+    rcp.rsp.geometry_mode = value;
+}
+
+#[no_mangle]
+pub extern "C" fn RSPGetStagingVertexAtIndexPtr(
+    rcp: Option<&mut RCP>,
+    index: usize,
+) -> *mut StagingVertex {
+    let rcp = rcp.unwrap();
+    &mut rcp.rsp.vertex_table[index] as *mut StagingVertex
 }

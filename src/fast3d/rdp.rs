@@ -489,6 +489,42 @@ impl RDP {
 // MARK: - C Bridge
 
 #[no_mangle]
+pub extern "C" fn RDPSetOutputDimensions(rcp: Option<&mut RCP>, dimensions: OutputDimensions) {
+    let rcp = rcp.unwrap();
+    rcp.rdp.output_dimensions = dimensions;
+}
+
+#[no_mangle]
+pub extern "C" fn RDPSetViewportOrScissorChanged(rcp: Option<&mut RCP>, value: bool) {
+    let rcp = rcp.unwrap();
+    rcp.rdp.viewport_or_scissor_changed = value;
+}
+
+#[no_mangle]
+pub extern "C" fn RDPGetViewport(rcp: Option<&mut RCP>) -> Rect {
+    let rcp = rcp.unwrap();
+    rcp.rdp.viewport
+}
+
+#[no_mangle]
+pub extern "C" fn RDPGetViewportPtr(rcp: Option<&mut RCP>) -> *mut Rect {
+    let rcp = rcp.unwrap();
+    &mut rcp.rdp.viewport as *mut Rect
+}
+
+#[no_mangle]
+pub extern "C" fn RDPSetViewport(rcp: Option<&mut RCP>, viewport: Rect) {
+    let rcp = rcp.unwrap();
+    rcp.rdp.viewport = viewport;
+}
+
+#[no_mangle]
+pub extern "C" fn RDPGetScissorPtr(rcp: Option<&mut RCP>) -> *mut Rect {
+    let rcp = rcp.unwrap();
+    &mut rcp.rdp.scissor as *mut Rect
+}
+
+#[no_mangle]
 pub extern "C" fn RDPFlush(rcp: Option<&mut RCP>) {
     let rcp = rcp.unwrap();
     rcp.rdp.flush(rcp.gfx_device.as_ref().unwrap());
@@ -580,12 +616,6 @@ pub extern "C" fn RDPGetOtherModeL(rcp: Option<&mut RCP>) -> u32 {
 pub extern "C" fn RDPGetOtherModeH(rcp: Option<&mut RCP>) -> u32 {
     let rcp = rcp.unwrap();
     rcp.rdp.other_mode_h
-}
-
-#[no_mangle]
-pub extern "C" fn RDPSetOtherModeL(rcp: Option<&mut RCP>, value: u32) {
-    let rcp = rcp.unwrap();
-    rcp.rdp.other_mode_l = value;
 }
 
 #[no_mangle]
