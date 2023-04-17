@@ -170,12 +170,6 @@ pub extern "C" fn RDPSetOutputDimensions(rcp: Option<&mut RCP>, dimensions: Outp
 }
 
 #[no_mangle]
-pub extern "C" fn RDPGetViewportOrScissorChanged(rcp: Option<&mut RCP>) -> bool {
-    let rcp = rcp.unwrap();
-    rcp.rdp.viewport_or_scissor_changed
-}
-
-#[no_mangle]
 pub extern "C" fn RDPSetViewportOrScissorChanged(rcp: Option<&mut RCP>, value: bool) {
     let rcp = rcp.unwrap();
     rcp.rdp.viewport_or_scissor_changed = value;

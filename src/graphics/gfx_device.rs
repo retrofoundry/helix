@@ -1,3 +1,5 @@
+use wgpu::BlendState;
+
 #[repr(C)]
 pub struct ShaderProgram;
 
@@ -16,10 +18,10 @@ pub struct C_GfxDevice {
     pub set_depth_test: extern "C" fn(bool),
     pub set_depth_compare: extern "C" fn(u8),
     pub set_depth_write: extern "C" fn(bool),
-    pub set_zmode_decal: extern "C" fn(bool),
+    pub set_polygon_offset: extern "C" fn(bool),
     pub set_viewport: extern "C" fn(i32, i32, i32, i32),
     pub set_scissor: extern "C" fn(i32, i32, i32, i32),
-    pub set_use_alpha: extern "C" fn(bool),
+    pub set_blend_state: extern "C" fn(BlendState),
     pub draw_triangles: extern "C" fn(*const f32, usize, usize),
     pub init: extern "C" fn(),
     pub on_resize: extern "C" fn(),
@@ -89,8 +91,8 @@ impl GfxDevice {
         unsafe { ((*self.storage).set_depth_write)(enable) }
     }
 
-    pub fn set_zmode_decal(&self, enable: bool) {
-        unsafe { ((*self.storage).set_zmode_decal)(enable) }
+    pub fn set_polygon_offset(&self, enable: bool) {
+        unsafe { ((*self.storage).set_polygon_offset)(enable) }
     }
 
     pub fn set_viewport(&self, x: i32, y: i32, width: i32, height: i32) {
@@ -101,8 +103,8 @@ impl GfxDevice {
         unsafe { ((*self.storage).set_scissor)(x, y, width, height) }
     }
 
-    pub fn set_use_alpha(&self, enable: bool) {
-        unsafe { ((*self.storage).set_use_alpha)(enable) }
+    pub fn set_blend_state(&self, blend_state: BlendState) {
+        unsafe { ((*self.storage).set_blend_state)(blend_state) }
     }
 
     pub fn draw_triangles(&self, vertices: *const f32, count: usize, stride: usize) {

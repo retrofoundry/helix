@@ -9,6 +9,7 @@
 #include <stdbool.h>
 
 struct ShaderProgram;
+struct WGPUBlendState;
 
 struct GfxDevice {
     bool (*z_is_from_0_to_1)(void);
@@ -24,10 +25,10 @@ struct GfxDevice {
     void (*set_depth_test)(bool enable);
     void (*set_depth_compare)(uint8_t function);
     void (*set_depth_write)(bool enable);
-    void (*set_zmode_decal)(bool zmode_decal);
+    void (*set_polygon_offset)(bool enable);
     void (*set_viewport)(int x, int y, int width, int height);
     void (*set_scissor)(int x, int y, int width, int height);
-    void (*set_use_alpha)(bool use_alpha);
+    void (*set_blend_components)(struct WGPUBlendState component);
     void (*draw_triangles)(float buf_vbo[], size_t buf_vbo_len, size_t buf_vbo_num_tris);
     void (*init)(void);
     void (*on_resize)(void);
@@ -52,7 +53,7 @@ struct ColorCombiner {
     uint8_t shader_input_mapping[2][4];
 };
 
-extern struct Light_t;
+struct Light_t;
 
 struct Rect {
     uint16_t x, y, width, height;
@@ -106,7 +107,6 @@ struct StagingVertex* RSPGetStagingVertexAtIndexPtr(void* rcp, uint8_t index);
 // RDP Getters and Setters
 void RDPSetOutputDimensions(void* rcp, struct OutputDimensions dimensions);
 
-bool RDPGetViewportOrScissorChanged(void* rcp);
 void RDPSetViewportOrScissorChanged(void* rcp, bool value);
 
 struct Rect RDPGetViewport(void* rcp);
@@ -129,14 +129,6 @@ struct ColorCombiner* RDPGetColorCombiner(void* rcp, uint32_t cc_id);
 
 void RDPLookupOrCreateShaderProgram(void* rcp, uint32_t shader_id);
 
-void RDPSetRenderingStateDepthMask(void* rcp, bool value);
-
-bool RDPGetRenderingStateZModeDecal(void* rcp);
-void RDPSetRenderingStateZModeDecal(void* rcp, bool value);
-
-bool RDPGetRenderingStateUseAlpha(void* rcp);
-void RDPSetRenderingStateUseAlpha(void* rcp, bool value);
-
 struct ShaderProgram* RDPGetRenderingStateShaderProgram(void* rcp);
 void RDPSetRenderingStateShaderProgram(void* rcp, struct ShaderProgram *prg);
 
@@ -148,7 +140,6 @@ bool RDPScissorDoesNotEqualRenderingStateScissor(void* rcp);
 
 u_int32_t RDPGetOtherModeL(void* rcp);
 u_int32_t RDPGetOtherModeH(void* rcp);
-void RDPSetOtherModeL(void* rcp, uint32_t value);
 void RDPSetOtherModeH(void* rcp, uint32_t value);
 
 u_int32_t RDPGetCombineU32(void* rcp);

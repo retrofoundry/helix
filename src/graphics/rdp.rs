@@ -1,5 +1,5 @@
 use log::trace;
-use wgpu::CompareFunction;
+use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState, CompareFunction};
 
 use super::{
     gbi::defines::Viewport,
@@ -67,9 +67,8 @@ pub struct RenderingState {
     pub depth_compare: CompareFunction,
     pub depth_test: bool,
     pub depth_write: bool,
-
-    pub decal_mode: bool,
-    pub alpha_blend: bool,
+    pub polygon_offset: bool,
+    pub blend_state: BlendState,
     pub viewport: Rect,
     pub scissor: Rect,
     pub shader_program: *mut ShaderProgram,
@@ -81,8 +80,8 @@ impl RenderingState {
         depth_compare: CompareFunction::Always,
         depth_test: false,
         depth_write: false,
-        decal_mode: false,
-        alpha_blend: false,
+        polygon_offset: false,
+        blend_state: BlendState::REPLACE,
         viewport: Rect::ZERO,
         scissor: Rect::ZERO,
         shader_program: std::ptr::null_mut(),
@@ -323,15 +322,29 @@ impl RDP {
             .insert(cc_id, combiner);
     }
 
-    fn translate_blend_mode(&mut self, gfx_device: &GfxDevice, render_mode: u32) {
-        let src_color = render_mode >> OtherModeLayoutL::P_2 as u32 & 0x03;
-        let src_factor = render_mode >> OtherModeLayoutL::A_2 as u32 & 0x03;
-        let dst_color = render_mode >> OtherModeLayoutL::M_2 as u32 & 0x03;
-        let dst_factor = render_mode >> OtherModeLayoutL::B_2 as u32 & 0x03;
+    fn translate_blend_param_b(param: u32, src: BlendFactor) -> BlendFactor {
+        match param {
+            x if x == BlendParamB::G_BL_1MA as u32 => {
+                if src == BlendFactor::SrcAlpha {
+                    BlendFactor::OneMinusSrcAlpha
+                } else if src == BlendFactor::One {
+                    BlendFactor::Zero
+                } else {
+                    BlendFactor::One
+                }
+            }
+            x if x == BlendParamB::G_BL_A_MEM as u32 => BlendFactor::DstAlpha,
+            x if x == BlendParamB::G_BL_1 as u32 => BlendFactor::One,
+            x if x == BlendParamB::G_BL_0 as u32 => BlendFactor::Zero,
+            _ => panic!("Unknown Blend Param B: {}", param),
+        }
+    }
+
+    fn translate_blend_mode(&mut self, gfx_device: &GfxDevice, render_mode: u32) -> BlendState {
+        let zmode = self.other_mode_l >> (OtherModeLayoutL::ZMODE as u32) & 0x03;
 
         // handle depth compare
         if self.other_mode_l & (1 << OtherModeLayoutL::Z_CMP as u32) != 0 {
-            let zmode = self.other_mode_l >> (OtherModeLayoutL::ZMODE as u32) & 0x03;
             let depth_compare = match zmode {
                 x if x == ZMode::ZMODE_OPA as u32 => CompareFunction::Less,
                 x if x == ZMode::ZMODE_INTER as u32 => CompareFunction::Less, // TODO: Understand this
@@ -354,6 +367,63 @@ impl RDP {
             gfx_device.set_depth_write(depth_write);
             self.rendering_state.depth_write = depth_write;
         }
+
+        // handle polygon offset (slope scale depth bias)
+        let polygon_offset = zmode == ZMode::ZMODE_DEC as u32;
+        if polygon_offset != self.rendering_state.polygon_offset {
+            self.flush(&gfx_device);
+            gfx_device.set_polygon_offset(polygon_offset);
+            self.rendering_state.polygon_offset = polygon_offset;
+        }
+
+        let src_color = render_mode >> OtherModeLayoutL::P_2 as u32 & 0x03;
+        let src_factor = render_mode >> OtherModeLayoutL::A_2 as u32 & 0x03;
+        let dst_color = render_mode >> OtherModeLayoutL::M_2 as u32 & 0x03;
+        let dst_factor = render_mode >> OtherModeLayoutL::B_2 as u32 & 0x03;
+
+        let do_blend = render_mode & (1 << OtherModeLayoutL::FORCE_BL as u32) != 0
+            && dst_color == BlendParamPMColor::G_BL_CLR_MEM as u32;
+
+        if do_blend {
+            assert!(src_color == BlendParamPMColor::G_BL_CLR_IN as u32);
+
+            let blend_src_factor: BlendFactor;
+            if src_factor == BlendParamA::G_BL_0 as u32 {
+                blend_src_factor = BlendFactor::Zero;
+            } else if (render_mode & (1 << OtherModeLayoutL::ALPHA_CVG_SEL as u32)) != 0
+                && (render_mode & (1 << OtherModeLayoutL::CVG_X_ALPHA as u32)) == 0
+            {
+                // this is technically "coverage", admitting blending on edges
+                blend_src_factor = BlendFactor::One;
+            } else {
+                blend_src_factor = BlendFactor::SrcAlpha;
+            }
+
+            let blend_component = BlendComponent {
+                src_factor: blend_src_factor,
+                dst_factor: RDP::translate_blend_param_b(dst_factor, blend_src_factor),
+                operation: BlendOperation::Add,
+            };
+
+            return BlendState {
+                color: blend_component,
+                alpha: blend_component,
+            };
+        } else {
+            // without FORCE_BL, blending only happens for AA of internal edges
+            // since we are ignoring n64 coverage values and AA, this means "never"
+            // if dstColor isn't the framebuffer, we'll take care of the "blending" in the shader
+            let blend_component = BlendComponent {
+                src_factor: BlendFactor::One,
+                dst_factor: BlendFactor::Zero,
+                operation: BlendOperation::Add,
+            };
+
+            return BlendState {
+                color: blend_component,
+                alpha: blend_component,
+            };
+        }
     }
 
     pub fn update_render_state(
@@ -369,51 +439,40 @@ impl RDP {
             self.rendering_state.depth_test = depth_test;
         }
 
-        self.translate_blend_mode(gfx_device, self.other_mode_l);
+        let blend_state = self.translate_blend_mode(gfx_device, self.other_mode_l);
 
-        // TODO: Rename depth_test to depth_write
-        // let z_upd = self.other_mode_l & (1 << OtherModeLayoutL::Z_UPD as u32) != 0;
-        // if z_upd != self.rendering_state.depth_mask {
-        //     self.flush(gfx_device);
-        //     gfx_device.set_depth_mask(z_upd);
-        //     self.rendering_state.depth_mask = z_upd;
-        // }
+        // TODO: split checks into updating blend state separately: enable, blendeq and blendfunc
+        if blend_state != self.rendering_state.blend_state {
+            self.flush(gfx_device);
+            gfx_device.set_blend_state(blend_state);
+            self.rendering_state.blend_state = blend_state;
+        }
 
-        // let zmode = self.other_mode_l >> (OtherModeLayoutL::ZMODE as u32) & 0x03;
-        // // TODO: Rename zmode_decal to polygon_offset
-        // let zmode_decal = zmode == ZMode::ZMODE_DEC as u32;
-        // if zmode_decal != self.rendering_state.decal_mode {
-        //     self.flush(gfx_device);
-        //     gfx_device.set_zmode_decal(zmode_decal);
-        //     self.rendering_state.decal_mode = zmode_decal;
-        // }
-
-        // if self.viewport_or_scissor_changed {
-        //     let viewport = self.viewport;
-        //     if viewport != self.rendering_state.viewport {
-        //         self.flush(gfx_device);
-        //         gfx_device.set_viewport(viewport.x as i32, viewport.y as i32, viewport.width as i32, viewport.height as i32);
-        //         self.rendering_state.viewport = viewport;
-        //     }
-        //     let scissor = self.scissor;
-        //     if scissor != self.rendering_state.scissor {
-        //         self.flush(gfx_device);
-        //         gfx_device.set_scissor(scissor.x as i32, scissor.y as i32, scissor.width as i32, scissor.height as i32);
-        //         self.rendering_state.scissor = scissor;
-        //     }
-        //     self.viewport_or_scissor_changed = false;
-        // }
-
-        // let cc_id = self.combine_mode;
-
-        // // bool use_alpha = (RDPGetOtherModeL(rcp) & (G_BL_A_MEM << 18)) == 0;
-        // // bool use_fog = (RDPGetOtherModeL(rcp) >> 30) == G_BL_CLR_FOG;
-        // // bool texture_edge = (RDPGetOtherModeL(rcp) & CVG_X_ALPHA) == CVG_X_ALPHA;
-        // // bool use_noise = (RDPGetOtherModeL(rcp) & G_AC_DITHER) == G_AC_DITHER;
-
-        // let use_alpha = (self.other_mode_l >> OtherModeLayoutL::B_1 as u32) & 0x03 != BlendParamB::G_BL_A_MEM as u32;
-        // let use_fog = (self.other_mode_l >> OtherModeLayoutL::P_1 as u32) & 0x03 == BlendParamPMColor::G_BL_CLR_FOG as u32;
-        // let texture_edge = (self.other_mode_l & (1 << OtherModeLayoutL::CVG_X_ALPHA as u32)) != 0;
+        if self.viewport_or_scissor_changed {
+            let viewport = self.viewport;
+            if viewport != self.rendering_state.viewport {
+                self.flush(gfx_device);
+                gfx_device.set_viewport(
+                    viewport.x as i32,
+                    viewport.y as i32,
+                    viewport.width as i32,
+                    viewport.height as i32,
+                );
+                self.rendering_state.viewport = viewport;
+            }
+            let scissor = self.scissor;
+            if scissor != self.rendering_state.scissor {
+                self.flush(gfx_device);
+                gfx_device.set_scissor(
+                    scissor.x as i32,
+                    scissor.y as i32,
+                    scissor.width as i32,
+                    scissor.height as i32,
+                );
+                self.rendering_state.scissor = scissor;
+            }
+            self.viewport_or_scissor_changed = false;
+        }
     }
 
     // MARK: - Helpers
@@ -473,36 +532,6 @@ pub extern "C" fn RDPLookupOrCreateShaderProgram(rcp: Option<&mut RCP>, shader_i
     let rcp = rcp.unwrap();
     rcp.rdp
         .lookup_or_create_shader_program(rcp.gfx_device.as_ref().unwrap(), shader_id);
-}
-
-#[no_mangle]
-pub extern "C" fn RDPSetRenderingStateDepthMask(rcp: Option<&mut RCP>, value: bool) {
-    let rcp = rcp.unwrap();
-    rcp.rdp.rendering_state.depth_write = value;
-}
-
-#[no_mangle]
-pub extern "C" fn RDPGetRenderingStateZModeDecal(rcp: Option<&mut RCP>) -> bool {
-    let rcp = rcp.unwrap();
-    rcp.rdp.rendering_state.decal_mode
-}
-
-#[no_mangle]
-pub extern "C" fn RDPSetRenderingStateZModeDecal(rcp: Option<&mut RCP>, value: bool) {
-    let rcp = rcp.unwrap();
-    rcp.rdp.rendering_state.decal_mode = value;
-}
-
-#[no_mangle]
-pub extern "C" fn RDPGetRenderingStateUseAlpha(rcp: Option<&mut RCP>) -> bool {
-    let rcp = rcp.unwrap();
-    rcp.rdp.rendering_state.alpha_blend
-}
-
-#[no_mangle]
-pub extern "C" fn RDPSetRenderingStateUseAlpha(rcp: Option<&mut RCP>, value: bool) {
-    let rcp = rcp.unwrap();
-    rcp.rdp.rendering_state.alpha_blend = value;
 }
 
 #[no_mangle]
