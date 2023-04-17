@@ -11,7 +11,7 @@ use super::utils::{get_cmd, get_segmented_address};
 use super::{GBIDefinition, GBIResult, GBI};
 use crate::{
     extensions::matrix::{calculate_normal_dir, matrix_from_fixed_point, matrix_multiply},
-    graphics::{gfx_device::GfxDevice, rdp::SCREEN_HEIGHT, utils::color_combiner::CombineParams},
+    fast3d::{gfx_device::GfxDevice, rdp::SCREEN_HEIGHT, utils::color_combiner::CombineParams},
 };
 
 pub enum F3DEX2 {
@@ -613,7 +613,7 @@ impl F3DEX2 {
 #[cfg(test)]
 mod tests {
     use super::F3DEX2;
-    use crate::graphics::{rdp::RDP, rsp::RSP};
+    use crate::fast3d::{rdp::RDP, rsp::RSP};
 
     #[test]
     fn test_moveword() {

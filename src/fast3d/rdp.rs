@@ -13,7 +13,7 @@ use super::{
         texture::{Texture, TextureManager},
     },
 };
-use crate::graphics::gfx_device::ShaderProgram;
+use crate::fast3d::gfx_device::ShaderProgram;
 
 pub const SCREEN_WIDTH: f32 = 320.0;
 pub const SCREEN_HEIGHT: f32 = 240.0;
@@ -68,9 +68,7 @@ pub struct RenderingState {
     pub depth_test: bool,
     pub depth_write: bool,
     pub polygon_offset: bool,
-
     pub blend_state: BlendState,
-
     pub viewport: Rect,
     pub scissor: Rect,
     pub shader_program: *mut ShaderProgram,
@@ -582,6 +580,12 @@ pub extern "C" fn RDPGetOtherModeL(rcp: Option<&mut RCP>) -> u32 {
 pub extern "C" fn RDPGetOtherModeH(rcp: Option<&mut RCP>) -> u32 {
     let rcp = rcp.unwrap();
     rcp.rdp.other_mode_h
+}
+
+#[no_mangle]
+pub extern "C" fn RDPSetOtherModeL(rcp: Option<&mut RCP>, value: u32) {
+    let rcp = rcp.unwrap();
+    rcp.rdp.other_mode_l = value;
 }
 
 #[no_mangle]

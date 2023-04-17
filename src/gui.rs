@@ -13,7 +13,7 @@ use sdl2::{
 use std::str;
 use std::{ffi::CStr, time::Instant};
 
-use crate::graphics::rcp::RCP;
+use crate::fast3d::rcp::RCP;
 
 use self::imgui_sdl_support::SdlPlatform;
 

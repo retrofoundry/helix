@@ -1,4 +1,4 @@
-use crate::graphics::rsp::StagingVertex;
+use crate::fast3d::rsp::StagingVertex;
 
 use super::super::{
     rcp::RCP,

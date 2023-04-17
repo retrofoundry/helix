@@ -1,4 +1,4 @@
-use crate::graphics::gbi::defines::Light;
+use crate::fast3d::gbi::defines::Light;
 
 pub fn matrix_from_fixed_point(addr: &[i32]) -> [[f32; 4]; 4] {
     let mut f_mtx = [[0.0; 4]; 4];

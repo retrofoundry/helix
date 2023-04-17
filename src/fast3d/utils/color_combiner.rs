@@ -1,4 +1,4 @@
-use crate::graphics::{gbi::utils::get_cmd, gfx_device::ShaderProgram, rcp::RCP};
+use crate::fast3d::{gbi::utils::get_cmd, gfx_device::ShaderProgram, rcp::RCP};
 use std::collections::HashMap;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

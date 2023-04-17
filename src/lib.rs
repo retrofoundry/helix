@@ -1,7 +1,7 @@
 pub use arie;
 use env_logger::Builder;
 mod extensions;
-mod graphics;
+mod fast3d;
 pub mod gui;
 #[cfg(feature = "network")]
 pub mod network;
