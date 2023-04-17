@@ -448,9 +448,9 @@ impl F3DEX2 {
     }
 
     pub fn gsp_tri1(
-        _rdp: &mut RDP,
+        rdp: &mut RDP,
         rsp: &mut RSP,
-        _gfx_device: &GfxDevice,
+        gfx_device: &GfxDevice,
         w0: usize,
         _w1: usize,
     ) -> GBIResult {
@@ -508,8 +508,7 @@ impl F3DEX2 {
         }
 
         // TODO: Produce draw calls for RDP to process later?
-        let depth_test =
-            rsp.geometry_mode & RSPGeometry::G_ZBUFFER as u32 == RSPGeometry::G_ZBUFFER as u32;
+        rdp.update_render_state(gfx_device, rsp.geometry_mode, &vertex_array);
 
         GBIResult::Continue
     }

@@ -22,6 +22,7 @@ struct GfxDevice {
     void (*upload_texture)(const uint8_t *rgba32_buf, int width, int height);
     void (*set_sampler_parameters)(int sampler, bool linear_filter, uint32_t cms, uint32_t cmt);
     void (*set_depth_test)(bool depth_test);
+    void (*set_depth_compare)(uint8_t function);
     void (*set_depth_mask)(bool z_upd);
     void (*set_zmode_decal)(bool zmode_decal);
     void (*set_viewport)(int x, int y, int width, int height);
@@ -157,6 +158,8 @@ void RDPSetOtherModeH(void* rcp, uint32_t value);
 u_int32_t RDPGetCombineU32(void* rcp);
 void* RDPGetCombine(void* rcp);
 void RDPSetCombine(void* rcp, void* value);
+
+void RDPUpdateRenderState(void* rcp, uint8_t vertex_id1, uint8_t vertex_id2, uint8_t vertex_id3);
 
 #ifdef __cplusplus
 }

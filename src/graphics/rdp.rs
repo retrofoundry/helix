@@ -1,7 +1,11 @@
+use log::trace;
+use wgpu::CompareFunction;
+
 use super::{
     gbi::defines::Viewport,
     gfx_device::GfxDevice,
     rcp::RCP,
+    rsp::{RSPGeometry, StagingVertex, RSP},
     utils::{
         color_combiner::{
             ColorCombiner, ColorCombinerManager, CombineParams, ACMUX, CCMUX, SHADER,
@@ -60,7 +64,9 @@ impl OutputDimensions {
 }
 
 pub struct RenderingState {
-    pub depth_test: bool,
+    pub depth_compare: CompareFunction,
+    pub depth_test: bool, // TODO: remove in favor of depth_compare
+
     pub depth_mask: bool,
     pub decal_mode: bool,
     pub alpha_blend: bool,
@@ -72,6 +78,7 @@ pub struct RenderingState {
 
 impl RenderingState {
     pub const EMPTY: Self = Self {
+        depth_compare: CompareFunction::Always,
         depth_test: false,
         depth_mask: false,
         decal_mode: false,
@@ -82,6 +89,61 @@ impl RenderingState {
         textures: [Texture::EMPTY; 2],
     };
 }
+
+enum OtherModeLayoutL {
+    // non-render-mode fields
+    G_MDSFT_ALPHACOMPARE = 0,
+    G_MDSFT_ZSRCSEL = 2,
+    // cycle-independent render-mode bits
+    AA_EN = 3,
+    Z_CMP = 4,
+    Z_UPD = 5,
+    IM_RD = 6,
+    CLR_ON_CVG = 7,
+    CVG_DST = 8,
+    ZMODE = 10,
+    CVG_X_ALPHA = 12,
+    ALPHA_CVG_SEL = 13,
+    FORCE_BL = 14,
+    // bit 15 unused, was "TEX_EDGE"
+    // cycle-dependent render-mode bits
+    B_2 = 16,
+    B_1 = 18,
+    M_2 = 20,
+    M_1 = 22,
+    A_2 = 24,
+    A_1 = 26,
+    P_2 = 28,
+    P_1 = 30,
+}
+enum ZMode {
+    ZMODE_OPA = 0,
+    ZMODE_INTER = 1,
+    ZMODE_XLU = 2, // translucent
+    ZMODE_DEC = 3,
+}
+
+enum BlendParamPMColor {
+    G_BL_CLR_IN = 0,
+    G_BL_CLR_MEM = 1,
+    G_BL_CLR_BL = 2,
+    G_BL_CLR_FOG = 3,
+}
+
+enum BlendParamA {
+    G_BL_A_IN = 0,
+    G_BL_A_FOG = 1,
+    G_BL_A_SHADE = 2,
+    G_BL_0 = 3,
+}
+
+enum BlendParamB {
+    G_BL_1MA = 0,
+    G_BL_A_MEM = 1,
+    G_BL_1 = 2,
+    G_BL_0 = 3,
+}
+
 pub struct RDP {
     pub output_dimensions: OutputDimensions,
     pub rendering_state: RenderingState,
@@ -179,7 +241,7 @@ impl RDP {
     }
 
     pub fn create_color_combiner(&mut self, gfx_device: &GfxDevice, cc_id: u32) -> &ColorCombiner {
-        self.flush(&gfx_device);
+        self.flush(gfx_device);
         self.generate_color_combiner(gfx_device, cc_id);
 
         let combiner = self.color_combiner_manager.combiners.get(&cc_id).unwrap();
@@ -259,6 +321,91 @@ impl RDP {
         self.color_combiner_manager
             .combiners
             .insert(cc_id, combiner);
+    }
+
+    fn translate_blend_mode(&mut self, gfx_device: &GfxDevice, render_mode: u32) {
+        let src_color = render_mode >> OtherModeLayoutL::P_2 as u32 & 0x03;
+        let src_factor = render_mode >> OtherModeLayoutL::A_2 as u32 & 0x03;
+        let dst_color = render_mode >> OtherModeLayoutL::M_2 as u32 & 0x03;
+        let dst_factor = render_mode >> OtherModeLayoutL::B_2 as u32 & 0x03;
+
+        if self.other_mode_l & (1 << OtherModeLayoutL::Z_CMP as u32) != 0 {
+            let zmode = self.other_mode_l >> (OtherModeLayoutL::ZMODE as u32) & 0x03;
+            let depth_compare = match zmode {
+                x if x == ZMode::ZMODE_OPA as u32 => CompareFunction::Less,
+                x if x == ZMode::ZMODE_INTER as u32 => CompareFunction::Less, // TODO: Understand this
+                x if x == ZMode::ZMODE_XLU as u32 => CompareFunction::Less,
+                x if x == ZMode::ZMODE_DEC as u32 => CompareFunction::LessEqual,
+                _ => panic!("Unknown ZMode"),
+            };
+
+            if depth_compare != self.rendering_state.depth_compare {
+                self.flush(&gfx_device);
+                gfx_device.set_depth_compare(depth_compare as u8);
+                self.rendering_state.depth_compare = depth_compare;
+            }
+        }
+    }
+
+    pub fn update_render_state(
+        &mut self,
+        gfx_device: &GfxDevice,
+        geometry_mode: u32,
+        vertices: &[&StagingVertex; 3],
+    ) {
+        // TODO: Base this off Z_CMP and Z_MODE?
+        let depth_test = geometry_mode & RSPGeometry::G_ZBUFFER as u32 != 0;
+        if depth_test != self.rendering_state.depth_test {
+            self.flush(gfx_device);
+            gfx_device.set_depth_test(depth_test);
+            self.rendering_state.depth_test = depth_test;
+        }
+
+        self.translate_blend_mode(gfx_device, self.other_mode_l);
+
+        // TODO: Rename depth_test to depth_write
+        // let z_upd = self.other_mode_l & (1 << OtherModeLayoutL::Z_UPD as u32) != 0;
+        // if z_upd != self.rendering_state.depth_mask {
+        //     self.flush(gfx_device);
+        //     gfx_device.set_depth_mask(z_upd);
+        //     self.rendering_state.depth_mask = z_upd;
+        // }
+
+        // let zmode = self.other_mode_l >> (OtherModeLayoutL::ZMODE as u32) & 0x03;
+        // // TODO: Rename zmode_decal to polygon_offset
+        // let zmode_decal = zmode == ZMode::ZMODE_DEC as u32;
+        // if zmode_decal != self.rendering_state.decal_mode {
+        //     self.flush(gfx_device);
+        //     gfx_device.set_zmode_decal(zmode_decal);
+        //     self.rendering_state.decal_mode = zmode_decal;
+        // }
+
+        // if self.viewport_or_scissor_changed {
+        //     let viewport = self.viewport;
+        //     if viewport != self.rendering_state.viewport {
+        //         self.flush(gfx_device);
+        //         gfx_device.set_viewport(viewport.x as i32, viewport.y as i32, viewport.width as i32, viewport.height as i32);
+        //         self.rendering_state.viewport = viewport;
+        //     }
+        //     let scissor = self.scissor;
+        //     if scissor != self.rendering_state.scissor {
+        //         self.flush(gfx_device);
+        //         gfx_device.set_scissor(scissor.x as i32, scissor.y as i32, scissor.width as i32, scissor.height as i32);
+        //         self.rendering_state.scissor = scissor;
+        //     }
+        //     self.viewport_or_scissor_changed = false;
+        // }
+
+        // let cc_id = self.combine_mode;
+
+        // // bool use_alpha = (RDPGetOtherModeL(rcp) & (G_BL_A_MEM << 18)) == 0;
+        // // bool use_fog = (RDPGetOtherModeL(rcp) >> 30) == G_BL_CLR_FOG;
+        // // bool texture_edge = (RDPGetOtherModeL(rcp) & CVG_X_ALPHA) == CVG_X_ALPHA;
+        // // bool use_noise = (RDPGetOtherModeL(rcp) & G_AC_DITHER) == G_AC_DITHER;
+
+        // let use_alpha = (self.other_mode_l >> OtherModeLayoutL::B_1 as u32) & 0x03 != BlendParamB::G_BL_A_MEM as u32;
+        // let use_fog = (self.other_mode_l >> OtherModeLayoutL::P_1 as u32) & 0x03 == BlendParamPMColor::G_BL_CLR_FOG as u32;
+        // let texture_edge = (self.other_mode_l & (1 << OtherModeLayoutL::CVG_X_ALPHA as u32)) != 0;
     }
 
     // MARK: - Helpers
@@ -444,4 +591,25 @@ pub extern "C" fn RDPGetCombine(rcp: Option<&mut RCP>) -> *const CombineParams {
 pub extern "C" fn RDPSetCombine(rcp: Option<&mut RCP>, value: *mut CombineParams) {
     let rcp = rcp.unwrap();
     rcp.rdp.combine = unsafe { *value };
+}
+
+#[no_mangle]
+pub extern "C" fn RDPUpdateRenderState(
+    rcp: Option<&mut RCP>,
+    vertex_id1: u8,
+    vertex_id2: u8,
+    vertex_id3: u8,
+) {
+    let rcp = rcp.unwrap();
+
+    let vertex1 = &rcp.rsp.vertex_table[vertex_id1 as usize];
+    let vertex2 = &rcp.rsp.vertex_table[vertex_id2 as usize];
+    let vertex3 = &rcp.rsp.vertex_table[vertex_id3 as usize];
+    let vertex_array = [vertex1, vertex2, vertex3];
+
+    rcp.rdp.update_render_state(
+        rcp.gfx_device.as_ref().unwrap(),
+        rcp.rsp.geometry_mode,
+        &vertex_array,
+    );
 }

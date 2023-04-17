@@ -14,6 +14,7 @@ pub struct C_GfxDevice {
     pub upload_texture: extern "C" fn(*const u8, i32, i32),
     pub set_sampler_parameters: extern "C" fn(i32, bool, u32, u32),
     pub set_depth_test: extern "C" fn(bool),
+    pub set_depth_compare: extern "C" fn(u8),
     pub set_depth_mask: extern "C" fn(bool),
     pub set_zmode_decal: extern "C" fn(bool),
     pub set_viewport: extern "C" fn(i32, i32, i32, i32),
@@ -78,6 +79,10 @@ impl GfxDevice {
 
     pub fn set_depth_test(&self, enable: bool) {
         unsafe { ((*self.storage).set_depth_test)(enable) }
+    }
+
+    pub fn set_depth_compare(&self, compare: u8) {
+        unsafe { ((*self.storage).set_depth_compare)(compare) }
     }
 
     pub fn set_depth_mask(&self, enable: bool) {
