@@ -1,9 +1,4 @@
-use crate::fast3d::rsp::StagingVertex;
-
-use super::super::{
-    rcp::RCP,
-    rdp::{OutputDimensions, Rect},
-};
+use super::super::rcp::RCP;
 use super::f3dex2::F3DEX2;
 
 #[no_mangle]
