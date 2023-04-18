@@ -13,7 +13,7 @@ use sdl2::{
 use std::str;
 use std::{ffi::CStr, time::Instant};
 
-use crate::fast3d::rcp::RCP;
+use crate::fast3d::{graphics::GraphicsContext, rcp::RCP};
 
 use self::imgui_sdl_support::SdlPlatform;
 
@@ -293,8 +293,8 @@ impl Gui {
         Ok(())
     }
 
-    pub fn draw_lists(&mut self, commands: usize) -> Result<()> {
-        self.rcp.run(commands);
+    pub fn draw_lists(&mut self, gfx_context: &GraphicsContext, commands: usize) -> Result<()> {
+        self.rcp.run(gfx_context, commands);
         // TODO: Draw rendered game image
         // let image = self.rcp.finish();
 
@@ -332,9 +332,15 @@ pub extern "C" fn GUIStartFrame(gui: Option<&mut Gui>) {
 }
 
 #[no_mangle]
-pub extern "C" fn GUIDrawLists(gui: Option<&mut Gui>, commands: u64) {
+pub extern "C" fn GUIDrawLists(
+    gui: Option<&mut Gui>,
+    gfx_context: Option<&mut GraphicsContext>,
+    commands: u64,
+) {
     let gui = gui.unwrap();
-    gui.draw_lists(commands.try_into().unwrap()).unwrap();
+    let gfx_context = gfx_context.unwrap();
+    gui.draw_lists(gfx_context, commands.try_into().unwrap())
+        .unwrap();
 }
 
 #[no_mangle]

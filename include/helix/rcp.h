@@ -11,7 +11,7 @@
 struct ShaderProgram;
 struct WGPUBlendState;
 
-struct GfxDevice {
+struct CGraphicsDevice {
     bool (*z_is_from_0_to_1)(void);
     void (*unload_shader)(struct ShaderProgram *old_prg);
     void (*load_shader)(struct ShaderProgram *new_prg);
@@ -79,24 +79,26 @@ struct StagingVertex {
 extern "C" {
 #endif
 
-void* RCPCreate(struct GfxDevice *rapi);
+void* RCPCreate();
 void RCPReset(void* rcp);
 
-struct GfxDevice* RCPGetGfxDevice(void* rcp);
+// Gfx Getters and Setters
+void* GfxCreateContext(struct CGraphicsDevice *rapi);
+struct CGraphicsDevice* GfxGetDevice(void* gfx_context);
 
 // F3DEX2 Commands
-void F3DEX2_GSPMatrix(void* rcp, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GSPPopMatrix(void* rcp, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GSPVertex(void* rcp, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GSPMoveWord(void* rcp, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GSPMoveMem(void* rcp, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GSPTexture(void* rcp, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GSPGeometryMode(void* rcp, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GSPMatrix(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GSPPopMatrix(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GSPVertex(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GSPMoveWord(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GSPMoveMem(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GSPTexture(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GSPGeometryMode(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
 
-void F3DEX2_GDPSetOtherModeL(void* rcp, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GDPSetOtherModeH(void* rcp, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GDPSetScissor(void* rcp, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GDPSetCombine(void* rcp, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPSetOtherModeL(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPSetOtherModeH(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPSetScissor(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPSetCombine(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
 
 // RSP Getters and Setters
 uint32_t RSPGetGeometryMode(void* rcp);
@@ -117,17 +119,17 @@ struct Rect* RDPGetScissorPtr(void* rcp);
 
 void RDPSetRenderingStateScissor(void* rcp, struct Rect scissor);
 
-void RDPFlush(void* rcp);
+void RDPFlush(void* rcp, void* gfx_context);
 
 void RDPAddToVBOAndIncrement(void* rcp, float value);
 size_t RDPIncrementTriangleCountAndReturn(void* rcp);
 
-bool RDPLookupTexture(void* rcp, int tile, const uint8_t *orig_addr, uint32_t fmt, uint32_t size);
+bool RDPLookupTexture(void* rcp, void* gfx_context, int tile, const uint8_t *orig_addr, uint32_t fmt, uint32_t size);
 
-void RDPLookupOrCreateColorCombiner(void* rcp, uint32_t cc_id);
+void RDPLookupOrCreateColorCombiner(void* rcp, void* gfx_context, uint32_t cc_id);
 struct ColorCombiner* RDPGetColorCombiner(void* rcp, uint32_t cc_id);
 
-void RDPLookupOrCreateShaderProgram(void* rcp, uint32_t shader_id);
+void RDPLookupOrCreateShaderProgram(void* rcp, void* gfx_context, uint32_t shader_id);
 
 struct ShaderProgram* RDPGetRenderingStateShaderProgram(void* rcp);
 void RDPSetRenderingStateShaderProgram(void* rcp, struct ShaderProgram *prg);
@@ -146,7 +148,7 @@ u_int32_t RDPGetCombineU32(void* rcp);
 void* RDPGetCombine(void* rcp);
 void RDPSetCombine(void* rcp, void* value);
 
-void RDPUpdateRenderState(void* rcp, uint8_t vertex_id1, uint8_t vertex_id2, uint8_t vertex_id3);
+void RDPUpdateRenderState(void* rcp, void* gfx_context, uint8_t vertex_id1, uint8_t vertex_id2, uint8_t vertex_id3);
 
 #ifdef __cplusplus
 }

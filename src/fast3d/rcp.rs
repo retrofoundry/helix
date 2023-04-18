@@ -2,7 +2,7 @@ use log::trace;
 
 use super::{
     gbi::{defines::Gfx, GBIResult, GBI},
-    gfx_device::{self, C_GfxDevice, GfxDevice},
+    graphics::GraphicsContext,
     rdp::RDP,
     rsp::RSP,
 };
@@ -11,7 +11,6 @@ pub struct RCP {
     gbi: GBI,
     pub rdp: RDP,
     pub rsp: RSP,
-    pub gfx_device: Option<GfxDevice>,
 }
 
 impl RCP {
@@ -23,19 +22,6 @@ impl RCP {
             gbi,
             rdp: RDP::new(),
             rsp: RSP::new(),
-            gfx_device: None,
-        }
-    }
-
-    pub fn bridge(gfx_device: GfxDevice) -> Self {
-        let mut gbi = GBI::new();
-        gbi.setup();
-
-        RCP {
-            gbi,
-            rdp: RDP::new(),
-            rsp: RSP::new(),
-            gfx_device: Some(gfx_device),
         }
     }
 
@@ -47,28 +33,27 @@ impl RCP {
     /// This funtion is called to process a work buffer.
     /// It takes in a pointer to the start of the work buffer and will
     /// process until it hits a `G_ENDDL` inidicating the end.
-    pub fn run(&mut self, commands: usize) {
+    pub fn run(&mut self, gfx_context: &GraphicsContext, commands: usize) {
         self.reset();
 
         // self.rdp.setup_draw();
-        self.run_dl(commands);
+        self.run_dl(gfx_context, commands);
         // self.rdp.flush();
     }
 
-    fn run_dl(&mut self, commands: usize) {
+    fn run_dl(&mut self, gfx_context: &GraphicsContext, commands: usize) {
         let mut commands = commands as *const Gfx;
 
         loop {
             let w0 = unsafe { (*commands).words.w0 };
             let w1 = unsafe { (*commands).words.w1 };
-            let gfx_device = self.gfx_device.as_ref().unwrap();
 
             match self
                 .gbi
-                .handle_command(&mut self.rdp, &mut self.rsp, gfx_device, w0, w1)
+                .handle_command(&mut self.rdp, &mut self.rsp, gfx_context, w0, w1)
             {
                 GBIResult::Recurse(new_commands) => {
-                    self.run_dl(new_commands);
+                    self.run_dl(gfx_context, new_commands);
                 }
                 GBIResult::SetAddress(new_address) => {
                     commands = new_address as *const Gfx;
@@ -97,14 +82,7 @@ pub extern "C" fn RCPReset(rcp: Option<&mut RCP>) {
 }
 
 #[no_mangle]
-pub extern "C" fn RCPCreate(gfx_device: *mut C_GfxDevice) -> Box<RCP> {
-    let gfx_device = GfxDevice::new(gfx_device);
-    let rcp = RCP::bridge(gfx_device);
+pub extern "C" fn RCPCreate() -> Box<RCP> {
+    let rcp = RCP::new();
     Box::new(rcp)
-}
-
-#[no_mangle]
-pub extern "C" fn RCPGetGfxDevice(rcp: Option<&mut RCP>) -> *mut C_GfxDevice {
-    let rcp = rcp.unwrap();
-    rcp.gfx_device.as_mut().unwrap().storage
 }

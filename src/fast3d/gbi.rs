@@ -1,4 +1,4 @@
-use super::{gfx_device::GfxDevice, rdp::RDP, rsp::RSP};
+use super::{graphics::GraphicsContext, rdp::RDP, rsp::RSP};
 use std::collections::HashMap;
 
 pub mod defines;
@@ -15,8 +15,13 @@ pub enum GBIResult {
     Unknown(usize),
 }
 
-pub type GBICommand =
-    fn(dp: &mut RDP, rsp: &mut RSP, gfx_device: &GfxDevice, w0: usize, w1: usize) -> GBIResult;
+pub type GBICommand = fn(
+    dp: &mut RDP,
+    rsp: &mut RSP,
+    gfx_context: &GraphicsContext,
+    w0: usize,
+    w1: usize,
+) -> GBIResult;
 
 pub struct GBI {
     pub gbi_opcode_table: HashMap<usize, GBICommand>,
@@ -51,7 +56,7 @@ impl GBI {
         &self,
         rdp: &mut RDP,
         rsp: &mut RSP,
-        gfx_device: &GfxDevice,
+        gfx_context: &GraphicsContext,
         w0: usize,
         w1: usize,
     ) -> GBIResult {
@@ -59,7 +64,7 @@ impl GBI {
         let cmd = self.gbi_opcode_table.get(&opcode);
 
         match cmd {
-            Some(cmd) => cmd(rdp, rsp, gfx_device, w0, w1),
+            Some(cmd) => cmd(rdp, rsp, gfx_context, w0, w1),
             None => GBIResult::Unknown(opcode),
         }
     }

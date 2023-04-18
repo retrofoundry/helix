@@ -1,11 +1,10 @@
-use log::trace;
 use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState, CompareFunction};
 
 use super::{
     gbi::defines::Viewport,
-    gfx_device::GfxDevice,
+    graphics::{GraphicsContext, ShaderProgram},
     rcp::RCP,
-    rsp::{RSPGeometry, StagingVertex, RSP},
+    rsp::{RSPGeometry, StagingVertex},
     utils::{
         color_combiner::{
             ColorCombiner, ColorCombinerManager, CombineParams, ACMUX, CCMUX, SHADER,
@@ -13,7 +12,6 @@ use super::{
         texture::{Texture, TextureManager},
     },
 };
-use crate::fast3d::gfx_device::ShaderProgram;
 
 pub const SCREEN_WIDTH: f32 = 320.0;
 pub const SCREEN_HEIGHT: f32 = 240.0;
@@ -212,9 +210,9 @@ impl RDP {
             / (self.output_dimensions.width as f32 / self.output_dimensions.height as f32)
     }
 
-    pub fn flush(&mut self, gfx_device: &GfxDevice) {
+    pub fn flush(&mut self, gfx_context: &GraphicsContext) {
         if self.buf_vbo_len > 0 {
-            gfx_device.draw_triangles(
+            gfx_context.api.draw_triangles(
                 &self.buf_vbo as *const f32,
                 self.buf_vbo_len,
                 self.buf_vbo_num_tris,
@@ -226,22 +224,28 @@ impl RDP {
 
     pub fn lookup_or_create_shader_program(
         &mut self,
-        gfx_device: &GfxDevice,
+        gfx_context: &GraphicsContext,
         shader_id: u32,
     ) -> *mut ShaderProgram {
-        let mut shader_program = gfx_device.lookup_shader(shader_id);
+        let mut shader_program = gfx_context.api.lookup_shader(shader_id);
         if shader_program.is_null() {
-            gfx_device.unload_shader(self.rendering_state.shader_program);
-            shader_program = gfx_device.create_and_load_new_shader(shader_id);
+            gfx_context
+                .api
+                .unload_shader(self.rendering_state.shader_program);
+            shader_program = gfx_context.api.create_and_load_new_shader(shader_id);
             self.rendering_state.shader_program = shader_program;
         }
 
         shader_program
     }
 
-    pub fn create_color_combiner(&mut self, gfx_device: &GfxDevice, cc_id: u32) -> &ColorCombiner {
-        self.flush(gfx_device);
-        self.generate_color_combiner(gfx_device, cc_id);
+    pub fn create_color_combiner(
+        &mut self,
+        gfx_context: &GraphicsContext,
+        cc_id: u32,
+    ) -> &ColorCombiner {
+        self.flush(gfx_context);
+        self.generate_color_combiner(gfx_context, cc_id);
 
         let combiner = self.color_combiner_manager.combiners.get(&cc_id).unwrap();
         self.color_combiner_manager.current_combiner = Some(cc_id);
@@ -249,14 +253,14 @@ impl RDP {
         combiner
     }
 
-    pub fn lookup_or_create_color_combiner(&mut self, gfx_device: &GfxDevice, cc_id: u32) {
+    pub fn lookup_or_create_color_combiner(&mut self, gfx_context: &GraphicsContext, cc_id: u32) {
         if let Some(_cc) = self.color_combiner_manager.lookup_color_combiner(cc_id) {
         } else {
-            self.create_color_combiner(gfx_device, cc_id);
+            self.create_color_combiner(gfx_context, cc_id);
         }
     }
 
-    pub fn generate_color_combiner(&mut self, gfx_device: &GfxDevice, cc_id: u32) {
+    pub fn generate_color_combiner(&mut self, gfx_context: &GraphicsContext, cc_id: u32) {
         let mut shader_id = (cc_id >> 24) << 24;
         let mut shader_input_mapping = [[0u8; 4]; 2];
 
@@ -315,7 +319,7 @@ impl RDP {
             }
         }
 
-        let shader_program = self.lookup_or_create_shader_program(gfx_device, shader_id);
+        let shader_program = self.lookup_or_create_shader_program(gfx_context, shader_id);
         let combiner = ColorCombiner::new(shader_id, shader_program, shader_input_mapping);
         self.color_combiner_manager
             .combiners
@@ -340,7 +344,11 @@ impl RDP {
         }
     }
 
-    fn translate_blend_mode(&mut self, gfx_device: &GfxDevice, render_mode: u32) -> BlendState {
+    fn translate_blend_mode(
+        &mut self,
+        gfx_context: &GraphicsContext,
+        render_mode: u32,
+    ) -> BlendState {
         let zmode = self.other_mode_l >> (OtherModeLayoutL::ZMODE as u32) & 0x03;
 
         // handle depth compare
@@ -354,8 +362,8 @@ impl RDP {
             };
 
             if depth_compare != self.rendering_state.depth_compare {
-                self.flush(&gfx_device);
-                gfx_device.set_depth_compare(depth_compare as u8);
+                self.flush(gfx_context);
+                gfx_context.api.set_depth_compare(depth_compare as u8);
                 self.rendering_state.depth_compare = depth_compare;
             }
         }
@@ -363,16 +371,16 @@ impl RDP {
         // handle depth write
         let depth_write = render_mode & (1 << OtherModeLayoutL::Z_UPD as u32) != 0;
         if depth_write != self.rendering_state.depth_write {
-            self.flush(&gfx_device);
-            gfx_device.set_depth_write(depth_write);
+            self.flush(gfx_context);
+            gfx_context.api.set_depth_write(depth_write);
             self.rendering_state.depth_write = depth_write;
         }
 
         // handle polygon offset (slope scale depth bias)
         let polygon_offset = zmode == ZMode::ZMODE_DEC as u32;
         if polygon_offset != self.rendering_state.polygon_offset {
-            self.flush(&gfx_device);
-            gfx_device.set_polygon_offset(polygon_offset);
+            self.flush(gfx_context);
+            gfx_context.api.set_polygon_offset(polygon_offset);
             self.rendering_state.polygon_offset = polygon_offset;
         }
 
@@ -428,31 +436,31 @@ impl RDP {
 
     pub fn update_render_state(
         &mut self,
-        gfx_device: &GfxDevice,
+        gfx_context: &GraphicsContext,
         geometry_mode: u32,
         vertices: &[&StagingVertex; 3],
     ) {
         let depth_test = geometry_mode & RSPGeometry::G_ZBUFFER as u32 != 0;
         if depth_test != self.rendering_state.depth_test {
-            self.flush(gfx_device);
-            gfx_device.set_depth_test(depth_test);
+            self.flush(gfx_context);
+            gfx_context.api.set_depth_test(depth_test);
             self.rendering_state.depth_test = depth_test;
         }
 
-        let blend_state = self.translate_blend_mode(gfx_device, self.other_mode_l);
+        let blend_state = self.translate_blend_mode(gfx_context, self.other_mode_l);
 
         // TODO: split checks into updating blend state separately: enable, blendeq and blendfunc
         if blend_state != self.rendering_state.blend_state {
-            self.flush(gfx_device);
-            gfx_device.set_blend_state(blend_state);
+            self.flush(gfx_context);
+            gfx_context.api.set_blend_state(blend_state);
             self.rendering_state.blend_state = blend_state;
         }
 
         if self.viewport_or_scissor_changed {
             let viewport = self.viewport;
             if viewport != self.rendering_state.viewport {
-                self.flush(gfx_device);
-                gfx_device.set_viewport(
+                self.flush(gfx_context);
+                gfx_context.api.set_viewport(
                     viewport.x as i32,
                     viewport.y as i32,
                     viewport.width as i32,
@@ -462,8 +470,8 @@ impl RDP {
             }
             let scissor = self.scissor;
             if scissor != self.rendering_state.scissor {
-                self.flush(gfx_device);
-                gfx_device.set_scissor(
+                self.flush(gfx_context);
+                gfx_context.api.set_scissor(
                     scissor.x as i32,
                     scissor.y as i32,
                     scissor.width as i32,
@@ -525,16 +533,21 @@ pub extern "C" fn RDPGetScissorPtr(rcp: Option<&mut RCP>) -> *mut Rect {
 }
 
 #[no_mangle]
-pub extern "C" fn RDPFlush(rcp: Option<&mut RCP>) {
+pub extern "C" fn RDPFlush(rcp: Option<&mut RCP>, gfx_context: Option<&mut GraphicsContext>) {
     let rcp = rcp.unwrap();
-    rcp.rdp.flush(rcp.gfx_device.as_ref().unwrap());
+    let gfx_context = gfx_context.unwrap();
+    rcp.rdp.flush(gfx_context);
 }
 
 #[no_mangle]
-pub extern "C" fn RDPLookupOrCreateColorCombiner(rcp: Option<&mut RCP>, cc_id: u32) {
+pub extern "C" fn RDPLookupOrCreateColorCombiner(
+    rcp: Option<&mut RCP>,
+    gfx_context: Option<&mut GraphicsContext>,
+    cc_id: u32,
+) {
     let rcp = rcp.unwrap();
-    rcp.rdp
-        .lookup_or_create_color_combiner(rcp.gfx_device.as_ref().unwrap(), cc_id);
+    let gfx_context = gfx_context.unwrap();
+    rcp.rdp.lookup_or_create_color_combiner(gfx_context, cc_id);
 }
 
 #[no_mangle]
@@ -564,10 +577,15 @@ pub extern "C" fn RDPSetRenderingStateScissor(rcp: Option<&mut RCP>, scissor: Re
 }
 
 #[no_mangle]
-pub extern "C" fn RDPLookupOrCreateShaderProgram(rcp: Option<&mut RCP>, shader_id: u32) {
+pub extern "C" fn RDPLookupOrCreateShaderProgram(
+    rcp: Option<&mut RCP>,
+    gfx_context: Option<&mut GraphicsContext>,
+    shader_id: u32,
+) {
     let rcp = rcp.unwrap();
+    let gfx_context = gfx_context.unwrap();
     rcp.rdp
-        .lookup_or_create_shader_program(rcp.gfx_device.as_ref().unwrap(), shader_id);
+        .lookup_or_create_shader_program(gfx_context, shader_id);
 }
 
 #[no_mangle]
@@ -645,20 +663,19 @@ pub extern "C" fn RDPSetCombine(rcp: Option<&mut RCP>, value: *mut CombineParams
 #[no_mangle]
 pub extern "C" fn RDPUpdateRenderState(
     rcp: Option<&mut RCP>,
+    gfx_context: Option<&mut GraphicsContext>,
     vertex_id1: u8,
     vertex_id2: u8,
     vertex_id3: u8,
 ) {
     let rcp = rcp.unwrap();
+    let gfx_context = gfx_context.unwrap();
 
     let vertex1 = &rcp.rsp.vertex_table[vertex_id1 as usize];
     let vertex2 = &rcp.rsp.vertex_table[vertex_id2 as usize];
     let vertex3 = &rcp.rsp.vertex_table[vertex_id3 as usize];
     let vertex_array = [vertex1, vertex2, vertex3];
 
-    rcp.rdp.update_render_state(
-        rcp.gfx_device.as_ref().unwrap(),
-        rcp.rsp.geometry_mode,
-        &vertex_array,
-    );
+    rcp.rdp
+        .update_render_state(gfx_context, rcp.rsp.geometry_mode, &vertex_array);
 }

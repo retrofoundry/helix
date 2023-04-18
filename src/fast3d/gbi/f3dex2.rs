@@ -11,7 +11,7 @@ use super::utils::{get_cmd, get_segmented_address};
 use super::{GBIDefinition, GBIResult, GBI};
 use crate::{
     extensions::matrix::{calculate_normal_dir, matrix_from_fixed_point, matrix_multiply},
-    fast3d::{gfx_device::GfxDevice, rdp::SCREEN_HEIGHT, utils::color_combiner::CombineParams},
+    fast3d::{graphics::GraphicsContext, rdp::SCREEN_HEIGHT, utils::color_combiner::CombineParams},
 };
 
 pub enum F3DEX2 {
@@ -98,7 +98,7 @@ impl F3DEX2 {
     pub fn gsp_matrix(
         _rdp: &mut RDP,
         rsp: &mut RSP,
-        _gfx_device: &GfxDevice,
+        _gfx_context: &GraphicsContext,
         w0: usize,
         w1: usize,
     ) -> GBIResult {
@@ -164,7 +164,7 @@ impl F3DEX2 {
     pub fn gsp_pop_matrix(
         _rdp: &mut RDP,
         rsp: &mut RSP,
-        _gfx_device: &GfxDevice,
+        _gfx_context: &GraphicsContext,
         _w0: usize,
         w1: usize,
     ) -> GBIResult {
@@ -193,7 +193,7 @@ impl F3DEX2 {
     pub fn gsp_movemem(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        _gfx_device: &GfxDevice,
+        _gfx_context: &GraphicsContext,
         w0: usize,
         w1: usize,
     ) -> GBIResult {
@@ -225,7 +225,7 @@ impl F3DEX2 {
     pub fn gsp_moveword(
         _rdp: &mut RDP,
         rsp: &mut RSP,
-        _gfx_device: &GfxDevice,
+        _gfx_context: &GraphicsContext,
         w0: usize,
         w1: usize,
     ) -> GBIResult {
@@ -248,7 +248,7 @@ impl F3DEX2 {
     pub fn gsp_texture(
         _rdp: &mut RDP,
         rsp: &mut RSP,
-        _gfx_device: &GfxDevice,
+        _gfx_context: &GraphicsContext,
         w0: usize,
         w1: usize,
     ) -> GBIResult {
@@ -268,7 +268,7 @@ impl F3DEX2 {
     pub fn gsp_vertex(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        _gfx_device: &GfxDevice,
+        _gfx_context: &GraphicsContext,
         w0: usize,
         w1: usize,
     ) -> GBIResult {
@@ -434,7 +434,7 @@ impl F3DEX2 {
     pub fn gsp_geometry_mode(
         _rdp: &mut RDP,
         rsp: &mut RSP,
-        _gfx_device: &GfxDevice,
+        _gfx_context: &GraphicsContext,
         w0: usize,
         w1: usize,
     ) -> GBIResult {
@@ -450,7 +450,7 @@ impl F3DEX2 {
     pub fn gsp_tri1(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        gfx_device: &GfxDevice,
+        gfx_context: &GraphicsContext,
         w0: usize,
         _w1: usize,
     ) -> GBIResult {
@@ -508,7 +508,7 @@ impl F3DEX2 {
         }
 
         // TODO: Produce draw calls for RDP to process later?
-        rdp.update_render_state(gfx_device, rsp.geometry_mode, &vertex_array);
+        rdp.update_render_state(gfx_context, rsp.geometry_mode, &vertex_array);
 
         GBIResult::Continue
     }
@@ -516,7 +516,7 @@ impl F3DEX2 {
     pub fn sub_dl(
         _rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gfx_device: &GfxDevice,
+        _gfx_context: &GraphicsContext,
         w0: usize,
         w1: usize,
     ) -> GBIResult {
@@ -533,7 +533,7 @@ impl F3DEX2 {
     pub fn gdp_set_other_mode_l(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gfx_device: &GfxDevice,
+        _gfx_context: &GraphicsContext,
         w0: usize,
         w1: usize,
     ) -> GBIResult {
@@ -547,7 +547,7 @@ impl F3DEX2 {
     pub fn gdp_set_other_mode_h(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gfx_device: &GfxDevice,
+        _gfx_context: &GraphicsContext,
         w0: usize,
         w1: usize,
     ) -> GBIResult {
@@ -573,7 +573,7 @@ impl F3DEX2 {
     pub fn gdp_set_scissor(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        _gfx_device: &GfxDevice,
+        _gfx_context: &GraphicsContext,
         w0: usize,
         w1: usize,
     ) -> GBIResult {
@@ -600,7 +600,7 @@ impl F3DEX2 {
     pub fn gdp_set_combine(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gfx_device: &GfxDevice,
+        _gfx_context: &GraphicsContext,
         w0: usize,
         w1: usize,
     ) -> GBIResult {
@@ -613,7 +613,11 @@ impl F3DEX2 {
 #[cfg(test)]
 mod tests {
     use super::F3DEX2;
-    use crate::fast3d::{rdp::RDP, rsp::RSP};
+    use crate::fast3d::{
+        graphics::{DummyGraphicsDevice, GraphicsContext},
+        rdp::RDP,
+        rsp::RSP,
+    };
 
     #[test]
     fn test_moveword() {
@@ -624,7 +628,8 @@ mod tests {
         let mut rsp = RSP::new();
         let mut rdp = RDP::new();
 
-        F3DEX2::gsp_moveword(&mut rdp, &mut rsp, w0, w1);
+        let dummy_gfx_context = GraphicsContext::new(Box::new(DummyGraphicsDevice {}));
+        F3DEX2::gsp_moveword(&mut rdp, &mut rsp, &dummy_gfx_context, w0, w1);
         assert!(rsp.num_lights == 2);
 
         // FOG
@@ -634,7 +639,8 @@ mod tests {
         let mut rsp = RSP::new();
         let mut rdp = RDP::new();
 
-        F3DEX2::gsp_moveword(&mut rdp, &mut rsp, w0, w1);
+        let dummy_gfx_context = GraphicsContext::new(Box::new(DummyGraphicsDevice {}));
+        F3DEX2::gsp_moveword(&mut rdp, &mut rsp, &dummy_gfx_context, w0, w1);
         assert!(rsp.fog_multiplier == 4266);
         assert!(rsp.fog_offset == -4010);
     }

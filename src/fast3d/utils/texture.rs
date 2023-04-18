@@ -1,6 +1,5 @@
+use super::super::{graphics::GraphicsContext, rcp::RCP};
 use std::collections::{HashMap, VecDeque};
-
-use super::super::{gfx_device::GfxDevice, rcp::RCP};
 
 pub struct TextureManager {
     pub map: HashMap<usize, Texture>,
@@ -19,7 +18,7 @@ impl TextureManager {
 
     pub fn lookup(
         &mut self,
-        gfx_device: &GfxDevice,
+        gfx_context: &GraphicsContext,
         tile: i32,
         orig_addr: usize,
         fmt: u8,
@@ -27,7 +26,7 @@ impl TextureManager {
     ) -> Option<&mut Texture> {
         if let Some(value) = self.map.get_mut(&orig_addr) {
             if value.fmt == fmt && value.size == siz {
-                gfx_device.select_texture(tile, value.texture_id);
+                gfx_context.api.select_texture(tile, value.texture_id);
                 self.lru.retain(|&k| k != orig_addr);
                 self.lru.push_back(orig_addr);
                 return Some(value);
@@ -38,7 +37,7 @@ impl TextureManager {
 
     pub fn insert_if_not_found(
         &mut self,
-        gfx_device: &GfxDevice,
+        gfx_context: &GraphicsContext,
         tile: i32,
         orig_addr: usize,
         fmt: u8,
@@ -50,9 +49,9 @@ impl TextureManager {
                 // TODO: Remove texture from gfx_device
             }
         }
-        let texture_id = gfx_device.new_texture();
-        gfx_device.select_texture(tile, texture_id);
-        gfx_device.set_sampler_parameters(tile, false, 0, 0);
+        let texture_id = gfx_context.api.new_texture();
+        gfx_context.api.select_texture(tile, texture_id);
+        gfx_context.api.set_sampler_parameters(tile, false, 0, 0);
         let value = self.map.entry(orig_addr).or_insert(Texture {
             texture_addr: orig_addr,
             fmt,
@@ -96,20 +95,21 @@ impl Texture {
 #[no_mangle]
 pub extern "C" fn RDPLookupTexture(
     rcp: Option<&mut RCP>,
+    gfx_context: Option<&mut GraphicsContext>,
     tile: i32,
     orig_addr: *const u8,
     fmt: u8,
     siz: u8,
 ) -> bool {
     let rcp = rcp.unwrap();
-    let gfx_device = rcp.gfx_device.as_ref().unwrap();
+    let gfx_context = gfx_context.unwrap();
     let texture_cache = &mut rcp.rdp.texture_manager;
-    if let Some(value) = texture_cache.lookup(gfx_device, tile, orig_addr as usize, fmt, siz) {
+    if let Some(value) = texture_cache.lookup(gfx_context, tile, orig_addr as usize, fmt, siz) {
         rcp.rdp.rendering_state.textures[tile as usize] = *value;
         true
     } else {
         let value =
-            texture_cache.insert_if_not_found(gfx_device, tile, orig_addr as usize, fmt, siz);
+            texture_cache.insert_if_not_found(gfx_context, tile, orig_addr as usize, fmt, siz);
         rcp.rdp.rendering_state.textures[tile as usize] = *value;
         false
     }
