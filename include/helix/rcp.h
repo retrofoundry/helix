@@ -150,6 +150,9 @@ void RDPSetCombine(void* rcp, void* value);
 
 void RDPUpdateRenderState(void* rcp, void* gfx_context, uint8_t vertex_id1, uint8_t vertex_id2, uint8_t vertex_id3);
 
+bool RDPGetTextureChangedAtIndex(void* rcp, uint8_t index);
+void RDPSetTextureChangedAtIndex(void* rcp, uint8_t index, bool value);
+
 #ifdef __cplusplus
 }
 #endif

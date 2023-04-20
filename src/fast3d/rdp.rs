@@ -146,6 +146,8 @@ pub struct RDP {
     pub rendering_state: RenderingState,
 
     pub texture_manager: TextureManager,
+    pub textures_changed: [bool; 2],
+
     pub color_combiner_manager: ColorCombinerManager,
 
     pub viewport: Rect,
@@ -168,6 +170,8 @@ impl RDP {
             rendering_state: RenderingState::EMPTY,
 
             texture_manager: TextureManager::new(TEXTURE_CACHE_MAX_SIZE),
+            textures_changed: [false; 2],
+
             color_combiner_manager: ColorCombinerManager::new(),
 
             viewport: Rect::ZERO,
@@ -678,4 +682,16 @@ pub extern "C" fn RDPUpdateRenderState(
 
     rcp.rdp
         .update_render_state(gfx_context, rcp.rsp.geometry_mode, &vertex_array);
+}
+
+#[no_mangle]
+pub extern "C" fn RDPGetTextureChangedAtIndex(rcp: Option<&mut RCP>, index: u8) -> bool {
+    let rcp = rcp.unwrap();
+    rcp.rdp.textures_changed[index as usize]
+}
+
+#[no_mangle]
+pub extern "C" fn RDPSetTextureChangedAtIndex(rcp: Option<&mut RCP>, index: u8, value: bool) {
+    let rcp = rcp.unwrap();
+    rcp.rdp.textures_changed[index as usize] = value;
 }
