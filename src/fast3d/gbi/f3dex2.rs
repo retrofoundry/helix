@@ -11,7 +11,7 @@ use super::utils::{get_cmd, get_segmented_address};
 use super::{GBIDefinition, GBIResult, GBI};
 use crate::{
     extensions::matrix::{calculate_normal_dir, matrix_from_fixed_point, matrix_multiply},
-    fast3d::{graphics::GraphicsContext, rdp::SCREEN_HEIGHT, utils::color_combiner::CombineParams},
+    fast3d::{graphics::GraphicsContext, rdp::{SCREEN_HEIGHT, G_TX_LOADTILE}, utils::color_combiner::CombineParams},
 };
 
 pub enum F3DEX2 {
@@ -246,7 +246,7 @@ impl F3DEX2 {
     }
 
     pub fn gsp_texture(
-        _rdp: &mut RDP,
+        rdp: &mut RDP,
         rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
         w0: usize,
@@ -255,12 +255,13 @@ impl F3DEX2 {
         let scale_s = get_cmd(w1, 16, 16) as u16;
         let scale_t = get_cmd(w1, 0, 16) as u16;
         let _level = get_cmd(w0, 11, 3) as u8;
-        let _tile = get_cmd(w0, 8, 3) as u8;
+        let tile = get_cmd(w0, 8, 3) as u8;
         let _on = get_cmd(w0, 1, 7) as u8;
 
         // TODO: Handle using tile descriptors?
         rsp.texture_scaling_factor.scale_s = scale_s;
         rsp.texture_scaling_factor.scale_t = scale_t;
+        rdp.current_tile_descriptor_index = tile as usize;
 
         GBIResult::Continue
     }
@@ -605,6 +606,121 @@ impl F3DEX2 {
         w1: usize,
     ) -> GBIResult {
         rdp.combine = CombineParams::decode(w0, w1);
+
+        GBIResult::Continue
+    }
+
+    pub fn gdp_set_tile(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gfx_context: &GraphicsContext,
+        w0: usize,
+        w1: usize,
+    ) -> GBIResult {
+        let format = get_cmd(w0, 21, 3) as u8;
+        let size = get_cmd(w0, 19, 2) as u8;
+        let line = get_cmd(w0, 9, 9) as u16;
+        let tmem = get_cmd(w0, 0, 9) as u16;
+        let tile = get_cmd(w1, 24, 3) as u8;
+        let palette = get_cmd(w1, 20, 4) as u8;
+        let cm_t: u8 = get_cmd(w1, 18, 2) as u8;
+        let mask_t: u8 = get_cmd(w1, 14, 4) as u8;
+        let shift_t: u8 = get_cmd(w1, 10, 4) as u8;
+        let cm_s: u8 = get_cmd(w1, 8, 2) as u8;
+        let mask_s: u8 = get_cmd(w1, 4, 4) as u8;
+        let shift_s: u8 = get_cmd(w1, 0, 4) as u8;
+        trace!("gdp_set_tile(tile: {}, format: {}, size: {}, line: {}, tmem: {}, palette: {}, cm_t: {}, mask_t: {}, shift_t: {}, cm_s: {}, mask_s: {}, shift_s: {})", tile, format, size, line, tmem, palette, cm_t, mask_t, shift_t, cm_s, mask_s, shift_s);
+
+        let tile = &mut rdp.tile_descriptors[tile as usize];
+        tile.set_format(format);
+        tile.set_size(size);
+        tile.line = line;
+        tile.tmem = tmem;
+        tile.palette = palette;
+        tile.cm_t = cm_t;
+        tile.mask_t = mask_t;
+        tile.shift_t = shift_t;
+        tile.cm_s = cm_s;
+        tile.mask_s = mask_s;
+        tile.shift_s = shift_s;
+
+        rdp.textures_changed;
+
+        GBIResult::Continue
+    }
+
+    pub fn gdp_load_tile(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gfx_context: &GraphicsContext,
+        w0: usize,
+        w1: usize,
+    ) -> GBIResult {
+        trace!("gdp_load_tile(w0: {}, w1: {})", w0, w1);
+        let tile_index = get_cmd(w1, 24, 3);
+        let uls = get_cmd(w0, 12, 12) as u16;
+        let ult = get_cmd(w0, 0, 12) as u16;
+        let lrs = get_cmd(w1, 12, 12) as u16;
+        let lrt = get_cmd(w1, 0, 12) as u16;
+
+        // First, verify that we're loading the whole texture.
+        assert!(uls == 0 && ult == 0);
+        // Verify that we're loading into LOADTILE.
+        assert!(tile_index == G_TX_LOADTILE);
+        trace!(
+            "gdp_load_tile(tile: {}, uls: {}, ult: {}, lrs: {}, lrt: {})",
+            tile_index,
+            uls,
+            ult,
+            lrs,
+            lrt
+        );
+
+        let tile = &mut rdp.tile_descriptors[tile_index as usize];
+        // rdp.tmem_map
+        //     .insert(tile.tmem, rdp.texture_image_state.address);
+
+        // TODO: Really necessary?
+        // tile.uls = uls;
+        // tile.ult = ult;
+        // tile.lrs = lrs;
+        // tile.lrt = lrt;
+
+        trace!("texture {} is being marked as has changed", tile.tmem / 256);
+        // rdp.textures_changed[(tile.tmem / 256) as usize] = true;
+
+        GBIResult::Continue
+    }
+
+    pub fn gdp_set_tile_size(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gfx_context: &GraphicsContext,
+        w0: usize,
+        w1: usize,
+    ) -> GBIResult {
+        let tile = get_cmd(w1, 24, 3) as u8;
+        let uls = get_cmd(w0, 12, 12) as u16;
+        let ult = get_cmd(w0, 0, 12) as u16;
+        let lrs = get_cmd(w1, 12, 12) as u16;
+        let lrt = get_cmd(w1, 0, 12) as u16;
+        trace!(
+            "gdp_set_tile_size(tile: {}, uls: {}, ult: {}, lrs: {}, lrt: {})",
+            tile,
+            uls,
+            ult,
+            lrs,
+            lrt
+        );
+
+        let tile = &mut rdp.tile_descriptors[tile as usize];
+        tile.uls = uls;
+        tile.ult = ult;
+        tile.lrs = lrs;
+        tile.lrt = lrt;
+
+        rdp.textures_changed[0] = true;
+        rdp.textures_changed[1] = true;
 
         GBIResult::Continue
     }

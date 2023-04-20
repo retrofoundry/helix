@@ -99,6 +99,9 @@ void F3DEX2_GDPSetOtherModeL(void* rcp, void* gfx_context, uintptr_t w0, uintptr
 void F3DEX2_GDPSetOtherModeH(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GDPSetScissor(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GDPSetCombine(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPSetTile(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPLoadTile(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPSetTileSize(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
 
 // RSP Getters and Setters
 uint32_t RSPGetGeometryMode(void* rcp);
@@ -152,6 +155,17 @@ void RDPUpdateRenderState(void* rcp, void* gfx_context, uint8_t vertex_id1, uint
 
 bool RDPGetTextureChangedAtIndex(void* rcp, uint8_t index);
 void RDPSetTextureChangedAtIndex(void* rcp, uint8_t index, bool value);
+
+uint16_t RDPGetCurrentTileDescriptorULS(void* rcp);
+uint16_t RDPGetCurrentTileDescriptorULT(void* rcp);
+uint16_t RDPGetCurrentTileDescriptorLRS(void* rcp);
+uint16_t RDPGetCurrentTileDescriptorLRT(void* rcp);
+uint8_t RDPGetCurrentTileDescriptorCMS(void* rcp);
+uint8_t RDPGetCurrentTileDescriptorCMT(void* rcp);
+uint8_t RDPGetCurrentTileDescriptorFormat(void* rcp);
+uint8_t RDPGetCurrentTileDescriptorSize(void* rcp);
+
+uint32_t RDPGetCurrentTileDescriptorLineSizeBytes(void* rcp);
 
 #ifdef __cplusplus
 }
