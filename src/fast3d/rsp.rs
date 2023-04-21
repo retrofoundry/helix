@@ -8,18 +8,6 @@ const MAX_VERTICES: usize = 64;
 // excluding ambient light
 pub const MAX_LIGHTS: usize = 7;
 
-pub struct TextureScalingFactor {
-    pub scale_s: u16,
-    pub scale_t: u16,
-}
-
-impl TextureScalingFactor {
-    pub const ZERO: Self = Self {
-        scale_s: 0,
-        scale_t: 0,
-    };
-}
-
 #[repr(C)]
 pub struct StagingVertex {
     pub position: [f32; 4],
@@ -70,8 +58,6 @@ pub struct RSP {
     pub fog_multiplier: i16,
     pub fog_offset: i16,
 
-    pub texture_scaling_factor: TextureScalingFactor,
-
     pub vertex_table: [StagingVertex; MAX_VERTICES + 4],
 
     pub lights_coeffs: [[f32; 3]; MAX_LIGHTS],
@@ -95,8 +81,6 @@ impl RSP {
 
             fog_multiplier: 0,
             fog_offset: 0,
-
-            texture_scaling_factor: TextureScalingFactor::ZERO,
 
             vertex_table: [StagingVertex::ZERO; MAX_VERTICES + 4],
 

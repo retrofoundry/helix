@@ -1,4 +1,4 @@
-use super::texture::{ImageSize, ImageFormat};
+use super::texture::{ImageFormat, ImageSize};
 
 #[derive(Debug, Clone, Copy)]
 pub struct TileDescriptor {

@@ -11,7 +11,11 @@ use super::utils::{get_cmd, get_segmented_address};
 use super::{GBIDefinition, GBIResult, GBI};
 use crate::{
     extensions::matrix::{calculate_normal_dir, matrix_from_fixed_point, matrix_multiply},
-    fast3d::{graphics::GraphicsContext, rdp::{SCREEN_HEIGHT, G_TX_LOADTILE}, utils::color_combiner::CombineParams},
+    fast3d::{
+        graphics::GraphicsContext,
+        rdp::{G_TX_LOADTILE, SCREEN_HEIGHT},
+        utils::{color_combiner::CombineParams, texture::TextureState},
+    },
 };
 
 pub enum F3DEX2 {
@@ -254,14 +258,16 @@ impl F3DEX2 {
     ) -> GBIResult {
         let scale_s = get_cmd(w1, 16, 16) as u16;
         let scale_t = get_cmd(w1, 0, 16) as u16;
-        let _level = get_cmd(w0, 11, 3) as u8;
+        let level = get_cmd(w0, 11, 3) as u8;
         let tile = get_cmd(w0, 8, 3) as u8;
-        let _on = get_cmd(w0, 1, 7) as u8;
+        let on = get_cmd(w0, 1, 7) as u8;
 
-        // TODO: Handle using tile descriptors?
-        rsp.texture_scaling_factor.scale_s = scale_s;
-        rsp.texture_scaling_factor.scale_t = scale_t;
-        rdp.current_tile_descriptor_index = tile as usize;
+        if rdp.texture_state.tile != tile {
+            rdp.textures_changed[0] = true;
+            rdp.textures_changed[1] = true;
+        }
+
+        rdp.texture_state = TextureState::new(on != 0, tile, level, scale_s, scale_t);
 
         GBIResult::Continue
     }
@@ -304,11 +310,9 @@ impl F3DEX2 {
 
             x = rdp.adjust_x_for_viewport(x);
 
-            let mut U = ((vertex.texture_coords[0] as i32)
-                * (rsp.texture_scaling_factor.scale_s as i32)
+            let mut U = ((vertex.texture_coords[0] as i32) * (rdp.texture_state.scale_s as i32)
                 >> 16) as i16;
-            let mut V = ((vertex.texture_coords[1] as i32)
-                * (rsp.texture_scaling_factor.scale_t as i32)
+            let mut V = ((vertex.texture_coords[1] as i32) * (rdp.texture_state.scale_t as i32)
                 >> 16) as i16;
 
             if rsp.geometry_mode & RSPGeometry::G_LIGHTING as u32 > 0 {
@@ -371,10 +375,8 @@ impl F3DEX2 {
                         + vertex_normal.normal[1] as f32 * rsp.lookat_coeffs[1][1]
                         + vertex_normal.normal[2] as f32 * rsp.lookat_coeffs[1][2];
 
-                    U = ((dotx / 127.0 + 1.0) / 4.0) as i16
-                        * rsp.texture_scaling_factor.scale_s as i16;
-                    V = ((doty / 127.0 + 1.0) / 4.0) as i16
-                        * rsp.texture_scaling_factor.scale_t as i16;
+                    U = ((dotx / 127.0 + 1.0) / 4.0) as i16 * rdp.texture_state.scale_s as i16;
+                    V = ((doty / 127.0 + 1.0) / 4.0) as i16 * rdp.texture_state.scale_t as i16;
                 }
             } else {
                 staging_vertex.color[0] = vertex.color[0];
@@ -629,7 +631,6 @@ impl F3DEX2 {
         let cm_s: u8 = get_cmd(w1, 8, 2) as u8;
         let mask_s: u8 = get_cmd(w1, 4, 4) as u8;
         let shift_s: u8 = get_cmd(w1, 0, 4) as u8;
-        trace!("gdp_set_tile(tile: {}, format: {}, size: {}, line: {}, tmem: {}, palette: {}, cm_t: {}, mask_t: {}, shift_t: {}, cm_s: {}, mask_s: {}, shift_s: {})", tile, format, size, line, tmem, palette, cm_t, mask_t, shift_t, cm_s, mask_s, shift_s);
 
         let tile = &mut rdp.tile_descriptors[tile as usize];
         tile.set_format(format);
@@ -704,14 +705,6 @@ impl F3DEX2 {
         let ult = get_cmd(w0, 0, 12) as u16;
         let lrs = get_cmd(w1, 12, 12) as u16;
         let lrt = get_cmd(w1, 0, 12) as u16;
-        trace!(
-            "gdp_set_tile_size(tile: {}, uls: {}, ult: {}, lrs: {}, lrt: {})",
-            tile,
-            uls,
-            ult,
-            lrs,
-            lrt
-        );
 
         let tile = &mut rdp.tile_descriptors[tile as usize];
         tile.uls = uls;

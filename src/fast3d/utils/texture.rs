@@ -83,6 +83,35 @@ impl TextureManager {
     }
 }
 
+pub struct TextureState {
+    pub on: bool,
+    /// Index of parameter-setting tile descriptor (3bit precision, 0 - 7)
+    pub tile: u8,
+    pub level: u8,
+    pub scale_s: u16,
+    pub scale_t: u16,
+}
+
+impl TextureState {
+    pub const EMPTY: Self = Self {
+        on: false,
+        tile: 0,
+        level: 0,
+        scale_s: 0,
+        scale_t: 0,
+    };
+
+    pub fn new(on: bool, tile: u8, level: u8, scale_s: u16, scale_t: u16) -> Self {
+        Self {
+            on,
+            tile,
+            level,
+            scale_s,
+            scale_t,
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct Texture {

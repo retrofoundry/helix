@@ -9,7 +9,8 @@ use super::{
         color_combiner::{
             ColorCombiner, ColorCombinerManager, CombineParams, ACMUX, CCMUX, SHADER,
         },
-        texture::{Texture, TextureManager}, tile::TileDescriptor,
+        texture::{Texture, TextureManager, TextureState},
+        tile::TileDescriptor,
     },
 };
 
@@ -156,10 +157,10 @@ pub struct RDP {
     pub rendering_state: RenderingState,
 
     pub texture_manager: TextureManager,
-    
-    pub textures_changed: [bool; 2],
+
+    pub texture_state: TextureState,
     pub tile_descriptors: [TileDescriptor; 8],
-    pub current_tile_descriptor_index: usize,
+    pub textures_changed: [bool; 2],
 
     pub color_combiner_manager: ColorCombinerManager,
 
@@ -184,9 +185,9 @@ impl RDP {
 
             texture_manager: TextureManager::new(TEXTURE_CACHE_MAX_SIZE),
 
-            textures_changed: [false; 2],
+            texture_state: TextureState::EMPTY,
             tile_descriptors: [TileDescriptor::EMPTY; 8],
-            current_tile_descriptor_index: 0,
+            textures_changed: [false; 2],
 
             color_combiner_manager: ColorCombinerManager::new(),
 
@@ -715,53 +716,53 @@ pub extern "C" fn RDPSetTextureChangedAtIndex(rcp: Option<&mut RCP>, index: u8, 
 #[no_mangle]
 pub extern "C" fn RDPGetCurrentTileDescriptorULS(rcp: Option<&mut RCP>) -> u16 {
     let rcp = rcp.unwrap();
-    rcp.rdp.tile_descriptors[rcp.rdp.current_tile_descriptor_index].uls
+    rcp.rdp.tile_descriptors[rcp.rdp.texture_state.tile as usize].uls
 }
 
 #[no_mangle]
 pub extern "C" fn RDPGetCurrentTileDescriptorULT(rcp: Option<&mut RCP>) -> u16 {
     let rcp = rcp.unwrap();
-    rcp.rdp.tile_descriptors[rcp.rdp.current_tile_descriptor_index].ult
+    rcp.rdp.tile_descriptors[rcp.rdp.texture_state.tile as usize].ult
 }
 
 #[no_mangle]
 pub extern "C" fn RDPGetCurrentTileDescriptorLRS(rcp: Option<&mut RCP>) -> u16 {
     let rcp = rcp.unwrap();
-    rcp.rdp.tile_descriptors[rcp.rdp.current_tile_descriptor_index].lrs
+    rcp.rdp.tile_descriptors[rcp.rdp.texture_state.tile as usize].lrs
 }
 
 #[no_mangle]
 pub extern "C" fn RDPGetCurrentTileDescriptorLRT(rcp: Option<&mut RCP>) -> u16 {
     let rcp = rcp.unwrap();
-    rcp.rdp.tile_descriptors[rcp.rdp.current_tile_descriptor_index].lrt
+    rcp.rdp.tile_descriptors[rcp.rdp.texture_state.tile as usize].lrt
 }
 
 #[no_mangle]
 pub extern "C" fn RDPGetCurrentTileDescriptorCMS(rcp: Option<&mut RCP>) -> u8 {
     let rcp = rcp.unwrap();
-    rcp.rdp.tile_descriptors[rcp.rdp.current_tile_descriptor_index].cm_s
+    rcp.rdp.tile_descriptors[rcp.rdp.texture_state.tile as usize].cm_s
 }
 
 #[no_mangle]
 pub extern "C" fn RDPGetCurrentTileDescriptorCMT(rcp: Option<&mut RCP>) -> u8 {
     let rcp = rcp.unwrap();
-    rcp.rdp.tile_descriptors[rcp.rdp.current_tile_descriptor_index].cm_t
+    rcp.rdp.tile_descriptors[rcp.rdp.texture_state.tile as usize].cm_t
 }
 
 #[no_mangle]
 pub extern "C" fn RDPGetCurrentTileDescriptorFormat(rcp: Option<&mut RCP>) -> u8 {
     let rcp = rcp.unwrap();
-    rcp.rdp.tile_descriptors[rcp.rdp.current_tile_descriptor_index].format as u8
+    rcp.rdp.tile_descriptors[rcp.rdp.texture_state.tile as usize].format as u8
 }
 
 #[no_mangle]
 pub extern "C" fn RDPGetCurrentTileDescriptorSize(rcp: Option<&mut RCP>) -> u8 {
     let rcp = rcp.unwrap();
-    rcp.rdp.tile_descriptors[rcp.rdp.current_tile_descriptor_index].size as u8
+    rcp.rdp.tile_descriptors[rcp.rdp.texture_state.tile as usize].size as u8
 }
 
 #[no_mangle]
 pub extern "C" fn RDPGetCurrentTileDescriptorLineSizeBytes(rcp: Option<&mut RCP>) -> u32 {
     let rcp = rcp.unwrap();
-    rcp.rdp.tile_descriptors[rcp.rdp.current_tile_descriptor_index].line as u32 * 8
+    rcp.rdp.tile_descriptors[rcp.rdp.texture_state.tile as usize].line as u32 * 8
 }
