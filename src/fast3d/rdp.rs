@@ -11,7 +11,7 @@ use super::{
         color_combiner::{
             ColorCombiner, ColorCombinerManager, CombineParams, ACMUX, CCMUX, SHADER,
         },
-        texture::{Texture, TextureManager, TextureState},
+        texture::{Texture, TextureImageState, TextureManager, TextureState},
         tile::TileDescriptor,
     },
 };
@@ -20,6 +20,7 @@ pub const SCREEN_WIDTH: f32 = 320.0;
 pub const SCREEN_HEIGHT: f32 = 240.0;
 const MAX_VBO_SIZE: usize = 256;
 const TEXTURE_CACHE_MAX_SIZE: usize = 500;
+const NUM_TILE_DESCRIPTORS: usize = 8;
 
 // Stray RDP defines
 pub const G_TX_LOADTILE: usize = 7;
@@ -166,7 +167,8 @@ pub struct RDP {
     pub texture_manager: TextureManager,
 
     pub texture_state: TextureState,
-    pub tile_descriptors: [TileDescriptor; 8],
+    pub texture_image_state: TextureImageState, // coming via GBI (texture to load)
+    pub tile_descriptors: [TileDescriptor; NUM_TILE_DESCRIPTORS],
     pub tmem_map: HashMap<u16, TMEMMapEntry>, // tmem address -> texture image state address
     pub textures_changed: [bool; 2],
 
@@ -190,12 +192,13 @@ impl RDP {
         RDP {
             output_dimensions: OutputDimensions::ZERO,
             rendering_state: RenderingState::EMPTY,
-            tmem_map: HashMap::new(),
+
             texture_manager: TextureManager::new(TEXTURE_CACHE_MAX_SIZE),
 
             texture_state: TextureState::EMPTY,
+            texture_image_state: TextureImageState::EMPTY,
             tile_descriptors: [TileDescriptor::EMPTY; 8],
-
+            tmem_map: HashMap::new(),
             textures_changed: [false; 2],
 
             color_combiner_manager: ColorCombinerManager::new(),
@@ -723,6 +726,12 @@ pub extern "C" fn RDPSetTextureChangedAtIndex(rcp: Option<&mut RCP>, index: u8, 
 }
 
 #[no_mangle]
+pub extern "C" fn RDPGetTileDescriptorTMEM(rcp: Option<&mut RCP>, index: u8) -> u16 {
+    let rcp = rcp.unwrap();
+    rcp.rdp.tile_descriptors[index as usize].tmem
+}
+
+#[no_mangle]
 pub extern "C" fn RDPGetCurrentTileDescriptorULS(rcp: Option<&mut RCP>) -> u16 {
     let rcp = rcp.unwrap();
     rcp.rdp.tile_descriptors[rcp.rdp.texture_state.tile as usize].uls
@@ -784,17 +793,39 @@ pub extern "C" fn RDPSetTMEMMap(
     size_bytes: u32,
 ) {
     let rcp = rcp.unwrap();
-    rcp.rdp.tmem_map.insert(tile_number as u16, TMEMMapEntry { address: address as usize, size_bytes });
+    rcp.rdp.tmem_map.insert(
+        tile_number as u16,
+        TMEMMapEntry {
+            address: address as usize,
+            size_bytes,
+        },
+    );
 }
 
 #[no_mangle]
 pub extern "C" fn RDPGetTMEMMapEntrySize(rcp: Option<&mut RCP>, tile_number: u8) -> u32 {
     let rcp = rcp.unwrap();
-    rcp.rdp.tmem_map.get(&(tile_number as u16)).unwrap().size_bytes
+    rcp.rdp
+        .tmem_map
+        .get(&(tile_number as u16))
+        .unwrap()
+        .size_bytes
 }
 
 #[no_mangle]
 pub extern "C" fn RDPGetTMEMMapEntryAddress(rcp: Option<&mut RCP>, tile_number: u8) -> *const u8 {
     let rcp = rcp.unwrap();
     rcp.rdp.tmem_map.get(&(tile_number as u16)).unwrap().address as *const u8
+}
+
+#[no_mangle]
+pub extern "C" fn RDPGetTextureImageStateAddress(rcp: Option<&mut RCP>) -> *const u8 {
+    let rcp = rcp.unwrap();
+    rcp.rdp.texture_image_state.address as *const u8
+}
+
+#[no_mangle]
+pub extern "C" fn RDPGetTextureImageStateSize(rcp: Option<&mut RCP>) -> u8 {
+    let rcp = rcp.unwrap();
+    rcp.rdp.texture_image_state.size
 }

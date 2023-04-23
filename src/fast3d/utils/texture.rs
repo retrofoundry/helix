@@ -112,6 +112,31 @@ impl TextureState {
     }
 }
 
+pub struct TextureImageState {
+    pub format: u8,
+    pub size: u8,
+    pub width: u16,
+    pub address: usize,
+}
+
+impl TextureImageState {
+    pub const EMPTY: Self = Self {
+        format: 0,
+        size: 0,
+        width: 0,
+        address: 0,
+    };
+
+    pub fn new(format: u8, size: u8, width: u16, address: usize) -> Self {
+        Self {
+            format,
+            size,
+            width,
+            address,
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct Texture {

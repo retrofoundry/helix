@@ -14,7 +14,10 @@ use crate::{
     fast3d::{
         graphics::GraphicsContext,
         rdp::{G_TX_LOADTILE, SCREEN_HEIGHT},
-        utils::{color_combiner::CombineParams, texture::TextureState},
+        utils::{
+            color_combiner::CombineParams,
+            texture::{TextureImageState, TextureState},
+        },
     },
 };
 
@@ -95,6 +98,7 @@ impl GBIDefinition for F3DEX2 {
         );
         gbi.register(F3DEX2::G_SETSCISSOR as usize, F3DEX2::gdp_set_scissor);
         gbi.register(F3DEX2::G_SETCOMBINE as usize, F3DEX2::gdp_set_combine);
+        gbi.register(F3DEX2::G_SETTIMG as usize, F3DEX2::gdp_set_texture_image);
     }
 }
 
@@ -715,6 +719,35 @@ impl F3DEX2 {
 
         rdp.textures_changed[0] = true;
         rdp.textures_changed[1] = true;
+
+        GBIResult::Continue
+    }
+
+    pub fn gdp_set_texture_image(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gfx_context: &GraphicsContext,
+        w0: usize,
+        w1: usize,
+    ) -> GBIResult {
+        let format = get_cmd(w0, 21, 3) as u8;
+        let size = get_cmd(w0, 19, 2) as u8;
+        let width = get_cmd(w0, 0, 10) as u16;
+        let address = get_segmented_address(w1);
+        trace!(
+            "gdp_set_teximage: format: {}, size: {}, width: {}, address: {}",
+            format,
+            size,
+            width,
+            address
+        );
+
+        rdp.texture_image_state = TextureImageState {
+            format,
+            size,
+            width,
+            address,
+        };
 
         GBIResult::Continue
     }
