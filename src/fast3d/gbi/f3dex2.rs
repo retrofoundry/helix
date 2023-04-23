@@ -645,7 +645,8 @@ impl F3DEX2 {
         tile.mask_s = mask_s;
         tile.shift_s = shift_s;
 
-        rdp.textures_changed;
+        rdp.textures_changed[0] = true;
+        rdp.textures_changed[1] = true;
 
         GBIResult::Continue
     }

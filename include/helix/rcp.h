@@ -167,6 +167,10 @@ uint8_t RDPGetCurrentTileDescriptorSize(void* rcp);
 
 uint32_t RDPGetCurrentTileDescriptorLineSizeBytes(void* rcp);
 
+void RDPSetTMEMMap(void* rcp, uint8_t tile_number, const uint8_t* address, uint32_t size_bytes);
+uint32_t RDPGetTMEMMapEntrySize(void* rcp, uint8_t tile_number);
+const uint8_t* RDPGetTMEMMapEntryAddress(void* rcp, uint8_t tile_number);
+
 #ifdef __cplusplus
 }
 #endif
