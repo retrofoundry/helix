@@ -160,6 +160,22 @@ pub struct TMEMMapEntry {
     pub size_bytes: u32,
 }
 
+impl TMEMMapEntry {
+    pub fn new(address: usize, size_bytes: u32) -> Self {
+        Self {
+            address,
+            size_bytes,
+        }
+    }
+
+    pub fn tlut(address: usize) -> Self {
+        Self {
+            address,
+            size_bytes: 256,
+        }
+    }
+}
+
 pub struct RDP {
     pub output_dimensions: OutputDimensions,
     pub rendering_state: RenderingState,
@@ -795,10 +811,7 @@ pub extern "C" fn RDPSetTMEMMap(
     let rcp = rcp.unwrap();
     rcp.rdp.tmem_map.insert(
         tile_number as u16,
-        TMEMMapEntry {
-            address: address as usize,
-            size_bytes,
-        },
+        TMEMMapEntry::new(address as usize, size_bytes),
     );
 }
 
@@ -828,4 +841,14 @@ pub extern "C" fn RDPGetTextureImageStateAddress(rcp: Option<&mut RCP>) -> *cons
 pub extern "C" fn RDPGetTextureImageStateSize(rcp: Option<&mut RCP>) -> u8 {
     let rcp = rcp.unwrap();
     rcp.rdp.texture_image_state.size
+}
+
+#[no_mangle]
+pub extern "C" fn RDPPaletteAtTMEMIndex(rcp: Option<&mut RCP>, index: u8) -> *const u8 {
+    let rcp = rcp.unwrap();
+    rcp.rdp
+        .tmem_map
+        .get(&(u16::MAX - index as u16))
+        .unwrap()
+        .address as *const u8
 }

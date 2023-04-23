@@ -13,10 +13,10 @@ use crate::{
     extensions::matrix::{calculate_normal_dir, matrix_from_fixed_point, matrix_multiply},
     fast3d::{
         graphics::GraphicsContext,
-        rdp::{G_TX_LOADTILE, SCREEN_HEIGHT},
+        rdp::{TMEMMapEntry, G_TX_LOADTILE, SCREEN_HEIGHT},
         utils::{
             color_combiner::CombineParams,
-            texture::{TextureImageState, TextureState},
+            texture::{ImageSize, TextureImageState, TextureState},
         },
     },
 };
@@ -99,6 +99,7 @@ impl GBIDefinition for F3DEX2 {
         gbi.register(F3DEX2::G_SETSCISSOR as usize, F3DEX2::gdp_set_scissor);
         gbi.register(F3DEX2::G_SETCOMBINE as usize, F3DEX2::gdp_set_combine);
         gbi.register(F3DEX2::G_SETTIMG as usize, F3DEX2::gdp_set_texture_image);
+        gbi.register(F3DEX2::G_LOADTLUT as usize, F3DEX2::gdp_load_tlut);
     }
 }
 
@@ -734,13 +735,6 @@ impl F3DEX2 {
         let size = get_cmd(w0, 19, 2) as u8;
         let width = get_cmd(w0, 0, 10) as u16;
         let address = get_segmented_address(w1);
-        trace!(
-            "gdp_set_teximage: format: {}, size: {}, width: {}, address: {}",
-            format,
-            size,
-            width,
-            address
-        );
 
         rdp.texture_image_state = TextureImageState {
             format,
@@ -748,6 +742,47 @@ impl F3DEX2 {
             width,
             address,
         };
+
+        GBIResult::Continue
+    }
+
+    pub fn gdp_load_tlut(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gfx_context: &GraphicsContext,
+        _w0: usize,
+        w1: usize,
+    ) -> GBIResult {
+        let tile = get_cmd(w1, 24, 3);
+        let high_index = get_cmd(w1, 14, 10) as u16;
+
+        assert!(tile == G_TX_LOADTILE);
+        assert!(rdp.texture_image_state.size == ImageSize::G_IM_SIZ_16b as u8); // TLUTs are always 16-bit (so far)
+        assert!(
+            rdp.tile_descriptors[tile as usize].tmem == 256
+                && (high_index <= 127 || high_index == 255)
+                || rdp.tile_descriptors[tile as usize].tmem == 384 && high_index == 127
+        );
+
+        trace!("gdp_load_tlut(tile: {}, high_index: {})", tile, high_index);
+
+        if rdp.tile_descriptors[tile as usize].tmem == 256 {
+            rdp.tmem_map.insert(
+                u16::MAX - 1,
+                TMEMMapEntry::tlut(rdp.texture_image_state.address),
+            );
+            if high_index == 255 {
+                rdp.tmem_map.insert(
+                    u16::MAX,
+                    TMEMMapEntry::tlut(rdp.texture_image_state.address + 2 * 128),
+                );
+            }
+        } else {
+            rdp.tmem_map.insert(
+                u16::MAX,
+                TMEMMapEntry::tlut(rdp.texture_image_state.address),
+            );
+        }
 
         GBIResult::Continue
     }

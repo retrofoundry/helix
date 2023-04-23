@@ -103,6 +103,7 @@ void F3DEX2_GDPSetTile(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1)
 void F3DEX2_GDPLoadTile(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GDPSetTileSize(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GDPSetTextureImage(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPLoadTLUT(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
 
 // RSP Getters and Setters
 uint32_t RSPGetGeometryMode(void* rcp);
@@ -175,6 +176,8 @@ const uint8_t* RDPGetTMEMMapEntryAddress(void* rcp, uint8_t tile_number);
 
 const uint8_t* RDPGetTextureImageStateAddress(void* rcp);
 uint8_t RDPGetTextureImageStateSize(void* rcp);
+
+const uint8_t* RDPPaletteAtTMEMIndex(void* rcp, uint8_t index);
 
 #ifdef __cplusplus
 }

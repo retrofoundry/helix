@@ -182,3 +182,15 @@ pub extern "C" fn F3DEX2_GDPSetTextureImage(
     let gfx_context = gfx_context.unwrap();
     F3DEX2::gdp_set_texture_image(&mut rcp.rdp, &mut rcp.rsp, gfx_context, w0, w1);
 }
+
+#[no_mangle]
+pub extern "C" fn F3DEX2_GDPLoadTLUT(
+    rcp: Option<&mut RCP>,
+    gfx_context: Option<&mut GraphicsContext>,
+    w0: usize,
+    w1: usize,
+) {
+    let rcp = rcp.unwrap();
+    let gfx_context = gfx_context.unwrap();
+    F3DEX2::gdp_load_tlut(&mut rcp.rdp, &mut rcp.rsp, gfx_context, w0, w1);
+}
