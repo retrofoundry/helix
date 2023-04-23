@@ -100,10 +100,10 @@ pub fn translate_tile_ci8(
 pub fn translate_tlut(
     pal_dram_addr: usize,
     image_size: FarbeImageSize,
-    // texlut: &TextureLUT,
+    texlut: &TextureLUT,
 ) -> Vec<u8> {
     // TODO: handle non-rgba16 palettes
-    // assert!(texlut == &TextureLUT::G_TT_RGBA16);
+    assert!(texlut == &TextureLUT::G_TT_RGBA16);
 
     let tlut_size = image_size.tlut_size_in_bytes();
     let palette_data = unsafe { std::slice::from_raw_parts(pal_dram_addr as *const u8, tlut_size) };
@@ -131,6 +131,24 @@ pub enum ImageSize {
     G_IM_SIZ_8b = 0x01,
     G_IM_SIZ_16b = 0x02,
     G_IM_SIZ_32b = 0x03,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum TextureLUT {
+    G_TT_NONE = 0x00,
+    G_TT_RGBA16 = 0x02,
+    G_TT_IA16 = 0x03,
+}
+
+impl TextureLUT {
+    pub fn from_u32(value: u32) -> Self {
+        match value {
+            x if x == TextureLUT::G_TT_NONE as u32 => TextureLUT::G_TT_NONE,
+            x if x == TextureLUT::G_TT_RGBA16 as u32 => TextureLUT::G_TT_RGBA16,
+            x if x == TextureLUT::G_TT_IA16 as u32 => TextureLUT::G_TT_IA16,
+            _ => panic!("Invalid TextureLUT"),
+        }
+    }
 }
 
 pub struct TextureManager {

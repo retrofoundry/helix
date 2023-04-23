@@ -16,7 +16,7 @@ use super::{
             translate_tile_ci4, translate_tile_ci8, translate_tile_i4, translate_tile_i8,
             translate_tile_ia16, translate_tile_ia4, translate_tile_ia8, translate_tile_rgba16,
             translate_tile_rgba32, translate_tlut, ImageFormat, ImageSize, Texture,
-            TextureImageState, TextureManager, TextureState,
+            TextureImageState, TextureLUT, TextureManager, TextureState,
         },
         tile::TileDescriptor,
     },
@@ -333,7 +333,8 @@ impl RDP {
                     .get(&(u16::MAX - tmem_index as u16))
                     .unwrap()
                     .address;
-                let palette = translate_tlut(pal_addr, FarbeImageSize::S4B /*, texlut*/);
+                let texlut: TextureLUT = TextureLUT::from_u32((self.other_mode_h >> 14) & 0x3);
+                let palette = translate_tlut(pal_addr, FarbeImageSize::S4B, &texlut);
                 translate_tile_ci4(texture_data, &palette, width, height)
             }
             x if x == ((ImageFormat::G_IM_FMT_CI as u32) << 4 | ImageSize::G_IM_SIZ_8b as u32) => {
@@ -342,7 +343,8 @@ impl RDP {
                     .get(&(u16::MAX - tmem_index as u16))
                     .unwrap()
                     .address;
-                let palette = translate_tlut(pal_addr, FarbeImageSize::S8B /*, texlut*/);
+                let texlut: TextureLUT = TextureLUT::from_u32((self.other_mode_h >> 14) & 0x3);
+                let palette = translate_tlut(pal_addr, FarbeImageSize::S8B, &texlut);
                 translate_tile_ci8(texture_data, &palette, width, height)
             }
             _ => {
