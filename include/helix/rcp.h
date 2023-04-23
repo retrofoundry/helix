@@ -179,6 +179,8 @@ uint8_t RDPGetTextureImageStateSize(void* rcp);
 
 const uint8_t* RDPPaletteAtTMEMIndex(void* rcp, uint8_t index);
 
+void RDPImportTileTexture(void* rcp, void* gfx_context, int tile);
+
 #ifdef __cplusplus
 }
 #endif

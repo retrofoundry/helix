@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use log::trace;
 use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState, CompareFunction};
 
 use super::{
@@ -11,15 +12,23 @@ use super::{
         color_combiner::{
             ColorCombiner, ColorCombinerManager, CombineParams, ACMUX, CCMUX, SHADER,
         },
-        texture::{Texture, TextureImageState, TextureManager, TextureState},
+        texture::{
+            translate_tile_ci4, translate_tile_ci8, translate_tile_i4, translate_tile_i8,
+            translate_tile_ia16, translate_tile_ia4, translate_tile_ia8, translate_tile_rgba16,
+            translate_tile_rgba32, translate_tlut, ImageFormat, ImageSize, Texture,
+            TextureImageState, TextureManager, TextureState,
+        },
         tile::TileDescriptor,
     },
 };
+
+use farbe::image::n64::ImageSize as FarbeImageSize;
 
 pub const SCREEN_WIDTH: f32 = 320.0;
 pub const SCREEN_HEIGHT: f32 = 240.0;
 const MAX_VBO_SIZE: usize = 256;
 const TEXTURE_CACHE_MAX_SIZE: usize = 500;
+const MAX_TEXTURE_SIZE: usize = 4096;
 const NUM_TILE_DESCRIPTORS: usize = 8;
 
 // Stray RDP defines
@@ -252,6 +261,112 @@ impl RDP {
         self.viewport.height = height as u16;
 
         self.viewport_or_scissor_changed = true;
+    }
+
+    pub fn lookup_texture(
+        &mut self,
+        gfx_context: &GraphicsContext,
+        tmem_index: usize,
+        fmt: ImageFormat,
+        siz: ImageSize,
+    ) -> bool {
+        if let Some(value) = self.texture_manager.lookup(
+            gfx_context,
+            tmem_index,
+            self.texture_image_state.address as usize,
+            fmt,
+            siz,
+        ) {
+            self.rendering_state.textures[tmem_index as usize] = *value;
+            true
+        } else {
+            let value = self.texture_manager.insert(
+                gfx_context,
+                tmem_index,
+                self.texture_image_state.address as usize,
+                fmt,
+                siz,
+            );
+            self.rendering_state.textures[tmem_index as usize] = *value;
+            false
+        }
+    }
+
+    pub fn import_tile_texture(&mut self, gfx_context: &GraphicsContext, tmem_index: usize) {
+        let tile = self.tile_descriptors[self.texture_state.tile as usize];
+        let format = tile.format as u32;
+        let size = tile.size as u32;
+        let width = tile.get_width() as u32;
+        let height = tile.get_height() as u32;
+
+        if self.lookup_texture(gfx_context, tmem_index, tile.format, tile.size) {
+            trace!("Texture already imported");
+            return;
+        }
+
+        let tmap_entry = self.tmem_map.get(&(tmem_index as u16)).unwrap();
+        let texture_address = tmap_entry.address;
+        let texture_size_bytes = tmap_entry.size_bytes;
+
+        // TODO: figure out how to find the size of bytes in the texture
+        let texture_data = unsafe {
+            std::slice::from_raw_parts(texture_address as *const u8, MAX_TEXTURE_SIZE * 4)
+        };
+
+        let texture = match format | size {
+            x if x
+                == ((ImageFormat::G_IM_FMT_RGBA as u32) << 4 | ImageSize::G_IM_SIZ_16b as u32) =>
+            {
+                translate_tile_rgba16(texture_data, width, height)
+            }
+            x if x
+                == ((ImageFormat::G_IM_FMT_RGBA as u32) << 4 | ImageSize::G_IM_SIZ_32b as u32) =>
+            {
+                translate_tile_rgba32(texture_data, width, height)
+            }
+            x if x == ((ImageFormat::G_IM_FMT_IA as u32) << 4 | ImageSize::G_IM_SIZ_4b as u32) => {
+                translate_tile_ia4(texture_data, width, height)
+            }
+            x if x == ((ImageFormat::G_IM_FMT_IA as u32) << 4 | ImageSize::G_IM_SIZ_8b as u32) => {
+                translate_tile_ia8(texture_data, width, height)
+            }
+            x if x == ((ImageFormat::G_IM_FMT_IA as u32) << 4 | ImageSize::G_IM_SIZ_16b as u32) => {
+                translate_tile_ia16(texture_data, width, height)
+            }
+            x if x == ((ImageFormat::G_IM_FMT_I as u32) << 4 | ImageSize::G_IM_SIZ_4b as u32) => {
+                translate_tile_i4(texture_data, width, height)
+            }
+            x if x == ((ImageFormat::G_IM_FMT_I as u32) << 4 | ImageSize::G_IM_SIZ_8b as u32) => {
+                translate_tile_i8(texture_data, width, height)
+            }
+            x if x == ((ImageFormat::G_IM_FMT_CI as u32) << 4 | ImageSize::G_IM_SIZ_4b as u32) => {
+                let pal_addr = self
+                    .tmem_map
+                    .get(&(u16::MAX - tmem_index as u16))
+                    .unwrap()
+                    .address;
+                let palette = translate_tlut(pal_addr, FarbeImageSize::S4B /*, texlut*/);
+                translate_tile_ci4(texture_data, &palette, width, height)
+            }
+            x if x == ((ImageFormat::G_IM_FMT_CI as u32) << 4 | ImageSize::G_IM_SIZ_8b as u32) => {
+                let pal_addr = self
+                    .tmem_map
+                    .get(&(u16::MAX - tmem_index as u16))
+                    .unwrap()
+                    .address;
+                let palette = translate_tlut(pal_addr, FarbeImageSize::S8B /*, texlut*/);
+                translate_tile_ci8(texture_data, &palette, width, height)
+            }
+            _ => {
+                // TODO: Create an empty texture?
+                panic!("Unsupported texture format: {:?} {:?}", format, size);
+            }
+        };
+
+        let texture = texture.as_ptr() as *const u8;
+        gfx_context
+            .api
+            .upload_texture(texture, width as i32, height as i32);
     }
 
     pub fn adjust_x_for_viewport(&self, x: f32) -> f32 {
@@ -851,4 +966,15 @@ pub extern "C" fn RDPPaletteAtTMEMIndex(rcp: Option<&mut RCP>, index: u8) -> *co
         .get(&(u16::MAX - index as u16))
         .unwrap()
         .address as *const u8
+}
+
+#[no_mangle]
+pub extern "C" fn RDPImportTileTexture(
+    rcp: Option<&mut RCP>,
+    gfx_context: Option<&mut GraphicsContext>,
+    tile: usize,
+) {
+    let rcp = rcp.unwrap();
+    let gfx_context = gfx_context.unwrap();
+    rcp.rdp.import_tile_texture(gfx_context, tile);
 }
