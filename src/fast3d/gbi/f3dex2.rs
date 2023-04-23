@@ -96,10 +96,14 @@ impl GBIDefinition for F3DEX2 {
             F3DEX2::G_SETOTHERMODE_H as usize,
             F3DEX2::gdp_set_other_mode_h,
         );
+        gbi.register(F3DEX2::G_SETTIMG as usize, F3DEX2::gdp_set_texture_image);
+        gbi.register(F3DEX2::G_LOADBLOCK as usize, F3DEX2::gdp_load_block);
+        gbi.register(F3DEX2::G_LOADTILE as usize, F3DEX2::gdp_load_tile);
+        gbi.register(F3DEX2::G_LOADTLUT as usize, F3DEX2::gdp_load_tlut);
+        gbi.register(F3DEX2::G_SETTILE as usize, F3DEX2::gdp_set_tile);
+        gbi.register(F3DEX2::G_SETTILESIZE as usize, F3DEX2::gdp_set_tile_size);
         gbi.register(F3DEX2::G_SETSCISSOR as usize, F3DEX2::gdp_set_scissor);
         gbi.register(F3DEX2::G_SETCOMBINE as usize, F3DEX2::gdp_set_combine);
-        gbi.register(F3DEX2::G_SETTIMG as usize, F3DEX2::gdp_set_texture_image);
-        gbi.register(F3DEX2::G_LOADTLUT as usize, F3DEX2::gdp_load_tlut);
     }
 }
 
@@ -656,49 +660,6 @@ impl F3DEX2 {
         GBIResult::Continue
     }
 
-    pub fn gdp_load_tile(
-        rdp: &mut RDP,
-        _rsp: &mut RSP,
-        _gfx_context: &GraphicsContext,
-        w0: usize,
-        w1: usize,
-    ) -> GBIResult {
-        trace!("gdp_load_tile(w0: {}, w1: {})", w0, w1);
-        let tile_index = get_cmd(w1, 24, 3);
-        let uls = get_cmd(w0, 12, 12) as u16;
-        let ult = get_cmd(w0, 0, 12) as u16;
-        let lrs = get_cmd(w1, 12, 12) as u16;
-        let lrt = get_cmd(w1, 0, 12) as u16;
-
-        // First, verify that we're loading the whole texture.
-        assert!(uls == 0 && ult == 0);
-        // Verify that we're loading into LOADTILE.
-        assert!(tile_index == G_TX_LOADTILE);
-        trace!(
-            "gdp_load_tile(tile: {}, uls: {}, ult: {}, lrs: {}, lrt: {})",
-            tile_index,
-            uls,
-            ult,
-            lrs,
-            lrt
-        );
-
-        let tile = &mut rdp.tile_descriptors[tile_index as usize];
-        // rdp.tmem_map
-        //     .insert(tile.tmem, rdp.texture_image_state.address);
-
-        // TODO: Really necessary?
-        // tile.uls = uls;
-        // tile.ult = ult;
-        // tile.lrs = lrs;
-        // tile.lrt = lrt;
-
-        trace!("texture {} is being marked as has changed", tile.tmem / 256);
-        // rdp.textures_changed[(tile.tmem / 256) as usize] = true;
-
-        GBIResult::Continue
-    }
-
     pub fn gdp_set_tile_size(
         rdp: &mut RDP,
         _rsp: &mut RSP,
@@ -769,20 +730,86 @@ impl F3DEX2 {
         if rdp.tile_descriptors[tile as usize].tmem == 256 {
             rdp.tmem_map.insert(
                 u16::MAX - 1,
-                TMEMMapEntry::tlut(rdp.texture_image_state.address),
+                TMEMMapEntry::new(rdp.texture_image_state.address),
             );
             if high_index == 255 {
                 rdp.tmem_map.insert(
                     u16::MAX,
-                    TMEMMapEntry::tlut(rdp.texture_image_state.address + 2 * 128),
+                    TMEMMapEntry::new(rdp.texture_image_state.address + 2 * 128),
                 );
             }
         } else {
-            rdp.tmem_map.insert(
-                u16::MAX,
-                TMEMMapEntry::tlut(rdp.texture_image_state.address),
-            );
+            rdp.tmem_map
+                .insert(u16::MAX, TMEMMapEntry::new(rdp.texture_image_state.address));
         }
+
+        GBIResult::Continue
+    }
+
+    pub fn gdp_load_block(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gfx_context: &GraphicsContext,
+        w0: usize,
+        w1: usize,
+    ) -> GBIResult {
+        let tile = get_cmd(w1, 24, 3);
+        let uls = get_cmd(w0, 12, 12);
+        let ult = get_cmd(w0, 0, 12);
+        let _texels = get_cmd(w1, 12, 12) as u16;
+        let _dxt = get_cmd(w1, 0, 12);
+
+        // First, verify that we're loading the whole texture.
+        assert!(uls == 0 && ult == 0);
+        // Verify that we're loading into LOADTILE.
+        assert!(tile == G_TX_LOADTILE);
+
+        let tile = &mut rdp.tile_descriptors[tile as usize];
+        let tmem_index = if tile.tmem != 0 { 1 } else { 0 };
+        rdp.tmem_map.insert(
+            tmem_index,
+            TMEMMapEntry::new(rdp.texture_image_state.address),
+        );
+
+        rdp.textures_changed[tmem_index as usize] = true;
+
+        GBIResult::Continue
+    }
+
+    pub fn gdp_load_tile(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gfx_context: &GraphicsContext,
+        w0: usize,
+        w1: usize,
+    ) -> GBIResult {
+        trace!("gdp_load_tile(w0: {}, w1: {})", w0, w1);
+        let tile_index = get_cmd(w1, 24, 3);
+        let uls = get_cmd(w0, 12, 12) as u16;
+        let ult = get_cmd(w0, 0, 12) as u16;
+        let _lrs = get_cmd(w1, 12, 12) as u16;
+        let _lrt = get_cmd(w1, 0, 12) as u16;
+
+        // First, verify that we're loading the whole texture.
+        assert!(uls == 0 && ult == 0);
+        // Verify that we're loading into LOADTILE.
+        assert!(tile_index == G_TX_LOADTILE);
+
+        let tile = &mut rdp.tile_descriptors[tile_index as usize];
+        let tmem_index = if tile.tmem != 0 { 1 } else { 0 };
+        rdp.tmem_map.insert(
+            tmem_index,
+            TMEMMapEntry::new(rdp.texture_image_state.address),
+        );
+
+        // TODO: Really necessary?
+        // tile.uls = uls;
+        // tile.ult = ult;
+        // tile.lrs = lrs;
+        // tile.lrt = lrt;
+
+        trace!("texture {} is being marked as has changed", tile.tmem / 256);
+        rdp.textures_changed[tmem_index as usize] = true;
 
         GBIResult::Continue
     }

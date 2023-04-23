@@ -166,22 +166,11 @@ enum BlendParamB {
 
 pub struct TMEMMapEntry {
     pub address: usize,
-    pub size_bytes: u32,
 }
 
 impl TMEMMapEntry {
-    pub fn new(address: usize, size_bytes: u32) -> Self {
-        Self {
-            address,
-            size_bytes,
-        }
-    }
-
-    pub fn tlut(address: usize) -> Self {
-        Self {
-            address,
-            size_bytes: 256,
-        }
+    pub fn new(address: usize) -> Self {
+        Self { address }
     }
 }
 
@@ -306,7 +295,6 @@ impl RDP {
 
         let tmap_entry = self.tmem_map.get(&(tmem_index as u16)).unwrap();
         let texture_address = tmap_entry.address;
-        let texture_size_bytes = tmap_entry.size_bytes;
 
         // TODO: figure out how to find the size of bytes in the texture
         let texture_data = unsafe {
@@ -917,27 +905,11 @@ pub extern "C" fn RDPGetCurrentTileDescriptorLineSizeBytes(rcp: Option<&mut RCP>
 }
 
 #[no_mangle]
-pub extern "C" fn RDPSetTMEMMap(
-    rcp: Option<&mut RCP>,
-    tile_number: u8,
-    address: *const u8,
-    size_bytes: u32,
-) {
-    let rcp = rcp.unwrap();
-    rcp.rdp.tmem_map.insert(
-        tile_number as u16,
-        TMEMMapEntry::new(address as usize, size_bytes),
-    );
-}
-
-#[no_mangle]
-pub extern "C" fn RDPGetTMEMMapEntrySize(rcp: Option<&mut RCP>, tile_number: u8) -> u32 {
+pub extern "C" fn RDPSetTMEMMap(rcp: Option<&mut RCP>, tile_number: u8, address: *const u8) {
     let rcp = rcp.unwrap();
     rcp.rdp
         .tmem_map
-        .get(&(tile_number as u16))
-        .unwrap()
-        .size_bytes
+        .insert(tile_number as u16, TMEMMapEntry::new(address as usize));
 }
 
 #[no_mangle]

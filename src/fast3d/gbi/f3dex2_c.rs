@@ -148,6 +148,18 @@ pub extern "C" fn F3DEX2_GDPSetTile(
 }
 
 #[no_mangle]
+pub extern "C" fn F3DEX2_GDPLoadBlock(
+    rcp: Option<&mut RCP>,
+    gfx_context: Option<&mut GraphicsContext>,
+    w0: usize,
+    w1: usize,
+) {
+    let rcp = rcp.unwrap();
+    let gfx_context = gfx_context.unwrap();
+    F3DEX2::gdp_load_block(&mut rcp.rdp, &mut rcp.rsp, gfx_context, w0, w1);
+}
+
+#[no_mangle]
 pub extern "C" fn F3DEX2_GDPLoadTile(
     rcp: Option<&mut RCP>,
     gfx_context: Option<&mut GraphicsContext>,

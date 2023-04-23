@@ -3,7 +3,7 @@ use farbe::image::n64::{
 };
 use log::trace;
 
-use super::super::{graphics::GraphicsContext, rcp::RCP};
+use super::super::graphics::GraphicsContext;
 use std::collections::{HashMap, VecDeque};
 
 pub fn translate_tile_rgba16(tmem: &[u8], tile_width: u32, tile_height: u32) -> Vec<u8> {
