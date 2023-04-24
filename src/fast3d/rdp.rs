@@ -329,7 +329,6 @@ impl RDP {
         let height = tile.get_height() as u32;
 
         if self.lookup_texture(gfx_context, tmem_index, tile.format, tile.size) {
-            trace!("Texture already imported");
             return;
         }
 
@@ -446,11 +445,6 @@ impl RDP {
             for i in 0..2 {
                 if i == 0 || self.uses_texture1() {
                     if self.textures_changed[i as usize] {
-                        trace!(
-                            "Uploading texture {} from tile: {}",
-                            i,
-                            self.texture_state.tile + i
-                        );
                         self.flush(gfx_context);
                         self.import_tile_texture(gfx_context, i as usize);
                         self.textures_changed[i as usize] = false;

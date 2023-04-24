@@ -771,7 +771,6 @@ impl F3DEX2 {
             TMEMMapEntry::new(rdp.texture_image_state.address),
         );
 
-        trace!("texture {} is being marked as has changed", tile.tmem / 256);
         let tmem_index = if tile.tmem != 0 { 1 } else { 0 };
         rdp.textures_changed[tmem_index as usize] = true;
 
@@ -785,7 +784,6 @@ impl F3DEX2 {
         w0: usize,
         w1: usize,
     ) -> GBIResult {
-        trace!("gdp_load_tile(w0: {}, w1: {})", w0, w1);
         let tile_index = get_cmd(w1, 24, 3);
         let uls = get_cmd(w0, 12, 12) as u16;
         let ult = get_cmd(w0, 0, 12) as u16;
