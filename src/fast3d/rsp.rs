@@ -3,7 +3,7 @@ use crate::extensions::matrix::matrix_multiply;
 use super::{gbi::defines::Light, rcp::RCP};
 
 pub const MATRIX_STACK_SIZE: usize = 11;
-const MAX_VERTICES: usize = 64;
+pub const MAX_VERTICES: usize = 64;
 
 // excluding ambient light
 pub const MAX_LIGHTS: usize = 7;

@@ -13,10 +13,14 @@ use crate::{
     extensions::matrix::{calculate_normal_dir, matrix_from_fixed_point, matrix_multiply},
     fast3d::{
         graphics::GraphicsContext,
-        rdp::{TMEMMapEntry, G_TX_LOADTILE, SCREEN_HEIGHT},
+        rdp::{
+            OtherModeHCycleType, OtherModeH_Layout, Rect, TMEMMapEntry, G_TX_LOADTILE,
+            SCREEN_HEIGHT, SCREEN_WIDTH,
+        },
+        rsp::MAX_VERTICES,
         utils::{
             color_combiner::CombineParams,
-            texture::{ImageSize, TextureImageState, TextureState},
+            texture::{ImageSize, TextFilt, TextureImageState, TextureState},
         },
     },
 };
@@ -803,6 +807,83 @@ impl F3DEX2 {
         rdp.textures_changed[tmem_index as usize] = true;
 
         GBIResult::Continue
+    }
+
+    pub fn draw_rectangle(rdp: &mut RDP, rsp: &mut RSP, ulx: i32, uly: i32, lrx: i32, lry: i32) {
+        let saved_other_mode_h = rdp.other_mode_h;
+        let cycle_type = RDP::get_cycle_type_from_other_mode_h(rdp.other_mode_h);
+
+        if cycle_type == OtherModeHCycleType::G_CYC_COPY {
+            rdp.other_mode_h = (rdp.other_mode_h
+                & !(3 << OtherModeH_Layout::G_MDSFT_TEXTFILT as u32))
+                | (TextFilt::G_TF_POINT as u32);
+        }
+
+        // U10.2 coordinates
+        let mut ulxf = ulx as f32 / (4.0 * (SCREEN_WIDTH / 2.0)) - 1.0;
+        let ulyf = -(uly as f32 / (4.0 * (SCREEN_HEIGHT / 2.0))) + 1.0;
+        let mut lrxf = lrx as f32 / (4.0 * (SCREEN_WIDTH / 2.0)) - 1.0;
+        let lryf = -(lry as f32 / (4.0 * (SCREEN_HEIGHT / 2.0))) + 1.0;
+
+        ulxf = rdp.adjust_x_for_viewport(ulxf);
+        lrxf = rdp.adjust_x_for_viewport(lrxf);
+
+        {
+            let ul = &mut rsp.vertex_table[MAX_VERTICES + 0];
+            ul.position[0] = ulxf;
+            ul.position[1] = ulyf;
+            ul.position[2] = -1.0;
+            ul.position[3] = 1.0;
+        }
+
+        {
+            let ll = &mut rsp.vertex_table[MAX_VERTICES + 1];
+            ll.position[0] = ulxf;
+            ll.position[1] = lryf;
+            ll.position[2] = -1.0;
+            ll.position[3] = 1.0;
+        }
+
+        {
+            let lr = &mut rsp.vertex_table[MAX_VERTICES + 2];
+            lr.position[0] = lrxf;
+            lr.position[1] = lryf;
+            lr.position[2] = -1.0;
+            lr.position[3] = 1.0;
+        }
+
+        {
+            let ur = &mut rsp.vertex_table[MAX_VERTICES + 3];
+            ur.position[0] = lrxf;
+            ur.position[1] = ulyf;
+            ur.position[2] = -1.0;
+            ur.position[3] = 1.0;
+        }
+
+        // The coordinates for texture rectangle shall bypass the viewport setting
+        let default_viewport = Rect::new(
+            0,
+            0,
+            rdp.output_dimensions.width as u16,
+            rdp.output_dimensions.height as u16,
+        );
+        let viewport_saved = rdp.viewport;
+        let geometry_mode_saved = rsp.geometry_mode;
+
+        rdp.viewport = default_viewport;
+        rdp.viewport_or_scissor_changed = true;
+        rsp.geometry_mode = 0;
+
+        // TODO: call sp_tri1
+        // TODO: call sp_tri1
+
+        rsp.geometry_mode = geometry_mode_saved;
+        rdp.viewport = viewport_saved;
+        rdp.viewport_or_scissor_changed = true;
+
+        if cycle_type == OtherModeHCycleType::G_CYC_COPY {
+            rdp.other_mode_h = saved_other_mode_h;
+        }
     }
 }
 
