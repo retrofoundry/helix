@@ -15,8 +15,8 @@ use super::{
         texture::{
             translate_tile_ci4, translate_tile_ci8, translate_tile_i4, translate_tile_i8,
             translate_tile_ia16, translate_tile_ia4, translate_tile_ia8, translate_tile_rgba16,
-            translate_tile_rgba32, translate_tlut, ImageFormat, ImageSize, Texture,
-            TextureImageState, TextureLUT, TextureManager, TextureState, TextFilt,
+            translate_tile_rgba32, translate_tlut, ImageFormat, ImageSize, TextFilt, Texture,
+            TextureImageState, TextureLUT, TextureManager, TextureState,
         },
         tile::TileDescriptor,
     },
@@ -318,7 +318,7 @@ impl RDP {
             return;
         }
 
-        let tmap_entry = self.tmem_map.get(&(tmem_index as u16)).unwrap();
+        let tmap_entry = self.tmem_map.get(&tile.tmem).unwrap();
         let texture_address = tmap_entry.address;
 
         // TODO: figure out how to find the size of bytes in the texture
@@ -431,13 +431,18 @@ impl RDP {
             for i in 0..2 {
                 if i == 0 || self.uses_texture1() {
                     if self.textures_changed[i as usize] {
-                        trace!("Uploading texture {} from tile: {}", i, self.texture_state.tile + i);
+                        trace!(
+                            "Uploading texture {} from tile: {}",
+                            i,
+                            self.texture_state.tile + i
+                        );
                         self.flush(gfx_context);
                         self.import_tile_texture(gfx_context, i as usize);
                         self.textures_changed[i as usize] = false;
                     }
 
-                    let tile_descriptor = self.tile_descriptors[(self.texture_state.tile + i) as usize];
+                    let tile_descriptor =
+                        self.tile_descriptors[(self.texture_state.tile + i) as usize];
                     let linear_filter = RDP::get_textfilter_from_other_mode_h(self.other_mode_h)
                         != TextFilt::G_TF_POINT;
                     let texture = self.rendering_state.textures[i as usize];

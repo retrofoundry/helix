@@ -584,7 +584,7 @@ impl F3DEX2 {
     // gdp_set_scissor
     pub fn gdp_set_scissor(
         rdp: &mut RDP,
-        rsp: &mut RSP,
+        _rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
         w0: usize,
         w1: usize,
@@ -727,21 +727,11 @@ impl F3DEX2 {
 
         trace!("gdp_load_tlut(tile: {}, high_index: {})", tile, high_index);
 
-        if rdp.tile_descriptors[tile as usize].tmem == 256 {
-            rdp.tmem_map.insert(
-                u16::MAX - 1,
-                TMEMMapEntry::new(rdp.texture_image_state.address),
-            );
-            if high_index == 255 {
-                rdp.tmem_map.insert(
-                    u16::MAX,
-                    TMEMMapEntry::new(rdp.texture_image_state.address + 2 * 128),
-                );
-            }
-        } else {
-            rdp.tmem_map
-                .insert(u16::MAX, TMEMMapEntry::new(rdp.texture_image_state.address));
-        }
+        let tile = &mut rdp.tile_descriptors[tile as usize];
+        rdp.tmem_map.insert(
+            tile.tmem,
+            TMEMMapEntry::new(rdp.texture_image_state.address),
+        );
 
         GBIResult::Continue
     }
@@ -765,12 +755,13 @@ impl F3DEX2 {
         assert!(tile == G_TX_LOADTILE);
 
         let tile = &mut rdp.tile_descriptors[tile as usize];
-        let tmem_index = if tile.tmem != 0 { 1 } else { 0 };
         rdp.tmem_map.insert(
-            tmem_index,
+            tile.tmem,
             TMEMMapEntry::new(rdp.texture_image_state.address),
         );
 
+        trace!("texture {} is being marked as has changed", tile.tmem / 256);
+        let tmem_index = if tile.tmem != 0 { 1 } else { 0 };
         rdp.textures_changed[tmem_index as usize] = true;
 
         GBIResult::Continue
@@ -787,8 +778,8 @@ impl F3DEX2 {
         let tile_index = get_cmd(w1, 24, 3);
         let uls = get_cmd(w0, 12, 12) as u16;
         let ult = get_cmd(w0, 0, 12) as u16;
-        let _lrs = get_cmd(w1, 12, 12) as u16;
-        let _lrt = get_cmd(w1, 0, 12) as u16;
+        let lrs = get_cmd(w1, 12, 12) as u16;
+        let lrt = get_cmd(w1, 0, 12) as u16;
 
         // First, verify that we're loading the whole texture.
         assert!(uls == 0 && ult == 0);
@@ -796,19 +787,19 @@ impl F3DEX2 {
         assert!(tile_index == G_TX_LOADTILE);
 
         let tile = &mut rdp.tile_descriptors[tile_index as usize];
-        let tmem_index = if tile.tmem != 0 { 1 } else { 0 };
         rdp.tmem_map.insert(
-            tmem_index,
+            tile.tmem,
             TMEMMapEntry::new(rdp.texture_image_state.address),
         );
 
         // TODO: Really necessary?
-        // tile.uls = uls;
-        // tile.ult = ult;
-        // tile.lrs = lrs;
-        // tile.lrt = lrt;
+        tile.uls = uls;
+        tile.ult = ult;
+        tile.lrs = lrs;
+        tile.lrt = lrt;
 
         trace!("texture {} is being marked as has changed", tile.tmem / 256);
+        let tmem_index = if tile.tmem != 0 { 1 } else { 0 };
         rdp.textures_changed[tmem_index as usize] = true;
 
         GBIResult::Continue
