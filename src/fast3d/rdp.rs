@@ -411,17 +411,18 @@ impl RDP {
 
     pub fn flush_textures(&mut self, gfx_context: &GraphicsContext) {
         // if textures are not on, then we have no textures to flush
-        if !self.texture_state.on {
-            return;
-        }
+        // if !self.texture_state.on {
+        //     return;
+        // }
 
         let lod_en = (self.other_mode_h >> 16 & 0x1) != 0;
         if lod_en {
             // TODO: Support mip-mapping
+            trace!("Mip-mapping is enabled, but not supported yet");
             assert!(false);
         } else {
             // we're in TILE mode. Let's check if we're in two-cycle mode.
-            let cycle_type = RDP::get_cycle_type_from_other_mode_h(self.other_mode_h);
+            // let cycle_type = RDP::get_cycle_type_from_other_mode_h(self.other_mode_h);
             // assert!(
             //     cycle_type == OtherModeHCycleType::G_CYC_1CYCLE
             //         || cycle_type == OtherModeHCycleType::G_CYC_2CYCLE
@@ -429,7 +430,6 @@ impl RDP {
 
             for i in 0..2 {
                 if i == 0 || self.uses_texture1() {
-                    let tile_descriptor = self.tile_descriptors[(self.texture_state.tile + i) as usize];
                     if self.textures_changed[i as usize] {
                         trace!("Uploading texture {} from tile: {}", i, self.texture_state.tile + i);
                         self.flush(gfx_context);
@@ -437,6 +437,7 @@ impl RDP {
                         self.textures_changed[i as usize] = false;
                     }
 
+                    let tile_descriptor = self.tile_descriptors[(self.texture_state.tile + i) as usize];
                     let linear_filter = RDP::get_textfilter_from_other_mode_h(self.other_mode_h)
                         != TextFilt::G_TF_POINT;
                     let texture = self.rendering_state.textures[i as usize];
