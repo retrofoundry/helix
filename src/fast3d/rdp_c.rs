@@ -343,3 +343,15 @@ pub extern "C" fn RDPGetEnvColor(rcp: Option<&mut RCP>) -> *const u8 {
     let rcp = rcp.unwrap();
     rcp.rdp.env_color.as_ptr()
 }
+
+#[no_mangle]
+pub extern "C" fn RDPGetDepthImage(rcp: Option<&mut RCP>) -> usize {
+    let rcp = rcp.unwrap();
+    rcp.rdp.depth_image
+}
+
+#[no_mangle]
+pub extern "C" fn RDPGetColorImage(rcp: Option<&mut RCP>) -> usize {
+    let rcp = rcp.unwrap();
+    rcp.rdp.color_image
+}

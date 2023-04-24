@@ -113,6 +113,8 @@ impl GBIDefinition for F3DEX2 {
         gbi.register(F3DEX2::G_SETPRIMCOLOR as usize, F3DEX2::gdp_set_prim_color);
         gbi.register(F3DEX2::G_SETFOGCOLOR as usize, F3DEX2::gdp_set_fog_color);
         gbi.register(F3DEX2::G_SETFILLCOLOR as usize, F3DEX2::gdp_set_fill_color);
+        gbi.register(F3DEX2::G_SETZIMG as usize, F3DEX2::gdp_set_depth_image);
+        gbi.register(F3DEX2::G_SETCIMG as usize, F3DEX2::gdp_set_color_image);
     }
 }
 
@@ -873,6 +875,32 @@ impl F3DEX2 {
         let color = R5G5B5A1::to_rgba(packed_color);
 
         rdp.fill_color = [color[0], color[1], color[2], color[3]];
+        GBIResult::Continue
+    }
+
+    pub fn gdp_set_depth_image(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gfx_context: &GraphicsContext,
+        _w0: usize,
+        w1: usize,
+    ) -> GBIResult {
+        rdp.depth_image = get_segmented_address(w1);
+        GBIResult::Continue
+    }
+
+    pub fn gdp_set_color_image(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gfx_context: &GraphicsContext,
+        w0: usize,
+        w1: usize,
+    ) -> GBIResult {
+        let _format = get_cmd(w0, 21, 3);
+        let _size = get_cmd(w0, 19, 2);
+        let _width = get_cmd(w0, 0, 11);
+
+        rdp.color_image = get_segmented_address(w1);
         GBIResult::Continue
     }
 

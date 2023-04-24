@@ -109,6 +109,8 @@ void F3DEX2_GDPSetEnvColor(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t
 void F3DEX2_GDPSetPrimColor(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GDPSetFogColor(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GDPSetFillColor(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPSetDepthImage(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPSetColorImage(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
 
 // RSP Getters and Setters
 uint32_t RSPGetGeometryMode(void* rcp);
@@ -192,6 +194,8 @@ struct RGBA* RDPGetFillColor(void* rcp);
 struct RGBA* RDPGetPrimColor(void* rcp);
 struct RGBA* RDPGetEnvColor(void* rcp);
 
+uintptr_t RDPGetDepthImage(void* rcp);
+uintptr_t RDPGetColorImage(void* rcp);
 
 #ifdef __cplusplus
 }

@@ -228,6 +228,9 @@ pub struct RDP {
     pub fog_color: [u8; 4],
     pub prim_color: [u8; 4],
     pub fill_color: [u8; 4],
+
+    pub depth_image: usize,
+    pub color_image: usize,
 }
 
 impl RDP {
@@ -262,6 +265,9 @@ impl RDP {
             fog_color: [0; 4],
             prim_color: [0; 4],
             fill_color: [0; 4],
+
+            depth_image: 0,
+            color_image: 0,
         }
     }
 
