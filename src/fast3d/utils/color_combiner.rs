@@ -20,6 +20,17 @@ impl ColorCombinePass {
             _ => panic!("Invalid index"),
         }
     }
+
+    pub fn uses_texture1(&self) -> bool {
+        self.a == CCMUX::TEXEL1
+            || self.a == CCMUX::TEXEL1_ALPHA
+            || self.b == CCMUX::TEXEL1
+            || self.b == CCMUX::TEXEL1_ALPHA
+            || self.c == CCMUX::TEXEL1
+            || self.c == CCMUX::TEXEL1_ALPHA
+            || self.d == CCMUX::TEXEL1
+            || self.d == CCMUX::TEXEL1_ALPHA
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -40,6 +51,13 @@ impl AlhpaCombinePass {
             3 => self.d,
             _ => panic!("Invalid index"),
         }
+    }
+
+    pub fn uses_texture1(&self) -> bool {
+        self.a == ACMUX::TEXEL1
+            || self.b == ACMUX::TEXEL1
+            || self.c == ACMUX::TEXEL1
+            || self.d == ACMUX::TEXEL1
     }
 }
 
@@ -138,6 +156,13 @@ impl CombineParams {
             (a0.a as u32) | ((a0.b as u32) << 3) | ((a0.c as u32) << 6) | ((a0.d as u32) << 9);
 
         cout | (aout << 12)
+    }
+
+    pub fn uses_texture1(&self) -> bool {
+        self.c0.uses_texture1()
+            || self.c1.uses_texture1()
+            || self.a0.uses_texture1()
+            || self.a1.uses_texture1()
     }
 }
 

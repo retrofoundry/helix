@@ -151,6 +151,20 @@ impl TextureLUT {
     }
 }
 
+pub enum TexCM {
+    WRAP = 0x00,
+    MIRROR = 0x01,
+    CLAMP = 0x02,
+    MIRROR_CLAMP = 0x03,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextFilt {
+    G_TF_POINT = 0x00,
+    G_TF_AVERAGE = 0x03,
+    G_TF_BILERP = 0x02,
+}
+
 pub struct TextureManager {
     pub map: HashMap<usize, Texture>,
     pub lru: VecDeque<usize>,
@@ -313,15 +327,15 @@ impl TextureImageState {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct Texture {
-    texture_addr: usize,
-    format: ImageFormat,
-    size: ImageSize,
+    pub texture_addr: usize,
+    pub format: ImageFormat,
+    pub size: ImageSize,
 
-    texture_id: u32,
-    cms: u8,
-    cmt: u8,
+    pub texture_id: u32,
+    pub cms: u8,
+    pub cmt: u8,
 
-    linear_filter: bool,
+    pub linear_filter: bool,
 }
 
 impl Texture {

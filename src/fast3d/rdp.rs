@@ -16,7 +16,7 @@ use super::{
             translate_tile_ci4, translate_tile_ci8, translate_tile_i4, translate_tile_i8,
             translate_tile_ia16, translate_tile_ia4, translate_tile_ia8, translate_tile_rgba16,
             translate_tile_rgba32, translate_tlut, ImageFormat, ImageSize, Texture,
-            TextureImageState, TextureLUT, TextureManager, TextureState,
+            TextureImageState, TextureLUT, TextureManager, TextureState, TextFilt,
         },
         tile::TileDescriptor,
     },
@@ -136,6 +136,31 @@ enum OtherModeLayoutL {
     P_2 = 28,
     P_1 = 30,
 }
+
+enum OtherModeH_Layout {
+    G_MDSFT_BLENDMASK = 0,
+    G_MDSFT_ALPHADITHER = 4,
+    G_MDSFT_RGBDITHER = 6,
+    G_MDSFT_COMBKEY = 8,
+    G_MDSFT_TEXTCONV = 9,
+    G_MDSFT_TEXTFILT = 12,
+    G_MDSFT_TEXTLUT = 14,
+    G_MDSFT_TEXTLOD = 16,
+    G_MDSFT_TEXTDETAIL = 17,
+    G_MDSFT_TEXTPERSP = 19,
+    G_MDSFT_CYCLETYPE = 20,
+    G_MDSFT_COLORDITHER = 22,
+    G_MDSFT_PIPELINE = 23,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OtherModeHCycleType {
+    G_CYC_1CYCLE = 0,
+    G_CYC_2CYCLE = 1,
+    G_CYC_COPY = 2,
+    G_CYC_FILL = 3,
+}
+
 enum ZMode {
     ZMODE_OPA = 0,
     ZMODE_INTER = 1,
@@ -301,7 +326,7 @@ impl RDP {
             std::slice::from_raw_parts(texture_address as *const u8, MAX_TEXTURE_SIZE * 4)
         };
 
-        let texture = match format | size {
+        let texture = match (format << 4) | size {
             x if x
                 == ((ImageFormat::G_IM_FMT_RGBA as u32) << 4 | ImageSize::G_IM_SIZ_16b as u32) =>
             {
@@ -357,6 +382,81 @@ impl RDP {
         gfx_context
             .api
             .upload_texture(texture, width as i32, height as i32);
+    }
+
+    fn get_cycle_type_from_other_mode_h(mode_h: u32) -> OtherModeHCycleType {
+        match (mode_h >> OtherModeH_Layout::G_MDSFT_CYCLETYPE as u32) & 0x3 {
+            x if x == OtherModeHCycleType::G_CYC_1CYCLE as u32 => OtherModeHCycleType::G_CYC_1CYCLE,
+            x if x == OtherModeHCycleType::G_CYC_2CYCLE as u32 => OtherModeHCycleType::G_CYC_2CYCLE,
+            x if x == OtherModeHCycleType::G_CYC_COPY as u32 => OtherModeHCycleType::G_CYC_COPY,
+            x if x == OtherModeHCycleType::G_CYC_FILL as u32 => OtherModeHCycleType::G_CYC_FILL,
+            _ => panic!("Invalid cycle type"),
+        }
+    }
+
+    pub fn get_textfilter_from_other_mode_h(mode_h: u32) -> TextFilt {
+        match (mode_h >> OtherModeH_Layout::G_MDSFT_TEXTFILT as u32) & 0x3 {
+            x if x == TextFilt::G_TF_POINT as u32 => TextFilt::G_TF_POINT,
+            x if x == TextFilt::G_TF_AVERAGE as u32 => TextFilt::G_TF_AVERAGE,
+            x if x == TextFilt::G_TF_BILERP as u32 => TextFilt::G_TF_BILERP,
+            _ => panic!("Invalid text filter"),
+        }
+    }
+
+    pub fn uses_texture1(&self) -> bool {
+        RDP::get_cycle_type_from_other_mode_h(self.other_mode_h)
+            == OtherModeHCycleType::G_CYC_2CYCLE
+            && self.combine.uses_texture1()
+    }
+
+    pub fn flush_textures(&mut self, gfx_context: &GraphicsContext) {
+        // if textures are not on, then we have no textures to flush
+        if !self.texture_state.on {
+            return;
+        }
+
+        let lod_en = (self.other_mode_h >> 16 & 0x1) != 0;
+        if lod_en {
+            // TODO: Support mip-mapping
+            assert!(false);
+        } else {
+            // we're in TILE mode. Let's check if we're in two-cycle mode.
+            let cycle_type = RDP::get_cycle_type_from_other_mode_h(self.other_mode_h);
+            // assert!(
+            //     cycle_type == OtherModeHCycleType::G_CYC_1CYCLE
+            //         || cycle_type == OtherModeHCycleType::G_CYC_2CYCLE
+            // );
+
+            for i in 0..2 {
+                if i == 0 || self.uses_texture1() {
+                    let tile_descriptor = self.tile_descriptors[(self.texture_state.tile + i) as usize];
+                    if self.textures_changed[i as usize] {
+                        trace!("Uploading texture {} from tile: {}", i, self.texture_state.tile + i);
+                        self.flush(gfx_context);
+                        self.import_tile_texture(gfx_context, i as usize);
+                        self.textures_changed[i as usize] = false;
+                    }
+
+                    let linear_filter = RDP::get_textfilter_from_other_mode_h(self.other_mode_h)
+                        != TextFilt::G_TF_POINT;
+                    let texture = self.rendering_state.textures[i as usize];
+                    if linear_filter != texture.linear_filter
+                        || tile_descriptor.cm_s != texture.cms
+                        || tile_descriptor.cm_t != texture.cmt
+                    {
+                        gfx_context.api.set_sampler_parameters(
+                            i as i32,
+                            linear_filter,
+                            tile_descriptor.cm_s as u32,
+                            tile_descriptor.cm_t as u32,
+                        );
+                        self.rendering_state.textures[i as usize].linear_filter = linear_filter;
+                        self.rendering_state.textures[i as usize].cms = tile_descriptor.cm_s;
+                        self.rendering_state.textures[i as usize].cmt = tile_descriptor.cm_t;
+                    }
+                }
+            }
+        }
     }
 
     pub fn adjust_x_for_viewport(&self, x: f32) -> f32 {
@@ -951,4 +1051,14 @@ pub extern "C" fn RDPImportTileTexture(
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
     rcp.rdp.import_tile_texture(gfx_context, tile);
+}
+
+#[no_mangle]
+pub extern "C" fn RDPFlushTextures(
+    rcp: Option<&mut RCP>,
+    gfx_context: Option<&mut GraphicsContext>,
+) {
+    let rcp = rcp.unwrap();
+    let gfx_context = gfx_context.unwrap();
+    rcp.rdp.flush_textures(gfx_context);
 }
