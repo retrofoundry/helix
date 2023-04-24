@@ -73,18 +73,10 @@ impl TileDescriptor {
     }
 
     pub fn get_width(&self) -> u16 {
-        if self.mask_s != 0 {
-            1 << self.mask_s
-        } else {
-            ((self.lrs - self.uls) >> 2) + 1
-        }
+        ((self.lrs - self.uls) + 4) / 4
     }
 
     pub fn get_height(&self) -> u16 {
-        if self.mask_t != 0 {
-            1 << self.mask_t
-        } else {
-            ((self.lrt - self.ult) >> 2) + 1
-        }
+        ((self.lrt - self.ult) + 4) / 4
     }
 }
