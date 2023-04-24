@@ -319,3 +319,27 @@ pub extern "C" fn RDPFlushTextures(
     let gfx_context = gfx_context.unwrap();
     rcp.rdp.flush_textures(gfx_context);
 }
+
+#[no_mangle]
+pub extern "C" fn RDPGetFogColor(rcp: Option<&mut RCP>) -> *const u8 {
+    let rcp = rcp.unwrap();
+    rcp.rdp.fog_color.as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn RDPGetFillColor(rcp: Option<&mut RCP>) -> *const u8 {
+    let rcp = rcp.unwrap();
+    rcp.rdp.fill_color.as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn RDPGetPrimColor(rcp: Option<&mut RCP>) -> *const u8 {
+    let rcp = rcp.unwrap();
+    rcp.rdp.prim_color.as_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn RDPGetEnvColor(rcp: Option<&mut RCP>) -> *const u8 {
+    let rcp = rcp.unwrap();
+    rcp.rdp.env_color.as_ptr()
+}

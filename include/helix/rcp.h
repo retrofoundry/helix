@@ -105,6 +105,10 @@ void F3DEX2_GDPSetTileSize(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t
 void F3DEX2_GDPSetTextureImage(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GDPLoadTLUT(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
 void F3DEX2_GDPLoadBlock(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPSetEnvColor(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPSetPrimColor(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPSetFogColor(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPSetFillColor(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
 
 // RSP Getters and Setters
 uint32_t RSPGetGeometryMode(void* rcp);
@@ -182,6 +186,11 @@ const uint8_t* RDPPaletteAtTMEMIndex(void* rcp, uint8_t index);
 
 void RDPImportTileTexture(void* rcp, void* gfx_context, int tile);
 void RDPFlushTextures(void* rcp, void* gfx_context);
+
+struct RGBA* RDPGetFogColor(void* rcp);
+struct RGBA* RDPGetFillColor(void* rcp);
+struct RGBA* RDPGetPrimColor(void* rcp);
+struct RGBA* RDPGetEnvColor(void* rcp);
 
 
 #ifdef __cplusplus

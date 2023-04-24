@@ -223,6 +223,11 @@ pub struct RDP {
     pub buf_vbo: [f32; MAX_VBO_SIZE * (26 * 3)], // 3 vertices in a triangle and 26 floats per vtx
     pub buf_vbo_len: usize,
     pub buf_vbo_num_tris: usize,
+
+    pub env_color: [u8; 4],
+    pub fog_color: [u8; 4],
+    pub prim_color: [u8; 4],
+    pub fill_color: [u8; 4],
 }
 
 impl RDP {
@@ -252,6 +257,11 @@ impl RDP {
             buf_vbo: [0.0; MAX_VBO_SIZE * (26 * 3)],
             buf_vbo_len: 0,
             buf_vbo_num_tris: 0,
+
+            env_color: [0; 4],
+            fog_color: [0; 4],
+            prim_color: [0; 4],
+            fill_color: [0; 4],
         }
     }
 

@@ -19,6 +19,7 @@ use crate::{
         },
         rsp::MAX_VERTICES,
         utils::{
+            color::R5G5B5A1,
             color_combiner::CombineParams,
             texture::{ImageSize, TextFilt, TextureImageState, TextureState},
         },
@@ -108,6 +109,10 @@ impl GBIDefinition for F3DEX2 {
         gbi.register(F3DEX2::G_SETTILESIZE as usize, F3DEX2::gdp_set_tile_size);
         gbi.register(F3DEX2::G_SETSCISSOR as usize, F3DEX2::gdp_set_scissor);
         gbi.register(F3DEX2::G_SETCOMBINE as usize, F3DEX2::gdp_set_combine);
+        gbi.register(F3DEX2::G_SETENVCOLOR as usize, F3DEX2::gdp_set_env_color);
+        gbi.register(F3DEX2::G_SETPRIMCOLOR as usize, F3DEX2::gdp_set_prim_color);
+        gbi.register(F3DEX2::G_SETFOGCOLOR as usize, F3DEX2::gdp_set_fog_color);
+        gbi.register(F3DEX2::G_SETFILLCOLOR as usize, F3DEX2::gdp_set_fill_color);
     }
 }
 
@@ -806,6 +811,68 @@ impl F3DEX2 {
         let tmem_index = if tile.tmem != 0 { 1 } else { 0 };
         rdp.textures_changed[tmem_index as usize] = true;
 
+        GBIResult::Continue
+    }
+
+    pub fn gdp_set_env_color(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gfx_context: &GraphicsContext,
+        _w0: usize,
+        w1: usize,
+    ) -> GBIResult {
+        let r = get_cmd(w1, 24, 8) as u8;
+        let g = get_cmd(w1, 16, 8) as u8;
+        let b = get_cmd(w1, 8, 8) as u8;
+        let a = get_cmd(w1, 0, 8) as u8;
+
+        rdp.env_color = [r, g, b, a];
+        GBIResult::Continue
+    }
+
+    pub fn gdp_set_prim_color(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gfx_context: &GraphicsContext,
+        _w0: usize,
+        w1: usize,
+    ) -> GBIResult {
+        let r = get_cmd(w1, 24, 8) as u8;
+        let g = get_cmd(w1, 16, 8) as u8;
+        let b = get_cmd(w1, 8, 8) as u8;
+        let a = get_cmd(w1, 0, 8) as u8;
+
+        rdp.prim_color = [r, g, b, a];
+        GBIResult::Continue
+    }
+
+    pub fn gdp_set_fog_color(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gfx_context: &GraphicsContext,
+        _w0: usize,
+        w1: usize,
+    ) -> GBIResult {
+        let r = get_cmd(w1, 24, 8) as u8;
+        let g = get_cmd(w1, 16, 8) as u8;
+        let b = get_cmd(w1, 8, 8) as u8;
+        let a = get_cmd(w1, 0, 8) as u8;
+
+        rdp.fog_color = [r, g, b, a];
+        GBIResult::Continue
+    }
+
+    pub fn gdp_set_fill_color(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gfx_context: &GraphicsContext,
+        _w0: usize,
+        w1: usize,
+    ) -> GBIResult {
+        let packed_color = w1 as u16;
+        let color = R5G5B5A1::to_rgba(packed_color);
+
+        rdp.fill_color = [color[0], color[1], color[2], color[3]];
         GBIResult::Continue
     }
 

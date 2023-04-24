@@ -206,3 +206,51 @@ pub extern "C" fn F3DEX2_GDPLoadTLUT(
     let gfx_context = gfx_context.unwrap();
     F3DEX2::gdp_load_tlut(&mut rcp.rdp, &mut rcp.rsp, gfx_context, w0, w1);
 }
+
+#[no_mangle]
+pub extern "C" fn F3DEX2_GDPSetEnvColor(
+    rcp: Option<&mut RCP>,
+    gfx_context: Option<&mut GraphicsContext>,
+    w0: usize,
+    w1: usize,
+) {
+    let rcp = rcp.unwrap();
+    let gfx_context = gfx_context.unwrap();
+    F3DEX2::gdp_set_env_color(&mut rcp.rdp, &mut rcp.rsp, gfx_context, w0, w1);
+}
+
+#[no_mangle]
+pub extern "C" fn F3DEX2_GDPSetPrimColor(
+    rcp: Option<&mut RCP>,
+    gfx_context: Option<&mut GraphicsContext>,
+    w0: usize,
+    w1: usize,
+) {
+    let rcp = rcp.unwrap();
+    let gfx_context = gfx_context.unwrap();
+    F3DEX2::gdp_set_prim_color(&mut rcp.rdp, &mut rcp.rsp, gfx_context, w0, w1);
+}
+
+#[no_mangle]
+pub extern "C" fn F3DEX2_GDPSetFogColor(
+    rcp: Option<&mut RCP>,
+    gfx_context: Option<&mut GraphicsContext>,
+    w0: usize,
+    w1: usize,
+) {
+    let rcp = rcp.unwrap();
+    let gfx_context = gfx_context.unwrap();
+    F3DEX2::gdp_set_fog_color(&mut rcp.rdp, &mut rcp.rsp, gfx_context, w0, w1);
+}
+
+#[no_mangle]
+pub extern "C" fn F3DEX2_GDPSetFillColor(
+    rcp: Option<&mut RCP>,
+    gfx_context: Option<&mut GraphicsContext>,
+    w0: usize,
+    w1: usize,
+) {
+    let rcp = rcp.unwrap();
+    let gfx_context = gfx_context.unwrap();
+    F3DEX2::gdp_set_fill_color(&mut rcp.rdp, &mut rcp.rsp, gfx_context, w0, w1);
+}
