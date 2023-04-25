@@ -293,8 +293,8 @@ impl Gui {
         Ok(())
     }
 
-    pub fn draw_lists(&mut self, gfx_context: &GraphicsContext, commands: usize) -> Result<()> {
-        self.rcp.run(gfx_context, commands);
+    pub fn draw_lists(&mut self, gfx_context: &GraphicsContext, commands: usize, commands_size: usize) -> Result<()> {
+        self.rcp.run(gfx_context, commands, commands_size);
         // TODO: Draw rendered game image
         // let image = self.rcp.finish();
 
@@ -336,10 +336,11 @@ pub extern "C" fn GUIDrawLists(
     gui: Option<&mut Gui>,
     gfx_context: Option<&mut GraphicsContext>,
     commands: u64,
+    commands_size: u32,
 ) {
     let gui = gui.unwrap();
     let gfx_context = gfx_context.unwrap();
-    gui.draw_lists(gfx_context, commands.try_into().unwrap())
+    gui.draw_lists(gfx_context, commands.try_into().unwrap(), commands_size as usize)
         .unwrap();
 }
 

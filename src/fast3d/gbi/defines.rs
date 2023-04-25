@@ -151,3 +151,8 @@ impl G_TX {
     pub const NOMASK: u8 = 0;
     pub const NOLOD: u8 = 0;
 }
+
+// lose defines
+
+pub const G_TEXRECT: u8 = 0xe4;
+pub const G_TEXRECTFLIP: u8 = 0xe5;

@@ -355,3 +355,9 @@ pub extern "C" fn RDPGetColorImage(rcp: Option<&mut RCP>) -> usize {
     let rcp = rcp.unwrap();
     rcp.rdp.color_image
 }
+
+#[no_mangle]
+pub extern "C" fn RDPSetCombineDecode(rcp: Option<&mut RCP>, w0: usize, w1: usize) {
+    let rcp = rcp.unwrap();
+    rcp.rdp.combine = CombineParams::decode(w0, w1);
+}

@@ -33,42 +33,38 @@ impl RCP {
     /// This funtion is called to process a work buffer.
     /// It takes in a pointer to the start of the work buffer and will
     /// process until it hits a `G_ENDDL` inidicating the end.
-    pub fn run(&mut self, gfx_context: &GraphicsContext, commands: usize) {
+    pub fn run(&mut self, gfx_context: &GraphicsContext, commands: usize, commands_size: usize) {
         self.reset();
 
         // self.rdp.setup_draw();
-        self.run_dl(gfx_context, commands);
+        self.run_dl(gfx_context, commands, commands_size);
         // self.rdp.flush();
     }
 
-    fn run_dl(&mut self, gfx_context: &GraphicsContext, commands: usize) {
-        let mut commands = commands as *const Gfx;
+    // commands_size is in bytes
+    fn run_dl(&mut self, gfx_context: &GraphicsContext, commands: usize, commands_size: usize) {
+        let mut command = commands as *mut Gfx;
+        let commands_end = commands + commands_size;
+
+        assert!(commands < commands_end);
 
         loop {
-            let w0 = unsafe { (*commands).words.w0 };
-            let w1 = unsafe { (*commands).words.w1 };
-
             match self
                 .gbi
-                .handle_command(&mut self.rdp, &mut self.rsp, gfx_context, w0, w1)
+                .handle_command(&mut self.rdp, &mut self.rsp, gfx_context, command)
             {
-                GBIResult::Recurse(new_commands) => {
-                    self.run_dl(gfx_context, new_commands);
-                }
-                GBIResult::SetAddress(new_address) => {
-                    commands = new_address as *const Gfx;
-                    commands = unsafe { commands.sub(1) };
-                }
-                GBIResult::Return => {
-                    return;
+                GBIResult::Recurse(new_command) => {
+                    let new_cmd_size = commands_end - new_command;
+                    self.run_dl(gfx_context, new_command, new_cmd_size)
                 }
                 GBIResult::Unknown(opcode) => {
                     trace!("Unknown GBI command: {:#x}", opcode);
                 }
-                _ => {}
+                GBIResult::Return => { return }
+                GBIResult::Continue => {}
             }
 
-            commands = unsafe { commands.add(1) };
+            command = unsafe { command.add(1) };
         }
     }
 }

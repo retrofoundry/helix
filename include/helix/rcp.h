@@ -87,30 +87,30 @@ void* GfxCreateContext(struct CGraphicsDevice *rapi);
 struct CGraphicsDevice* GfxGetDevice(void* gfx_context);
 
 // F3DEX2 Commands
-void F3DEX2_GSPMatrix(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GSPPopMatrix(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GSPVertex(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GSPMoveWord(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GSPMoveMem(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GSPTexture(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GSPGeometryMode(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GSPMatrix(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GSPPopMatrix(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GSPVertex(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GSPMoveWord(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GSPMoveMem(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GSPTexture(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GSPGeometryMode(void* rcp, void* gfx_context, uintptr_t command);
 
-void F3DEX2_GDPSetOtherModeL(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GDPSetOtherModeH(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GDPSetScissor(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GDPSetCombine(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GDPSetTile(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GDPLoadTile(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GDPSetTileSize(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GDPSetTextureImage(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GDPLoadTLUT(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GDPLoadBlock(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GDPSetEnvColor(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GDPSetPrimColor(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GDPSetFogColor(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GDPSetFillColor(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GDPSetDepthImage(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
-void F3DEX2_GDPSetColorImage(void* rcp, void* gfx_context, uintptr_t w0, uintptr_t w1);
+void F3DEX2_GDPSetOtherModeL(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GDPSetOtherModeH(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GDPSetScissor(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GDPSetCombine(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GDPSetTile(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GDPLoadTile(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GDPSetTileSize(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GDPSetTextureImage(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GDPLoadTLUT(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GDPLoadBlock(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GDPSetEnvColor(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GDPSetPrimColor(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GDPSetFogColor(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GDPSetFillColor(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GDPSetDepthImage(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GDPSetColorImage(void* rcp, void* gfx_context, uintptr_t command);
 
 // RSP Getters and Setters
 uint32_t RSPGetGeometryMode(void* rcp);
@@ -196,6 +196,8 @@ struct RGBA* RDPGetEnvColor(void* rcp);
 
 uintptr_t RDPGetDepthImage(void* rcp);
 uintptr_t RDPGetColorImage(void* rcp);
+
+void RDPSetCombineDecode(void* rcp, uintptr_t w0, uintptr_t w1);
 
 #ifdef __cplusplus
 }
