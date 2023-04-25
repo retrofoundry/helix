@@ -87,63 +87,67 @@ pub struct Vtx_tn {
 }
 
 #[cfg(feature = "f3dex2")]
-#[derive(PartialEq, Eq)]
-pub enum G_MTX {
-    NOPUSH_MUL_MODELVIEW = 0x00,
-    PUSH = 0x01,
-    // MUL = 0x00,
-    LOAD = 0x02,
-    // MODELVIEW = 0x00,
-    PROJECTION = 0x04,
-}
-
-/*
- * MOVEMEM indices
- *
- * Each of these indexes an entry in a dmem table
- * which points to a 1-4 word block of dmem in
- * which to store a 1-4 word DMA.
- *
- */
+pub struct G_MTX;
 #[cfg(feature = "f3dex2")]
-#[derive(PartialEq, Eq)]
-pub enum G_MV {
-    MMTX = 2,
-    PMTX = 6,
-    VIEWPORT = 8,
-    LIGHT = 10,
-    POINT = 12,
-    O_LOOKATX = 0 * 24,
-    O_LOOKATY = 1 * 24,
-    O_L0 = 2 * 24,
-    O_L1 = 3 * 24,
-    O_L2 = 4 * 24,
-    O_L3 = 5 * 24,
-    O_L4 = 6 * 24,
-    O_L5 = 7 * 24,
-    O_L6 = 8 * 24,
-    O_L7 = 9 * 24,
+impl G_MTX {
+    pub const NOPUSH: u8 = 0x00;
+    pub const PUSH: u8 = 0x01;
+    pub const MUL: u8 = 0x00;
+    pub const LOAD: u8 = 0x02;
+    pub const MODELVIEW: u8 = 0x00;
+    pub const PROJECTION: u8 = 0x04;
 }
 
-/*
- * MOVEWORD indices
- *
- * Each of these indexes an entry in a dmem table
- * which points to a word in dmem in dmem where
- * an immediate word will be stored.
- *
- */
-#[derive(PartialEq, Eq)]
-pub enum G_MW {
-    MATRIX = 0x00, /* NOTE: also used by movemem */
-    NUMLIGHT = 0x02,
-    CLIP = 0x04,
-    SEGMENT = 0x06,
-    FOG = 0x08,
-    LIGHTCOL = 0x0A,
+pub struct G_SET;
+impl G_SET {
+    pub const COLORIMG: u8 = 0xff;
+    pub const DEPTHIMG: u8 = 0xfe;
+    pub const TEXIMG: u8 = 0xfd;
+    pub const COMBINE: u8 = 0xfc;
+    pub const ENVCOLOR: u8 = 0xfb;
+    pub const PRIMCOLOR: u8 = 0xfa;
+    pub const BLENDCOLOR: u8 = 0xf9;
+    pub const FOGCOLOR: u8 = 0xf8;
+    pub const FILLCOLOR: u8 = 0xf7;
+    pub const TILE: u8 = 0xf5;
+    pub const TILESIZE: u8 = 0xf2;
+    pub const PRIMDEPTH: u8 = 0xee;
+    pub const SCISSOR: u8 = 0xed;
+    pub const CONVERT: u8 = 0xec;
+    pub const KEYR: u8 = 0xeb;
+    pub const KEYGB: u8 = 0xea;
+}
+
+pub struct G_LOAD;
+impl G_LOAD {
+    pub const BLOCK: u8 = 0xf3;
+    pub const TILE: u8 = 0xf4;
+    pub const TLUT: u8 = 0xf0;
+}
+
+pub struct G_MW;
+impl G_MW {
+    pub const MATRIX: u8 = 0x00; /* NOTE: also used by movemem */
+    pub const NUMLIGHT: u8 = 0x02;
+    pub const CLIP: u8 = 0x04;
+    pub const SEGMENT: u8 = 0x06;
+    pub const FOG: u8 = 0x08;
+    pub const LIGHTCOL: u8 = 0x0A;
     #[cfg(feature = "f3dex2")]
-    FORCEMTX = 0x0C,
+    pub const FORCEMTX: u8 = 0x0C;
     #[cfg(not(feature = "f3dex2"))]
-    POINTS = 0x0C,
-    PERSPNORM = 0x0E,
+    pub const POINTS: u8 = 0x0C;
+    pub const PERSPNORM: u8 = 0x0E;
+}
+
+pub struct G_TX;
+impl G_TX {
+    pub const LOADTILE: u8 = 7;
+    pub const RENDERTILE: u8 = 0;
+    pub const NOMIRROR: u8 = 0;
+    pub const WRAP: u8 = 0;
+    pub const MIRROR: u8 = 1;
+    pub const CLAMP: u8 = 2;
+    pub const NOMASK: u8 = 0;
+    pub const NOLOD: u8 = 0;
 }

@@ -12,6 +12,7 @@ default = ["f3dex2"]
 
 # Graphics Features
 f3dex2 = []
+f3dex2e = ["gbifloats"]
 f3dzex2 = ["f3dex2"]
 
 gbifloats = []

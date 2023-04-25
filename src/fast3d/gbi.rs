@@ -2,6 +2,7 @@ use super::{graphics::GraphicsContext, rdp::RDP, rsp::RSP};
 use std::collections::HashMap;
 
 pub mod defines;
+mod f3d;
 mod f3dex2;
 mod f3dex2_c;
 mod f3dzex2;

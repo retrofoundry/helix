@@ -30,16 +30,6 @@ const TEXTURE_CACHE_MAX_SIZE: usize = 500;
 const MAX_TEXTURE_SIZE: usize = 4096;
 const NUM_TILE_DESCRIPTORS: usize = 8;
 
-// Stray RDP defines
-pub const G_TX_LOADTILE: usize = 7;
-const G_TX_RENDERTILE: usize = 0;
-const G_TX_NOMIRROR: usize = 0;
-const G_TX_WRAP: usize = 0;
-const G_TX_MIRROR: usize = 1;
-const G_TX_CLAMP: usize = 2;
-const G_TX_NOMASK: usize = 0;
-const G_TX_NOLOD: usize = 0;
-
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Rect {

@@ -2,19 +2,23 @@ use std::slice;
 
 use log::trace;
 
-use super::super::{
-    rdp::RDP,
-    rsp::{RSPGeometry, MATRIX_STACK_SIZE, MAX_LIGHTS, RSP},
-};
-use super::defines::{Light, Viewport, Vtx, G_MTX, G_MV, G_MW};
+use super::defines::{Light, Viewport, Vtx, G_MTX};
 use super::utils::{get_cmd, get_segmented_address};
+use super::{
+    super::{
+        rdp::RDP,
+        rsp::{RSPGeometry, MATRIX_STACK_SIZE, MAX_LIGHTS, RSP},
+    },
+    defines::{G_LOAD, G_MW, G_SET},
+};
 use super::{GBIDefinition, GBIResult, GBI};
+use crate::fast3d::gbi::defines::G_TX;
 use crate::{
     extensions::matrix::{calculate_normal_dir, matrix_from_fixed_point, matrix_multiply},
     fast3d::{
         graphics::GraphicsContext,
         rdp::{
-            OtherModeHCycleType, OtherModeH_Layout, Rect, TMEMMapEntry, G_TX_LOADTILE,
+            OtherModeHCycleType, OtherModeH_Layout, Rect, TMEMMapEntry,
             SCREEN_HEIGHT, SCREEN_WIDTH,
         },
         rsp::MAX_VERTICES,
@@ -26,58 +30,90 @@ use crate::{
     },
 };
 
-pub enum F3DEX2 {
-    // DMA
-    G_VTX = 0x01,
-    G_MODIFYVTX = 0x02,
-    G_CULLDL = 0x03,
-    G_BRANCH_Z = 0x04,
-    G_TRI1 = 0x05,
-    G_TRI2 = 0x06,
-    G_QUAD = 0x07,
-    G_LINE3D = 0x08,
+pub struct F3DEX2;
 
-    // RSP
-    G_TEXTURE = 0xD7,
-    G_POPMTX = 0xD8,
-    G_GEOMETRYMODE = 0xD9,
-    G_MTX = 0xDA,
-    G_MOVEWORD = 0xDB,
-    G_MOVEMEM = 0xDC,
-    G_LOAD_UCODE = 0xDD,
-    G_DL = 0xDE,
-    G_ENDDL = 0xDF,
+impl F3DEX2 {
+    /*
+     * MOVEWORD indices
+     *
+     * Each of these indexes an entry in a dmem table
+     * which points to a word in dmem in dmem where
+     * an immediate word will be stored.
+     *
+     */
+    pub const G_MWO_aLIGHT_2: u8 = 0x18;
+    pub const G_MWO_bLIGHT_2: u8 = 0x1c;
+    pub const G_MWO_aLIGHT_3: u8 = 0x30;
+    pub const G_MWO_bLIGHT_3: u8 = 0x34;
+    pub const G_MWO_aLIGHT_4: u8 = 0x48;
+    pub const G_MWO_bLIGHT_4: u8 = 0x4c;
+    pub const G_MWO_aLIGHT_5: u8 = 0x60;
+    pub const G_MWO_bLIGHT_5: u8 = 0x64;
+    pub const G_MWO_aLIGHT_6: u8 = 0x78;
+    pub const G_MWO_bLIGHT_6: u8 = 0x7c;
+    pub const G_MWO_aLIGHT_7: u8 = 0x90;
+    pub const G_MWO_bLIGHT_7: u8 = 0x94;
+    pub const G_MWO_aLIGHT_8: u8 = 0xa8;
+    pub const G_MWO_bLIGHT_8: u8 = 0xac;
+
+    pub const G_NOOP: u8 = 0x00;
 
     // RDP
-    G_SETCIMG = 0xFF,
-    G_SETZIMG = 0xFE,
-    G_SETTIMG = 0xFD,
-    G_SETCOMBINE = 0xFC,
-    G_SETENVCOLOR = 0xFB,
-    G_SETPRIMCOLOR = 0xFA,
-    G_SETBLENDCOLOR = 0xF9,
-    G_SETFOGCOLOR = 0xF8,
-    G_SETFILLCOLOR = 0xF7,
-    G_FILLRECT = 0xF6,
-    G_SETTILE = 0xF5,
-    G_LOADTILE = 0xF4,
-    G_LOADBLOCK = 0xF3,
-    G_SETTILESIZE = 0xF2,
-    G_LOADTLUT = 0xF0,
-    G_RDPSETOTHERMODE = 0xEF,
-    G_SETPRIMDEPTH = 0xEE,
-    G_SETSCISSOR = 0xED,
-    G_SETCONVERT = 0xEC,
-    G_SETKEYR = 0xEB,
-    G_SETKEYFB = 0xEA,
-    G_RDPFULLSYNC = 0xE9,
-    G_RDPTILESYNC = 0xE8,
-    G_RDPPIPESYNC = 0xE7,
-    G_RDPLOADSYNC = 0xE6,
-    G_TEXRECTFLIP = 0xE5,
-    G_TEXRECT = 0xE4,
-    G_SETOTHERMODE_H = 0xE3,
-    G_SETOTHERMODE_L = 0xE2,
+    pub const G_SETOTHERMODE_H: u8 = 0xe3;
+    pub const G_SETOTHERMODE_L: u8 = 0xe2;
+    pub const G_RDPHALF_1: u8 = 0xe1;
+    pub const G_RDPHALF_2: u8 = 0xf1;
+
+    pub const G_SPNOOP: u8 = 0xe0;
+
+    // RSP
+    pub const G_ENDDL: u8 = 0xdf;
+    pub const G_DL: u8 = 0xde;
+    pub const G_LOAD_UCODE: u8 = 0xdd;
+    pub const G_MOVEMEM: u8 = 0xdc;
+    pub const G_MOVEWORD: u8 = 0xdb;
+    pub const G_MTX: u8 = 0xda;
+    pub const G_GEOMETRYMODE: u8 = 0xd9;
+    pub const G_POPMTX: u8 = 0xd8;
+    pub const G_TEXTURE: u8 = 0xd7;
+
+    // DMA
+    pub const G_VTX: u8 = 0x01;
+    pub const G_MODIFYVTX: u8 = 0x02;
+    pub const G_CULLDL: u8 = 0x03;
+    pub const G_BRANCH_Z: u8 = 0x04;
+    pub const G_TRI1: u8 = 0x05;
+    pub const G_TRI2: u8 = 0x06;
+    pub const G_QUAD: u8 = 0x07;
+    pub const G_LINE3D: u8 = 0x08;
+    pub const G_DMA_IO: u8 = 0xD6;
+
+    pub const G_SPECIAL_1: u8 = 0xD5;
+
+    /*
+     * MOVEMEM indices
+     *
+     * Each of these indexes an entry in a dmem table
+     * which points to a 1-4 word block of dmem in
+     * which to store a 1-4 word DMA.
+     *
+     */
+    pub const G_MV_MMTX: u8 = 2;
+    pub const G_MV_PMTX: u8 = 6;
+    pub const G_MV_VIEWPORT: u8 = 8;
+    pub const G_MV_LIGHT: u8 = 10;
+    pub const G_MV_POINT: u8 = 12;
+    pub const G_MV_MATRIX: u8 = 14;
+    pub const G_MVO_LOOKATX: u8 = (0 * 24);
+    pub const G_MVO_LOOKATY: u8 = (1 * 24);
+    pub const G_MVO_L0: u8 = (2 * 24);
+    pub const G_MVO_L1: u8 = (3 * 24);
+    pub const G_MVO_L2: u8 = (4 * 24);
+    pub const G_MVO_L3: u8 = (5 * 24);
+    pub const G_MVO_L4: u8 = (6 * 24);
+    pub const G_MVO_L5: u8 = (7 * 24);
+    pub const G_MVO_L6: u8 = (8 * 24);
+    pub const G_MVO_L7: u8 = (9 * 24);
 }
 
 impl GBIDefinition for F3DEX2 {
@@ -101,20 +137,20 @@ impl GBIDefinition for F3DEX2 {
             F3DEX2::G_SETOTHERMODE_H as usize,
             F3DEX2::gdp_set_other_mode_h,
         );
-        gbi.register(F3DEX2::G_SETTIMG as usize, F3DEX2::gdp_set_texture_image);
-        gbi.register(F3DEX2::G_LOADBLOCK as usize, F3DEX2::gdp_load_block);
-        gbi.register(F3DEX2::G_LOADTILE as usize, F3DEX2::gdp_load_tile);
-        gbi.register(F3DEX2::G_LOADTLUT as usize, F3DEX2::gdp_load_tlut);
-        gbi.register(F3DEX2::G_SETTILE as usize, F3DEX2::gdp_set_tile);
-        gbi.register(F3DEX2::G_SETTILESIZE as usize, F3DEX2::gdp_set_tile_size);
-        gbi.register(F3DEX2::G_SETSCISSOR as usize, F3DEX2::gdp_set_scissor);
-        gbi.register(F3DEX2::G_SETCOMBINE as usize, F3DEX2::gdp_set_combine);
-        gbi.register(F3DEX2::G_SETENVCOLOR as usize, F3DEX2::gdp_set_env_color);
-        gbi.register(F3DEX2::G_SETPRIMCOLOR as usize, F3DEX2::gdp_set_prim_color);
-        gbi.register(F3DEX2::G_SETFOGCOLOR as usize, F3DEX2::gdp_set_fog_color);
-        gbi.register(F3DEX2::G_SETFILLCOLOR as usize, F3DEX2::gdp_set_fill_color);
-        gbi.register(F3DEX2::G_SETZIMG as usize, F3DEX2::gdp_set_depth_image);
-        gbi.register(F3DEX2::G_SETCIMG as usize, F3DEX2::gdp_set_color_image);
+        gbi.register(G_SET::TEXIMG as usize, F3DEX2::gdp_set_texture_image);
+        gbi.register(G_LOAD::BLOCK as usize, F3DEX2::gdp_load_block);
+        gbi.register(G_LOAD::TILE as usize, F3DEX2::gdp_load_tile);
+        gbi.register(G_LOAD::TLUT as usize, F3DEX2::gdp_load_tlut);
+        gbi.register(G_SET::TILE as usize, F3DEX2::gdp_set_tile);
+        gbi.register(G_SET::TILESIZE as usize, F3DEX2::gdp_set_tile_size);
+        gbi.register(G_SET::SCISSOR as usize, F3DEX2::gdp_set_scissor);
+        gbi.register(G_SET::COMBINE as usize, F3DEX2::gdp_set_combine);
+        gbi.register(G_SET::ENVCOLOR as usize, F3DEX2::gdp_set_env_color);
+        gbi.register(G_SET::PRIMCOLOR as usize, F3DEX2::gdp_set_prim_color);
+        gbi.register(G_SET::FOGCOLOR as usize, F3DEX2::gdp_set_fog_color);
+        gbi.register(G_SET::FILLCOLOR as usize, F3DEX2::gdp_set_fill_color);
+        gbi.register(G_SET::DEPTHIMG as usize, F3DEX2::gdp_set_depth_image);
+        gbi.register(G_SET::COLORIMG as usize, F3DEX2::gdp_set_color_image);
     }
 }
 
@@ -226,12 +262,12 @@ impl F3DEX2 {
         let data = get_segmented_address(w1);
 
         match index {
-            index if index == G_MV::VIEWPORT as u8 => {
+            index if index == F3DEX2::G_MV_VIEWPORT as u8 => {
                 let viewport_ptr = data as *const Viewport;
                 let viewport = unsafe { &*viewport_ptr };
                 rdp.calculate_and_set_viewport(*viewport);
             }
-            index if index == G_MV::LIGHT as u8 => {
+            index if index == F3DEX2::G_MV_LIGHT as u8 => {
                 let light_index = (offset as i8 / 24) - 2;
                 if light_index >= 0 && (light_index as usize) < MAX_LIGHTS {
                     let light_ptr = data as *const Light;
@@ -725,10 +761,10 @@ impl F3DEX2 {
         _w0: usize,
         w1: usize,
     ) -> GBIResult {
-        let tile = get_cmd(w1, 24, 3);
+        let tile = get_cmd(w1, 24, 3) as u8;
         let high_index = get_cmd(w1, 14, 10) as u16;
 
-        assert!(tile == G_TX_LOADTILE);
+        assert!(tile == G_TX::LOADTILE);
         assert!(rdp.texture_image_state.size == ImageSize::G_IM_SIZ_16b as u8); // TLUTs are always 16-bit (so far)
         assert!(
             rdp.tile_descriptors[tile as usize].tmem == 256
@@ -754,7 +790,7 @@ impl F3DEX2 {
         w0: usize,
         w1: usize,
     ) -> GBIResult {
-        let tile = get_cmd(w1, 24, 3);
+        let tile = get_cmd(w1, 24, 3) as u8;
         let uls = get_cmd(w0, 12, 12);
         let ult = get_cmd(w0, 0, 12);
         let _texels = get_cmd(w1, 12, 12) as u16;
@@ -763,7 +799,7 @@ impl F3DEX2 {
         // First, verify that we're loading the whole texture.
         assert!(uls == 0 && ult == 0);
         // Verify that we're loading into LOADTILE.
-        assert!(tile == G_TX_LOADTILE);
+        assert!(tile == G_TX::LOADTILE);
 
         let tile = &mut rdp.tile_descriptors[tile as usize];
         rdp.tmem_map.insert(
@@ -784,7 +820,7 @@ impl F3DEX2 {
         w0: usize,
         w1: usize,
     ) -> GBIResult {
-        let tile_index = get_cmd(w1, 24, 3);
+        let tile = get_cmd(w1, 24, 3) as u8;
         let uls = get_cmd(w0, 12, 12) as u16;
         let ult = get_cmd(w0, 0, 12) as u16;
         let lrs = get_cmd(w1, 12, 12) as u16;
@@ -793,9 +829,9 @@ impl F3DEX2 {
         // First, verify that we're loading the whole texture.
         assert!(uls == 0 && ult == 0);
         // Verify that we're loading into LOADTILE.
-        assert!(tile_index == G_TX_LOADTILE);
+        assert!(tile == G_TX::LOADTILE);
 
-        let tile = &mut rdp.tile_descriptors[tile_index as usize];
+        let tile = &mut rdp.tile_descriptors[tile as usize];
         rdp.tmem_map.insert(
             tile.tmem,
             TMEMMapEntry::new(rdp.texture_image_state.address),
