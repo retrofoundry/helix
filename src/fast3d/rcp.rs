@@ -5,7 +5,45 @@ use super::{
     graphics::GraphicsContext,
     rdp::RDP,
     rsp::RSP,
+    utils::{color_combiner::CombineParams, texture::TextureState},
 };
+
+pub struct DrawCall {
+    pub geometry_mode: u32,
+    pub texture_state: TextureState,
+    pub other_mode_l: u32,
+    pub other_mode_h: u32,
+    pub combine: CombineParams,
+
+    pub env_color: [u8; 4],
+    pub fog_color: [u8; 4],
+    pub prim_color: [u8; 4],
+    pub fill_color: [u8; 4],
+
+    pub texture_indices: Vec<usize>,
+
+    pub first_index: usize,
+    pub num_indices: usize,
+}
+
+impl DrawCall {
+    pub fn new() -> Self {
+        DrawCall {
+            geometry_mode: 0,
+            texture_state: TextureState::EMPTY,
+            other_mode_l: 0,
+            other_mode_h: 0,
+            combine: CombineParams::ZERO,
+            env_color: [0; 4],
+            fog_color: [0; 4],
+            prim_color: [0; 4],
+            fill_color: [0; 4],
+            texture_indices: Vec::new(),
+            first_index: 0,
+            num_indices: 0,
+        }
+    }
+}
 
 pub struct RCP {
     gbi: GBI,
@@ -60,7 +98,7 @@ impl RCP {
                 GBIResult::Unknown(opcode) => {
                     trace!("Unknown GBI command: {:#x}", opcode);
                 }
-                GBIResult::Return => { return }
+                GBIResult::Return => return,
                 GBIResult::Continue => {}
             }
 

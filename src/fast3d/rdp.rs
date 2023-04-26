@@ -29,6 +29,7 @@ const MAX_VBO_SIZE: usize = 256;
 const TEXTURE_CACHE_MAX_SIZE: usize = 500;
 const MAX_TEXTURE_SIZE: usize = 4096;
 const NUM_TILE_DESCRIPTORS: usize = 8;
+pub const MAX_BUFFERED: usize = 256;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -73,6 +74,12 @@ impl OutputDimensions {
     };
 }
 
+pub struct BlendResult {
+    pub blend_state: BlendState,
+    pub use_alpha: bool,
+    pub use_texture_edge: bool,
+}
+
 pub struct RenderingState {
     pub depth_compare: CompareFunction,
     pub depth_test: bool,
@@ -99,7 +106,7 @@ impl RenderingState {
     };
 }
 
-enum OtherModeLayoutL {
+pub enum OtherModeLayoutL {
     // non-render-mode fields
     G_MDSFT_ALPHACOMPARE = 0,
     G_MDSFT_ZSRCSEL = 2,
@@ -157,7 +164,7 @@ enum ZMode {
     ZMODE_DEC = 3,
 }
 
-enum BlendParamPMColor {
+pub enum BlendParamPMColor {
     G_BL_CLR_IN = 0,
     G_BL_CLR_MEM = 1,
     G_BL_CLR_BL = 2,
@@ -171,11 +178,17 @@ enum BlendParamA {
     G_BL_0 = 3,
 }
 
-enum BlendParamB {
+pub enum BlendParamB {
     G_BL_1MA = 0,
     G_BL_A_MEM = 1,
     G_BL_1 = 2,
     G_BL_0 = 3,
+}
+
+pub enum AlphaCompare {
+    G_AC_NONE = 0,
+    G_AC_THRESHOLD = 1,
+    G_AC_DITHER = 3,
 }
 
 pub struct TMEMMapEntry {
@@ -608,7 +621,7 @@ impl RDP {
         gfx_context: &GraphicsContext,
         render_mode: u32,
     ) -> BlendState {
-        let zmode = self.other_mode_l >> (OtherModeLayoutL::ZMODE as u32) & 0x03;
+        let zmode: u32 = self.other_mode_l >> (OtherModeLayoutL::ZMODE as u32) & 0x03;
 
         // handle depth compare
         if self.other_mode_l & (1 << OtherModeLayoutL::Z_CMP as u32) != 0 {
@@ -624,6 +637,14 @@ impl RDP {
                 self.flush(gfx_context);
                 gfx_context.api.set_depth_compare(depth_compare as u8);
                 self.rendering_state.depth_compare = depth_compare;
+            }
+        } else {
+            if self.rendering_state.depth_compare != CompareFunction::Always {
+                self.flush(gfx_context);
+                gfx_context
+                    .api
+                    .set_depth_compare(CompareFunction::Always as u8);
+                self.rendering_state.depth_compare = CompareFunction::Always;
             }
         }
 
@@ -653,6 +674,7 @@ impl RDP {
 
         if do_blend {
             assert!(src_color == BlendParamPMColor::G_BL_CLR_IN as u32);
+            let mut use_texture_edge = false;
 
             let blend_src_factor: BlendFactor;
             if src_factor == BlendParamA::G_BL_0 as u32 {
@@ -662,6 +684,7 @@ impl RDP {
             {
                 // this is technically "coverage", admitting blending on edges
                 blend_src_factor = BlendFactor::One;
+                use_texture_edge = true;
             } else {
                 blend_src_factor = BlendFactor::SrcAlpha;
             }
@@ -742,7 +765,18 @@ impl RDP {
         }
     }
 
+    pub fn add_to_buf_vbo(&mut self, data: f32) {
+        self.buf_vbo[self.buf_vbo_len] = data;
+        self.buf_vbo_len += 1;
+    }
+
     // MARK: - Helpers
+
+    fn blend_component_state_none(component: BlendComponent) -> bool {
+        component.src_factor == BlendFactor::One
+            && component.dst_factor == BlendFactor::Zero
+            && component.operation == BlendOperation::Add
+    }
 
     pub fn scaled_x(&self) -> f32 {
         self.output_dimensions.width as f32 / SCREEN_WIDTH

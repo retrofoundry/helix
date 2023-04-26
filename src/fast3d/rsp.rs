@@ -9,8 +9,25 @@ pub const MAX_VERTICES: usize = 64;
 pub const MAX_LIGHTS: usize = 7;
 
 #[repr(C)]
+pub struct Position {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub w: f32,
+}
+
+impl Position {
+    pub const ZERO: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+        w: 0.0,
+    };
+}
+
+#[repr(C)]
 pub struct StagingVertex {
-    pub position: [f32; 4],
+    pub position: Position,
     pub uv: [f32; 2],
     pub color: [u8; 4],
     pub clip_reject: u8,
@@ -18,7 +35,7 @@ pub struct StagingVertex {
 
 impl StagingVertex {
     pub const ZERO: Self = Self {
-        position: [0.0; 4],
+        position: Position::ZERO,
         uv: [0.0; 2],
         color: [0; 4],
         clip_reject: 0,

@@ -279,3 +279,47 @@ pub extern "C" fn F3DEX2_GDPSetColorImage(
     let command: *mut Gfx = command as *mut Gfx;
     F3DEX2::gdp_set_color_image(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
 }
+
+#[no_mangle]
+pub extern "C" fn F3DEX2_GSPTriangle1(
+    rcp: Option<&mut RCP>,
+    gfx_context: Option<&mut GraphicsContext>,
+    command: usize,
+) {
+    let rcp = rcp.unwrap();
+    let gfx_context = gfx_context.unwrap();
+    let command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gsp_tri1(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+}
+
+#[no_mangle]
+pub extern "C" fn F3DEX2_GSPTriangle2(
+    rcp: Option<&mut RCP>,
+    gfx_context: Option<&mut GraphicsContext>,
+    command: usize,
+) {
+    let rcp = rcp.unwrap();
+    let gfx_context = gfx_context.unwrap();
+    let command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gsp_tri2(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+}
+
+#[no_mangle]
+pub extern "C" fn F3DEX2_GSPTriangle1WithIndexes(
+    rcp: Option<&mut RCP>,
+    gfx_context: Option<&mut GraphicsContext>,
+    vertex_index1: u8,
+    vertex_index2: u8,
+    vertex_index3: u8,
+) {
+    let rcp = rcp.unwrap();
+    let gfx_context = gfx_context.unwrap();
+    F3DEX2::gsp_tri1_raw(
+        &mut rcp.rdp,
+        &mut rcp.rsp,
+        gfx_context,
+        vertex_index1 as usize,
+        vertex_index2 as usize,
+        vertex_index3 as usize,
+    );
+}

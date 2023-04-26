@@ -3,7 +3,12 @@ use std::any::Any;
 use wgpu::BlendState;
 
 #[repr(C)]
-pub struct ShaderProgram;
+pub struct ShaderProgram {
+    pub shader_id: u32,
+    pub num_inputs: u8,
+    pub used_textures: [bool; 2],
+    // .. ommiting the rest
+}
 
 pub trait GraphicsAPI {
     fn as_any(&self) -> &dyn Any;

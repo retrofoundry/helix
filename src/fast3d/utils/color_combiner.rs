@@ -21,6 +21,17 @@ impl ColorCombinePass {
         }
     }
 
+    pub fn uses_texture0(&self) -> bool {
+        self.a == CCMUX::TEXEL0
+            || self.a == CCMUX::TEXEL0_ALPHA
+            || self.b == CCMUX::TEXEL0
+            || self.b == CCMUX::TEXEL0_ALPHA
+            || self.c == CCMUX::TEXEL0
+            || self.c == CCMUX::TEXEL0_ALPHA
+            || self.d == CCMUX::TEXEL0
+            || self.d == CCMUX::TEXEL0_ALPHA
+    }
+
     pub fn uses_texture1(&self) -> bool {
         self.a == CCMUX::TEXEL1
             || self.a == CCMUX::TEXEL1_ALPHA
@@ -51,6 +62,13 @@ impl AlhpaCombinePass {
             3 => self.d,
             _ => panic!("Invalid index"),
         }
+    }
+
+    pub fn uses_texture0(&self) -> bool {
+        self.a == ACMUX::TEXEL0
+            || self.b == ACMUX::TEXEL0
+            || self.c == ACMUX::TEXEL0
+            || self.d == ACMUX::TEXEL0
     }
 
     pub fn uses_texture1(&self) -> bool {
@@ -158,6 +176,13 @@ impl CombineParams {
         cout | (aout << 12)
     }
 
+    pub fn uses_texture0(&self) -> bool {
+        self.c0.uses_texture0()
+            || self.c1.uses_texture0()
+            || self.a0.uses_texture0()
+            || self.a1.uses_texture0()
+    }
+
     pub fn uses_texture1(&self) -> bool {
         self.c0.uses_texture1()
             || self.c1.uses_texture1()
@@ -241,6 +266,11 @@ impl ACMUX {
     }
 }
 
+pub const SHADER_OPT_ALPHA: u32 = 1 << 24;
+pub const SHADER_OPT_FOG: u32 = 1 << 25;
+pub const SHADER_OPT_TEXTURE_EDGE: u32 = 1 << 26;
+pub const SHADER_OPT_NOISE: u32 = 1 << 27;
+
 pub enum SHADER {
     ZERO,
     INPUT_1,
@@ -288,7 +318,7 @@ impl ColorCombinerManager {
 pub struct ColorCombiner {
     pub cc_id: u32,
     pub prg: *mut ShaderProgram,
-    shader_input_mapping: [[u8; 4]; 2],
+    pub shader_input_mapping: [[u8; 4]; 2],
 }
 
 impl ColorCombiner {

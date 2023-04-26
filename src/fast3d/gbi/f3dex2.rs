@@ -2,7 +2,7 @@ use std::slice;
 
 use log::trace;
 
-use super::defines::{Light, Viewport, Vtx, G_MTX, Gfx};
+use super::defines::{Gfx, Light, Viewport, Vtx, G_MTX};
 use super::utils::{get_cmd, get_segmented_address};
 use super::{
     super::{
@@ -13,6 +13,12 @@ use super::{
 };
 use super::{GBIDefinition, GBIResult, GBI};
 use crate::fast3d::gbi::defines::G_TX;
+use crate::fast3d::rdp::{
+    AlphaCompare, BlendParamB, BlendParamPMColor, OtherModeLayoutL, MAX_BUFFERED,
+};
+use crate::fast3d::utils::color_combiner::{
+    CCMUX, SHADER_OPT_ALPHA, SHADER_OPT_FOG, SHADER_OPT_NOISE, SHADER_OPT_TEXTURE_EDGE,
+};
 use crate::{
     extensions::matrix::{calculate_normal_dir, matrix_from_fixed_point, matrix_multiply},
     fast3d::{
@@ -126,6 +132,7 @@ impl GBIDefinition for F3DEX2 {
         gbi.register(F3DEX2::G_DL as usize, F3DEX2::sub_dl);
         gbi.register(F3DEX2::G_GEOMETRYMODE as usize, F3DEX2::gsp_geometry_mode);
         gbi.register(F3DEX2::G_TRI1 as usize, F3DEX2::gsp_tri1);
+        gbi.register(F3DEX2::G_TRI2 as usize, F3DEX2::gsp_tri2);
         gbi.register(F3DEX2::G_ENDDL as usize, |_, _, _, _| GBIResult::Return);
 
         gbi.register(
@@ -475,10 +482,10 @@ impl F3DEX2 {
                 staging_vertex.clip_reject |= 32;
             }
 
-            staging_vertex.position[0] = x;
-            staging_vertex.position[1] = y;
-            staging_vertex.position[2] = z;
-            staging_vertex.position[3] = w;
+            staging_vertex.position.x = x;
+            staging_vertex.position.y = y;
+            staging_vertex.position.z = z;
+            staging_vertex.position.w = w;
 
             if rsp.geometry_mode & RSPGeometry::G_FOG as u32 > 0 {
                 let w = if w.abs() < 0.001 { 0.001 } else { w };
@@ -519,19 +526,14 @@ impl F3DEX2 {
         GBIResult::Continue
     }
 
-    pub fn gsp_tri1(
+    pub fn gsp_tri1_raw(
         rdp: &mut RDP,
         rsp: &mut RSP,
         gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        vertex_id1: usize,
+        vertex_id2: usize,
+        vertex_id3: usize,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
-
-        let vertex_id1 = get_cmd(w0, 16, 8) / 2;
-        let vertex_id2 = get_cmd(w0, 8, 8) / 2;
-        let vertex_id3 = get_cmd(w0, 0, 8) / 2;
-
         let vertex1 = &rsp.vertex_table[vertex_id1];
         let vertex2 = &rsp.vertex_table[vertex_id2];
         let vertex3 = &rsp.vertex_table[vertex_id3];
@@ -542,21 +544,19 @@ impl F3DEX2 {
             return GBIResult::Continue;
         }
 
-        if (rsp.geometry_mode & RSPGeometry::G_CULL_BOTH as u32) > 0 {
-            let dx1 = vertex1.position[0] / vertex1.position[3]
-                - vertex2.position[0] / vertex2.position[3];
-            let dy1 = vertex1.position[1] / vertex1.position[3]
-                - vertex2.position[1] / vertex2.position[3];
-            let dx2 = vertex3.position[0] / vertex3.position[3]
-                - vertex2.position[0] / vertex2.position[3];
-            let dy2 = vertex3.position[1] / vertex3.position[3]
-                - vertex2.position[1] / vertex2.position[3];
+        if (rsp.geometry_mode & RSPGeometry::G_CULL_BOTH as u32) != 0 {
+            let dx1 =
+                vertex1.position.x / vertex1.position.w - vertex2.position.x / vertex2.position.w;
+            let dy1 =
+                vertex1.position.y / vertex1.position.w - vertex2.position.y / vertex2.position.w;
+            let dx2 =
+                vertex3.position.x / vertex3.position.w - vertex2.position.x / vertex2.position.w;
+            let dy2 =
+                vertex3.position.y / vertex3.position.w - vertex2.position.y / vertex2.position.w;
             let mut cross = dx1 * dy2 - dy1 * dx2;
 
             // If any verts are past any clipping plane..
-            if (vertex1.position[3] < 0.0)
-                ^ (vertex2.position[3] < 0.0)
-                ^ (vertex3.position[3] < 0.0)
+            if (vertex1.position.w < 0.0) ^ (vertex2.position.w < 0.0) ^ (vertex3.position.w < 0.0)
             {
                 // If one vertex lies behind the eye, negating cross will give the correct result.
                 // If all vertices lie behind the eye, the triangle will be rejected anyway.
@@ -581,10 +581,201 @@ impl F3DEX2 {
             }
         }
 
-        // TODO: Produce draw calls for RDP to process later?
         rdp.update_render_state(gfx_context, rsp.geometry_mode, &vertex_array);
 
+        // TODO: Produce draw calls for RDP to process later?
+        let mut cc_id = rdp.combine.to_u32();
+        let mut use_alpha = F3DEX2::other_mode_l_uses_alpha(rdp.other_mode_l);
+        let use_texture_edge = F3DEX2::other_mode_l_uses_texture_edge(rdp.other_mode_l);
+        let use_fog = F3DEX2::other_mode_l_uses_fog(rdp.other_mode_l);
+        let use_noise = F3DEX2::other_mode_l_uses_noise(rdp.other_mode_l);
+
+        if use_texture_edge {
+            use_alpha = true;
+        }
+
+        if use_alpha {
+            cc_id |= SHADER_OPT_ALPHA;
+        };
+        if use_fog {
+            cc_id |= SHADER_OPT_FOG;
+        };
+        if use_texture_edge {
+            cc_id |= SHADER_OPT_TEXTURE_EDGE;
+        };
+        if use_noise {
+            cc_id |= SHADER_OPT_NOISE;
+        };
+
+        if !use_alpha {
+            cc_id &= !0xfff000;
+        }
+
+        // TODO: Stop using ID's for the color combiner, use the object instead
+        rdp.lookup_or_create_color_combiner(gfx_context, cc_id);
+        let color_combiner = rdp.color_combiner_manager.combiners.get(&cc_id).unwrap();
+        let shader_input_mapping = color_combiner.shader_input_mapping;
+
+        let prg = color_combiner.prg;
+        let rs_prg = rdp.rendering_state.shader_program;
+        if prg != rs_prg {
+            rdp.flush(gfx_context);
+            gfx_context.api.unload_shader(rs_prg);
+            gfx_context.api.load_shader(prg);
+            rdp.rendering_state.shader_program = prg;
+        }
+
+        let num_inputs = unsafe { (*prg).num_inputs };
+        let use_texture = rdp.combine.uses_texture0() || rdp.uses_texture1();
+        // let use_texture = unsafe { (*prg).used_textures[0] || (*prg).used_textures[1] };
+        rdp.flush_textures(gfx_context);
+
+        let current_tile = rdp.tile_descriptors[rdp.texture_state.tile as usize];
+        let tex_width = current_tile.get_width();
+        let tex_height = current_tile.get_height();
+
+        let z_is_from_0_to_1 = gfx_context.api.z_is_from_0_to_1();
+
+        for i in 0..3 {
+            let mut z = vertex_array[i].position.z;
+            let w = vertex_array[i].position.w;
+            if z_is_from_0_to_1 {
+                z = (z + w) / 2.0;
+            }
+
+            rdp.add_to_buf_vbo(vertex_array[i].position.x);
+            rdp.add_to_buf_vbo(vertex_array[i].position.y);
+            rdp.add_to_buf_vbo(z);
+            rdp.add_to_buf_vbo(w);
+
+            if use_texture {
+                let mut u = (vertex_array[i].uv[0] - (current_tile.uls as f32) * 8.0) / 32.0;
+                let mut v = (vertex_array[i].uv[1] - (current_tile.ult as f32) * 8.0) / 32.0;
+
+                if RDP::get_textfilter_from_other_mode_h(rdp.other_mode_h) != TextFilt::G_TF_POINT {
+                    u += 0.5;
+                    v += 0.5;
+                }
+
+                rdp.add_to_buf_vbo(u / tex_width as f32);
+                rdp.add_to_buf_vbo(v / tex_height as f32);
+            }
+
+            if use_fog {
+                rdp.add_to_buf_vbo(rdp.fog_color[0] as f32 / 255.0);
+                rdp.add_to_buf_vbo(rdp.fog_color[1] as f32 / 255.0);
+                rdp.add_to_buf_vbo(rdp.fog_color[2] as f32 / 255.0);
+                rdp.add_to_buf_vbo(vertex_array[i].color[3] as f32 / 255.0);
+            }
+
+            for j in 0..num_inputs {
+                let mut color: [u8; 4];
+                for k in 0..1 + if use_alpha { 1 } else { 0 } {
+                    match shader_input_mapping[k][j as usize] {
+                        x if x == CCMUX::PRIMITIVE as u8 => {
+                            color = rdp.prim_color;
+                        }
+                        x if x == CCMUX::SHADE as u8 => {
+                            color = vertex_array[i].color;
+                        }
+                        x if x == CCMUX::ENVIRONMENT as u8 => {
+                            color = rdp.env_color;
+                        }
+                        x if x == CCMUX::LOD_FRACTION as u8 => {
+                            let mut distance_frac = (vertex1.position.w - 3000.0) / 3000.0;
+                            if distance_frac < 0.0 {
+                                distance_frac = 0.0
+                            }
+                            if distance_frac > 1.0 {
+                                distance_frac = 1.0
+                            }
+                            color = [
+                                (distance_frac * 255.0) as u8,
+                                (distance_frac * 255.0) as u8,
+                                (distance_frac * 255.0) as u8,
+                                (distance_frac * 255.0) as u8,
+                            ];
+                        }
+                        _ => {
+                            color = [0; 4];
+                        }
+                    }
+
+                    if k == 0 {
+                        rdp.add_to_buf_vbo(color[0] as f32 / 255.0);
+                        rdp.add_to_buf_vbo(color[1] as f32 / 255.0);
+                        rdp.add_to_buf_vbo(color[2] as f32 / 255.0);
+                    } else {
+                        if use_fog && color == vertex_array[i].color {
+                            rdp.add_to_buf_vbo(1.0);
+                        } else {
+                            rdp.add_to_buf_vbo(color[3] as f32 / 255.0);
+                        }
+                    }
+                }
+            }
+        }
+
+        rdp.buf_vbo_num_tris += 1;
+        if rdp.buf_vbo_num_tris == MAX_BUFFERED {
+            rdp.flush(gfx_context);
+        }
+
         GBIResult::Continue
+    }
+
+    pub fn gsp_tri1(
+        rdp: &mut RDP,
+        rsp: &mut RSP,
+        gfx_context: &GraphicsContext,
+        command: *mut Gfx,
+    ) -> GBIResult {
+        let w0 = unsafe { (*command).words.w0 };
+
+        let vertex_id1 = get_cmd(w0, 16, 8) / 2;
+        let vertex_id2 = get_cmd(w0, 8, 8) / 2;
+        let vertex_id3 = get_cmd(w0, 0, 8) / 2;
+
+        F3DEX2::gsp_tri1_raw(rdp, rsp, gfx_context, vertex_id1, vertex_id2, vertex_id3)
+    }
+
+    pub fn gsp_tri2(
+        rdp: &mut RDP,
+        rsp: &mut RSP,
+        gfx_context: &GraphicsContext,
+        command: *mut Gfx,
+    ) -> GBIResult {
+        let w0 = unsafe { (*command).words.w0 };
+        let w1 = unsafe { (*command).words.w1 };
+
+        let vertex_id1 = get_cmd(w0, 16, 8) / 2;
+        let vertex_id2 = get_cmd(w0, 8, 8) / 2;
+        let vertex_id3 = get_cmd(w0, 0, 8) / 2;
+
+        F3DEX2::gsp_tri1_raw(rdp, rsp, gfx_context, vertex_id1, vertex_id2, vertex_id3);
+
+        let vertex_id1 = get_cmd(w1, 16, 8) / 2;
+        let vertex_id2 = get_cmd(w1, 8, 8) / 2;
+        let vertex_id3 = get_cmd(w1, 0, 8) / 2;
+        F3DEX2::gsp_tri1_raw(rdp, rsp, gfx_context, vertex_id1, vertex_id2, vertex_id3)
+    }
+
+    fn other_mode_l_uses_texture_edge(other_mode_l: u32) -> bool {
+        return other_mode_l >> (OtherModeLayoutL::CVG_X_ALPHA as u32) & 0x01 == 0x01;
+    }
+
+    fn other_mode_l_uses_alpha(other_mode_l: u32) -> bool {
+        return other_mode_l & ((BlendParamB::G_BL_A_MEM as u32) << (OtherModeLayoutL::B_1 as u32))
+            == 0;
+    }
+
+    fn other_mode_l_uses_fog(other_mode_l: u32) -> bool {
+        return (other_mode_l >> OtherModeLayoutL::P_1 as u32)
+            == BlendParamPMColor::G_BL_CLR_FOG as u32;
+    }
+
+    fn other_mode_l_uses_noise(other_mode_l: u32) -> bool {
+        return other_mode_l & AlphaCompare::G_AC_DITHER as u32 == AlphaCompare::G_AC_DITHER as u32;
     }
 
     pub fn sub_dl(
@@ -1010,34 +1201,34 @@ impl F3DEX2 {
 
         {
             let ul = &mut rsp.vertex_table[MAX_VERTICES + 0];
-            ul.position[0] = ulxf;
-            ul.position[1] = ulyf;
-            ul.position[2] = -1.0;
-            ul.position[3] = 1.0;
+            ul.position.x = ulxf;
+            ul.position.y = ulyf;
+            ul.position.z = -1.0;
+            ul.position.w = 1.0;
         }
 
         {
             let ll = &mut rsp.vertex_table[MAX_VERTICES + 1];
-            ll.position[0] = ulxf;
-            ll.position[1] = lryf;
-            ll.position[2] = -1.0;
-            ll.position[3] = 1.0;
+            ll.position.x = ulxf;
+            ll.position.y = lryf;
+            ll.position.z = -1.0;
+            ll.position.w = 1.0;
         }
 
         {
             let lr = &mut rsp.vertex_table[MAX_VERTICES + 2];
-            lr.position[0] = lrxf;
-            lr.position[1] = lryf;
-            lr.position[2] = -1.0;
-            lr.position[3] = 1.0;
+            lr.position.x = lrxf;
+            lr.position.y = lryf;
+            lr.position.z = -1.0;
+            lr.position.w = 1.0;
         }
 
         {
             let ur = &mut rsp.vertex_table[MAX_VERTICES + 3];
-            ur.position[0] = lrxf;
-            ur.position[1] = ulyf;
-            ur.position[2] = -1.0;
-            ur.position[3] = 1.0;
+            ur.position.x = lrxf;
+            ur.position.y = ulyf;
+            ur.position.z = -1.0;
+            ur.position.w = 1.0;
         }
 
         // The coordinates for texture rectangle shall bypass the viewport setting

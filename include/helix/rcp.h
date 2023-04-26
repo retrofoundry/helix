@@ -94,6 +94,9 @@ void F3DEX2_GSPMoveWord(void* rcp, void* gfx_context, uintptr_t command);
 void F3DEX2_GSPMoveMem(void* rcp, void* gfx_context, uintptr_t command);
 void F3DEX2_GSPTexture(void* rcp, void* gfx_context, uintptr_t command);
 void F3DEX2_GSPGeometryMode(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GSPTriangle1WithIndexes(void* rcp, void* gfx_context, uint8_t vertex_index1, uint8_t vertex_index2, uint8_t vertex_index3);
+void F3DEX2_GSPTriangle1(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GSPTriangle2(void* rcp, void* gfx_context, uintptr_t command);
 
 void F3DEX2_GDPSetOtherModeL(void* rcp, void* gfx_context, uintptr_t command);
 void F3DEX2_GDPSetOtherModeH(void* rcp, void* gfx_context, uintptr_t command);

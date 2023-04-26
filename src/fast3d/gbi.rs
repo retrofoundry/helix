@@ -18,12 +18,8 @@ pub enum GBIResult {
     Continue,
 }
 
-pub type GBICommand = fn(
-    dp: &mut RDP,
-    rsp: &mut RSP,
-    gfx_context: &GraphicsContext,
-    command: *mut Gfx,
-) -> GBIResult;
+pub type GBICommand =
+    fn(dp: &mut RDP, rsp: &mut RSP, gfx_context: &GraphicsContext, command: *mut Gfx) -> GBIResult;
 
 pub struct GBI {
     pub gbi_opcode_table: HashMap<usize, GBICommand>,
