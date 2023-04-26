@@ -23,10 +23,10 @@ impl F3DEX2E {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gfx_context: &GraphicsContext,
-        mut command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let opcode = w0 >> 24;
 
@@ -34,17 +34,17 @@ impl F3DEX2E {
         let lry = get_cmd(w1, 0, 24) << 8 >> 8;
         let tile = get_cmd(w1, 24, 3);
 
-        command = unsafe { command.add(1) };
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        unsafe { *command = (*command).add(1); }
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let ulx = get_cmd(w0, 0, 24) << 8 >> 8;
         let uls = get_cmd(w1, 16, 16);
         let ult = get_cmd(w1, 0, 16);
 
-        command = unsafe { command.add(1) };
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        unsafe { *command = (*command).add(1); }
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let uly = get_cmd(w0, 0, 24) << 8 >> 8;
         let dsdx = get_cmd(w1, 16, 16);
@@ -71,17 +71,17 @@ impl F3DEX2E {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gfx_context: &GraphicsContext,
-        mut command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let lrx = get_cmd(w0, 0, 24) << 8 >> 8;
         let lry = get_cmd(w1, 0, 24) << 8 >> 8;
 
-        command = unsafe { command.add(1) };
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        unsafe { *command = (*command).add(1); }
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let ulx = get_cmd(w0, 0, 24) << 8 >> 8;
         let uly = get_cmd(w1, 0, 24) << 8 >> 8;
@@ -108,9 +108,9 @@ pub extern "C" fn F3DEX2E_GDPTextureRectangle(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
+    let mut command: *mut Gfx = command as *mut Gfx;
 
-    F3DEX2E::gdp_texture_rectangle(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    F3DEX2E::gdp_texture_rectangle(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -121,7 +121,7 @@ pub extern "C" fn F3DEX2E_GDPFillRectangle(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
+    let mut command: *mut Gfx = command as *mut Gfx;
 
-    F3DEX2E::gdp_fill_rectangle(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    F3DEX2E::gdp_fill_rectangle(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }

@@ -55,6 +55,7 @@ extern "C" {
 
 void* RCPCreate();
 void RCPReset(void* rcp);
+void RCPRunDL(void* rcp, void* gfx_context, uintptr_t command);
 
 // Gfx Getters and Setters
 void* GfxCreateContext(struct CGraphicsDevice *rapi);

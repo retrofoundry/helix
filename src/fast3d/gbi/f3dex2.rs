@@ -168,10 +168,10 @@ impl F3DEX2 {
         _rdp: &mut RDP,
         rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let params = get_cmd(w0, 0, 8) as u8 ^ G_MTX::PUSH as u8;
 
@@ -236,10 +236,9 @@ impl F3DEX2 {
         _rdp: &mut RDP,
         rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let num_matrices_to_pop = w1 / 64;
 
@@ -267,10 +266,10 @@ impl F3DEX2 {
         rdp: &mut RDP,
         rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let index: u8 = get_cmd(w0, 0, 8) as u8;
         let offset: u8 = get_cmd(w0, 8, 8) as u8 * 8;
@@ -301,10 +300,10 @@ impl F3DEX2 {
         _rdp: &mut RDP,
         rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let index = get_cmd(w0, 16, 8) as u8;
         let _offset: u16 = get_cmd(w0, 0, 16) as u16;
@@ -324,12 +323,12 @@ impl F3DEX2 {
 
     pub fn gsp_texture(
         rdp: &mut RDP,
-        rsp: &mut RSP,
+        _rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let scale_s = get_cmd(w1, 16, 16) as u16;
         let scale_t = get_cmd(w1, 0, 16) as u16;
@@ -351,10 +350,10 @@ impl F3DEX2 {
         rdp: &mut RDP,
         rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let vertex_count = get_cmd(w0, 12, 8) as u8;
         let mut write_index = get_cmd(w0, 1, 7) as u8 - get_cmd(w0, 12, 8) as u8;
@@ -515,10 +514,10 @@ impl F3DEX2 {
         _rdp: &mut RDP,
         rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let clear_bits = get_cmd(w0, 0, 24);
         let set_bits = w1;
@@ -694,9 +693,9 @@ impl F3DEX2 {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
+        let w0 = unsafe { (*(*command)).words.w0 };
 
         let vertex_id1 = get_cmd(w0, 16, 8) / 2;
         let vertex_id2 = get_cmd(w0, 8, 8) / 2;
@@ -709,10 +708,10 @@ impl F3DEX2 {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let vertex_id1 = get_cmd(w0, 16, 8) / 2;
         let vertex_id2 = get_cmd(w0, 8, 8) / 2;
@@ -748,10 +747,10 @@ impl F3DEX2 {
         _rdp: &mut RDP,
         _rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        mut command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         if get_cmd(w0, 16, 1) == 0 {
             // Push return address
@@ -760,7 +759,7 @@ impl F3DEX2 {
         } else {
             let new_addr = get_segmented_address(w1);
             let cmd = new_addr as *mut Gfx;
-            command = unsafe { cmd.sub(1) };
+            unsafe { *command = cmd.sub(1); }
             return GBIResult::Continue;
         }
     }
@@ -769,10 +768,10 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let shift = 31 - get_cmd(w0, 8, 8) - get_cmd(w0, 0, 8);
         let mask = get_cmd(w0, 0, 8) + 1;
@@ -785,10 +784,10 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let shift = 63 - get_cmd(w0, 8, 8) - get_cmd(w0, 0, 8);
         let mask = get_cmd(w0, 0, 8) + 1;
@@ -813,10 +812,10 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let _mode = get_cmd(w1, 24, 2);
         let ulx = get_cmd(w0, 12, 12);
@@ -842,10 +841,10 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         rdp.combine = CombineParams::decode(w0, w1);
 
@@ -856,10 +855,10 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let format = get_cmd(w0, 21, 3) as u8;
         let size = get_cmd(w0, 19, 2) as u8;
@@ -897,10 +896,10 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let tile = get_cmd(w1, 24, 3) as u8;
         let uls = get_cmd(w0, 12, 12) as u16;
@@ -924,10 +923,10 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let format = get_cmd(w0, 21, 3) as u8;
         let size = get_cmd(w0, 19, 2) as u8;
@@ -948,10 +947,9 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let tile = get_cmd(w1, 24, 3) as u8;
         let high_index = get_cmd(w1, 14, 10) as u16;
@@ -979,10 +977,10 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let tile = get_cmd(w1, 24, 3) as u8;
         let uls = get_cmd(w0, 12, 12);
@@ -1011,10 +1009,10 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let tile = get_cmd(w1, 24, 3) as u8;
         let uls = get_cmd(w0, 12, 12) as u16;
@@ -1050,10 +1048,9 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let r = get_cmd(w1, 24, 8) as u8;
         let g = get_cmd(w1, 16, 8) as u8;
@@ -1068,10 +1065,9 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let r = get_cmd(w1, 24, 8) as u8;
         let g = get_cmd(w1, 16, 8) as u8;
@@ -1086,10 +1082,9 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let r = get_cmd(w1, 24, 8) as u8;
         let g = get_cmd(w1, 16, 8) as u8;
@@ -1104,10 +1099,9 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let packed_color = w1 as u16;
         let color = R5G5B5A1::to_rgba(packed_color);
@@ -1120,10 +1114,9 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         rdp.depth_image = get_segmented_address(w1);
         GBIResult::Continue
@@ -1133,10 +1126,10 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let _format = get_cmd(w0, 21, 3);
         let _size = get_cmd(w0, 19, 2);
@@ -1318,10 +1311,10 @@ impl F3DEX2 {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gfx_context: &GraphicsContext,
-        mut command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let opcode = w0 >> 24;
 
@@ -1331,14 +1324,14 @@ impl F3DEX2 {
         let ulx = get_cmd(w1, 12, 12);
         let uly = get_cmd(w1, 0, 12);
 
-        command = unsafe { command.add(1) };
-        let w1 = unsafe { (*command).words.w1 };
+        unsafe { *command = (*command).add(1); }
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let uls = get_cmd(w1, 16, 16);
         let ult = get_cmd(w1, 0, 16);
 
-        command = unsafe { command.add(1) };
-        let w1: usize = unsafe { (*command).words.w1 };
+        unsafe { *command = (*command).add(1); }
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let dsdx = get_cmd(w1, 16, 16);
         let dtdy = get_cmd(w1, 0, 16);
@@ -1402,10 +1395,10 @@ impl F3DEX2 {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
 
         let ulx = get_cmd(w1, 12, 12);
         let uly = get_cmd(w1, 0, 12);

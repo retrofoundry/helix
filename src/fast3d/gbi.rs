@@ -18,8 +18,12 @@ pub enum GBIResult {
     Continue,
 }
 
-pub type GBICommand =
-    fn(dp: &mut RDP, rsp: &mut RSP, gfx_context: &GraphicsContext, command: *mut Gfx) -> GBIResult;
+pub type GBICommand = fn(
+    dp: &mut RDP,
+    rsp: &mut RSP,
+    gfx_context: &GraphicsContext,
+    command: &mut *mut Gfx,
+) -> GBIResult;
 
 pub struct GBI {
     pub gbi_opcode_table: HashMap<usize, GBICommand>,
@@ -37,10 +41,10 @@ impl GBI {
     }
 
     pub fn setup(&mut self) {
-        // TODO: Register some base handlers?
-
         if cfg!(feature = "f3dzex2") {
             f3dzex2::F3DZEX2::setup(self);
+        } else if cfg!(feature = "f3dex2e") {
+            f3dex2e::F3DEX2E::setup(self);
         } else if cfg!(feature = "f3dex2") {
             f3dex2::F3DEX2::setup(self);
         }
@@ -55,10 +59,9 @@ impl GBI {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gfx_context: &GraphicsContext,
-        command: *mut Gfx,
+        command: &mut *mut Gfx,
     ) -> GBIResult {
-        let w0 = unsafe { (*command).words.w0 };
-        let w1 = unsafe { (*command).words.w1 };
+        let w0 = unsafe { (*(*command)).words.w0 };
 
         let opcode = w0 >> 24;
         let cmd = self.gbi_opcode_table.get(&opcode);

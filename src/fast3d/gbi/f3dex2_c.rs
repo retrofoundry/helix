@@ -12,8 +12,8 @@ pub extern "C" fn F3DEX2_GSPMatrix(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gsp_matrix(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gsp_matrix(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -24,8 +24,8 @@ pub extern "C" fn F3DEX2_GSPPopMatrix(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gsp_pop_matrix(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gsp_pop_matrix(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -36,8 +36,8 @@ pub extern "C" fn F3DEX2_GSPVertex(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gsp_vertex(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gsp_vertex(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -48,8 +48,8 @@ pub extern "C" fn F3DEX2_GSPMoveWord(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gsp_moveword(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gsp_moveword(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -60,8 +60,8 @@ pub extern "C" fn F3DEX2_GSPMoveMem(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gsp_movemem(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gsp_movemem(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -72,8 +72,8 @@ pub extern "C" fn F3DEX2_GSPTexture(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gsp_texture(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gsp_texture(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -84,8 +84,8 @@ pub extern "C" fn F3DEX2_GSPGeometryMode(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gsp_geometry_mode(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gsp_geometry_mode(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -96,8 +96,8 @@ pub extern "C" fn F3DEX2_GDPSetOtherModeL(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gdp_set_other_mode_l(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gdp_set_other_mode_l(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -108,8 +108,8 @@ pub extern "C" fn F3DEX2_GDPSetOtherModeH(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gdp_set_other_mode_h(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gdp_set_other_mode_h(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -120,8 +120,8 @@ pub extern "C" fn F3DEX2_GDPSetScissor(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gdp_set_scissor(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gdp_set_scissor(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -132,8 +132,8 @@ pub extern "C" fn F3DEX2_GDPSetCombine(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gdp_set_combine(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gdp_set_combine(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -144,8 +144,8 @@ pub extern "C" fn F3DEX2_GDPSetTile(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gdp_set_tile(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gdp_set_tile(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -156,8 +156,8 @@ pub extern "C" fn F3DEX2_GDPLoadBlock(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gdp_load_block(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gdp_load_block(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -168,8 +168,8 @@ pub extern "C" fn F3DEX2_GDPLoadTile(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gdp_load_tile(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gdp_load_tile(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -180,8 +180,8 @@ pub extern "C" fn F3DEX2_GDPSetTileSize(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gdp_set_tile_size(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gdp_set_tile_size(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -192,8 +192,8 @@ pub extern "C" fn F3DEX2_GDPSetTextureImage(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gdp_set_texture_image(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gdp_set_texture_image(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -204,8 +204,8 @@ pub extern "C" fn F3DEX2_GDPLoadTLUT(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gdp_load_tlut(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gdp_load_tlut(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -216,8 +216,8 @@ pub extern "C" fn F3DEX2_GDPSetEnvColor(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gdp_set_env_color(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gdp_set_env_color(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -228,8 +228,8 @@ pub extern "C" fn F3DEX2_GDPSetPrimColor(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gdp_set_prim_color(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gdp_set_prim_color(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -240,8 +240,8 @@ pub extern "C" fn F3DEX2_GDPSetFogColor(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gdp_set_fog_color(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gdp_set_fog_color(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -252,8 +252,8 @@ pub extern "C" fn F3DEX2_GDPSetFillColor(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gdp_set_fill_color(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gdp_set_fill_color(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -264,8 +264,8 @@ pub extern "C" fn F3DEX2_GDPSetDepthImage(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gdp_set_depth_image(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gdp_set_depth_image(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -276,8 +276,8 @@ pub extern "C" fn F3DEX2_GDPSetColorImage(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gdp_set_color_image(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gdp_set_color_image(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -288,8 +288,8 @@ pub extern "C" fn F3DEX2_GSPTriangle1(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gsp_tri1(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gsp_tri1(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -300,8 +300,8 @@ pub extern "C" fn F3DEX2_GSPTriangle2(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
-    F3DEX2::gsp_tri2(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    let mut command: *mut Gfx = command as *mut Gfx;
+    F3DEX2::gsp_tri2(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -332,9 +332,9 @@ pub extern "C" fn F3DEX2_GDPTextureRectangle(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
+    let mut command: *mut Gfx = command as *mut Gfx;
 
-    F3DEX2::gdp_texture_rectangle(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    F3DEX2::gdp_texture_rectangle(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }
 
 #[no_mangle]
@@ -345,7 +345,7 @@ pub extern "C" fn F3DEX2_GDPFillRectangle(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    let command: *mut Gfx = command as *mut Gfx;
+    let mut command: *mut Gfx = command as *mut Gfx;
 
-    F3DEX2::gdp_fill_rectangle(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+    F3DEX2::gdp_fill_rectangle(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }

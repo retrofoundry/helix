@@ -5,45 +5,7 @@ use super::{
     graphics::GraphicsContext,
     rdp::RDP,
     rsp::RSP,
-    utils::{color_combiner::CombineParams, texture::TextureState},
 };
-
-pub struct DrawCall {
-    pub geometry_mode: u32,
-    pub texture_state: TextureState,
-    pub other_mode_l: u32,
-    pub other_mode_h: u32,
-    pub combine: CombineParams,
-
-    pub env_color: [u8; 4],
-    pub fog_color: [u8; 4],
-    pub prim_color: [u8; 4],
-    pub fill_color: [u8; 4],
-
-    pub texture_indices: Vec<usize>,
-
-    pub first_index: usize,
-    pub num_indices: usize,
-}
-
-impl DrawCall {
-    pub fn new() -> Self {
-        DrawCall {
-            geometry_mode: 0,
-            texture_state: TextureState::EMPTY,
-            other_mode_l: 0,
-            other_mode_h: 0,
-            combine: CombineParams::ZERO,
-            env_color: [0; 4],
-            fog_color: [0; 4],
-            prim_color: [0; 4],
-            fill_color: [0; 4],
-            texture_indices: Vec::new(),
-            first_index: 0,
-            num_indices: 0,
-        }
-    }
-}
 
 pub struct RCP {
     gbi: GBI,
@@ -71,38 +33,29 @@ impl RCP {
     /// This funtion is called to process a work buffer.
     /// It takes in a pointer to the start of the work buffer and will
     /// process until it hits a `G_ENDDL` inidicating the end.
-    pub fn run(&mut self, gfx_context: &GraphicsContext, commands: usize, commands_size: usize) {
+    pub fn run(&mut self, gfx_context: &GraphicsContext, commands: usize) {
         self.reset();
 
         // self.rdp.setup_draw();
-        self.run_dl(gfx_context, commands, commands_size);
+        self.run_dl(gfx_context, commands);
         // self.rdp.flush();
     }
 
-    // commands_size is in bytes
-    fn run_dl(&mut self, gfx_context: &GraphicsContext, commands: usize, commands_size: usize) {
+    fn run_dl(&mut self, gfx_context: &GraphicsContext, commands: usize) {
         let mut command = commands as *mut Gfx;
-        let commands_end = commands + commands_size;
-
-        assert!(commands < commands_end);
 
         loop {
             match self
                 .gbi
-                .handle_command(&mut self.rdp, &mut self.rsp, gfx_context, command)
+                .handle_command(&mut self.rdp, &mut self.rsp, gfx_context, &mut command)
             {
-                GBIResult::Recurse(new_command) => {
-                    let new_cmd_size = commands_end - new_command;
-                    self.run_dl(gfx_context, new_command, new_cmd_size)
-                }
-                GBIResult::Unknown(opcode) => {
-                    trace!("Unknown GBI command: {:#x}", opcode);
-                }
+                GBIResult::Recurse(new_command) => self.run_dl(gfx_context, new_command),
+                GBIResult::Unknown(opcode) => trace!("Unknown GBI command: {:#x}", opcode),
                 GBIResult::Return => return,
                 GBIResult::Continue => {}
             }
 
-            command = unsafe { command.add(1) };
+            unsafe { command = command.add(1) };
         }
     }
 }
@@ -119,4 +72,15 @@ pub extern "C" fn RCPReset(rcp: Option<&mut RCP>) {
 pub extern "C" fn RCPCreate() -> Box<RCP> {
     let rcp = RCP::new();
     Box::new(rcp)
+}
+
+#[no_mangle]
+pub extern "C" fn RCPRunDL(
+    rcp: Option<&mut RCP>,
+    gfx_context: Option<&GraphicsContext>,
+    commands: usize,
+) {
+    let rcp = rcp.unwrap();
+    let gfx_context = gfx_context.unwrap();
+    rcp.run_dl(gfx_context, commands);
 }
