@@ -6,6 +6,7 @@ use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState, CompareFunct
 use super::{
     gbi::defines::Viewport,
     graphics::{CullMode, GraphicsContext, ShaderProgram},
+    rcp::RCP,
     rsp::{RSPGeometry, StagingVertex},
     utils::{
         color_combiner::{
@@ -801,4 +802,31 @@ impl RDP {
     pub fn scaled_y(&self) -> f32 {
         self.output_dimensions.height as f32 / SCREEN_HEIGHT
     }
+}
+
+// MARK: - C Bridge
+
+#[no_mangle]
+pub extern "C" fn RDPSetOutputDimensions(rcp: Option<&mut RCP>, dimensions: OutputDimensions) {
+    let rcp = rcp.unwrap();
+    rcp.rdp.output_dimensions = dimensions;
+}
+
+#[no_mangle]
+pub extern "C" fn RDPLookupOrCreateShaderProgram(
+    rcp: Option<&mut RCP>,
+    gfx_context: Option<&mut GraphicsContext>,
+    shader_id: u32,
+) {
+    let rcp = rcp.unwrap();
+    let gfx_context = gfx_context.unwrap();
+    rcp.rdp
+        .lookup_or_create_shader_program(gfx_context, shader_id);
+}
+
+#[no_mangle]
+pub extern "C" fn RDPFlush(rcp: Option<&mut RCP>, gfx_context: Option<&mut GraphicsContext>) {
+    let rcp = rcp.unwrap();
+    let gfx_context = gfx_context.unwrap();
+    rcp.rdp.flush(gfx_context);
 }

@@ -127,92 +127,11 @@ void F3DEX2E_GDPTextureRectangle(void* rcp, void* gfx_context, uintptr_t command
 void F3DEX2_GDPFillRectangle(void* rcp, void* gfx_context, uintptr_t command);
 void F3DEX2E_GDPFillRectangle(void* rcp, void* gfx_context, uintptr_t command);
 
-// RSP Getters and Setters
-uint32_t RSPGetGeometryMode(void* rcp);
-void RSPSetGeometryMode(void* rcp, uint32_t value);
-
-struct StagingVertex* RSPGetStagingVertexAtIndexPtr(void* rcp, uint8_t index);
-
 // RDP Getters and Setters
+
 void RDPSetOutputDimensions(void* rcp, struct OutputDimensions dimensions);
-
-void RDPSetViewportOrScissorChanged(void* rcp, bool value);
-
-struct Rect RDPGetViewport(void* rcp);
-struct Rect* RDPGetViewportPtr(void* rcp);
-void RDPSetRenderingStateViewport(void* rcp, struct Rect viewport);
-void RDPSetViewport(void* rcp, struct Rect viewport);
-struct Rect* RDPGetScissorPtr(void* rcp);
-
-void RDPSetRenderingStateScissor(void* rcp, struct Rect scissor);
-
-void RDPFlush(void* rcp, void* gfx_context);
-
-void RDPAddToVBOAndIncrement(void* rcp, float value);
-size_t RDPIncrementTriangleCountAndReturn(void* rcp);
-
-bool RDPLookupTexture(void* rcp, void* gfx_context, int tile, const uint8_t *orig_addr, uint32_t fmt, uint32_t size);
-
-void RDPLookupOrCreateColorCombiner(void* rcp, void* gfx_context, uint32_t cc_id);
-struct ColorCombiner* RDPGetColorCombiner(void* rcp, uint32_t cc_id);
-
 void RDPLookupOrCreateShaderProgram(void* rcp, void* gfx_context, uint32_t shader_id);
-
-struct ShaderProgram* RDPGetRenderingStateShaderProgram(void* rcp);
-void RDPSetRenderingStateShaderProgram(void* rcp, struct ShaderProgram *prg);
-
-struct Texture* RDPGetRenderingStateTextureAtIndex(void* rcp, int index);
-
-bool RDPViewportDoesNotEqualRenderingStateViewport(void* rcp);
-bool RDPScissorDoesNotEqualRenderingStateScissor(void* rcp);
-
-
-u_int32_t RDPGetOtherModeL(void* rcp);
-u_int32_t RDPGetOtherModeH(void* rcp);
-void RDPSetOtherModeH(void* rcp, uint32_t value);
-
-u_int32_t RDPGetCombineU32(void* rcp);
-void* RDPGetCombine(void* rcp);
-void RDPSetCombine(void* rcp, void* value);
-
-void RDPUpdateRenderState(void* rcp, void* gfx_context, uint8_t vertex_id1, uint8_t vertex_id2, uint8_t vertex_id3);
-
-bool RDPGetTextureChangedAtIndex(void* rcp, uint8_t index);
-void RDPSetTextureChangedAtIndex(void* rcp, uint8_t index, bool value);
-
-uint16_t RDPGetTileDescriptorTMEM(void* rcp, uint8_t index);
-uint16_t RDPGetCurrentTileDescriptorULS(void* rcp);
-uint16_t RDPGetCurrentTileDescriptorULT(void* rcp);
-uint16_t RDPGetCurrentTileDescriptorLRS(void* rcp);
-uint16_t RDPGetCurrentTileDescriptorLRT(void* rcp);
-uint8_t RDPGetCurrentTileDescriptorCMS(void* rcp);
-uint8_t RDPGetCurrentTileDescriptorCMT(void* rcp);
-uint8_t RDPGetCurrentTileDescriptorFormat(void* rcp);
-uint8_t RDPGetCurrentTileDescriptorSize(void* rcp);
-
-uint32_t RDPGetCurrentTileDescriptorLineSizeBytes(void* rcp);
-
-void RDPSetTMEMMap(void* rcp, uint8_t tile_number, const uint8_t* address);
-uint32_t RDPGetTMEMMapEntrySize(void* rcp, uint8_t tile_number);
-const uint8_t* RDPGetTMEMMapEntryAddress(void* rcp, uint8_t tile_number);
-
-const uint8_t* RDPGetTextureImageStateAddress(void* rcp);
-uint8_t RDPGetTextureImageStateSize(void* rcp);
-
-const uint8_t* RDPPaletteAtTMEMIndex(void* rcp, uint8_t index);
-
-void RDPImportTileTexture(void* rcp, void* gfx_context, int tile);
-void RDPFlushTextures(void* rcp, void* gfx_context);
-
-struct RGBA* RDPGetFogColor(void* rcp);
-struct RGBA* RDPGetFillColor(void* rcp);
-struct RGBA* RDPGetPrimColor(void* rcp);
-struct RGBA* RDPGetEnvColor(void* rcp);
-
-uintptr_t RDPGetDepthImage(void* rcp);
-uintptr_t RDPGetColorImage(void* rcp);
-
-void RDPSetCombineDecode(void* rcp, uintptr_t w0, uintptr_t w1);
+void RDPFlush(void* rcp, void* gfx_context);
 
 #ifdef __cplusplus
 }
