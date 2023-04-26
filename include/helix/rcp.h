@@ -89,12 +89,13 @@ void F3DEX2_GDPSetFillColor(void* rcp, void* gfx_context, uintptr_t command);
 void F3DEX2_GDPSetDepthImage(void* rcp, void* gfx_context, uintptr_t command);
 void F3DEX2_GDPSetColorImage(void* rcp, void* gfx_context, uintptr_t command);
 void F3DEX2_GDPTextureRectangle(void* rcp, void* gfx_context, uintptr_t command);
-void F3DEX2E_GDPTextureRectangle(void* rcp, void* gfx_context, uintptr_t command);
 void F3DEX2_GDPFillRectangle(void* rcp, void* gfx_context, uintptr_t command);
+
+// F3DEX2E Commands
+void F3DEX2E_GDPTextureRectangle(void* rcp, void* gfx_context, uintptr_t command);
 void F3DEX2E_GDPFillRectangle(void* rcp, void* gfx_context, uintptr_t command);
 
 // RDP Getters and Setters
-
 void RDPSetOutputDimensions(void* rcp, struct OutputDimensions dimensions);
 void RDPLookupOrCreateShaderProgram(void* rcp, void* gfx_context, uint32_t shader_id);
 void RDPFlush(void* rcp, void* gfx_context);

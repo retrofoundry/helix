@@ -316,7 +316,7 @@ impl Gui {
 type OnDraw = unsafe extern "C" fn();
 
 #[no_mangle]
-pub extern "C" fn GUICreate(title_raw: *const i8, draw_menu: Option<OnDraw>) -> Box<Gui> {
+pub unsafe extern "C" fn GUICreate(title_raw: *const i8, draw_menu: Option<OnDraw>) -> Box<Gui> {
     let title_str: &CStr = unsafe { CStr::from_ptr(title_raw) };
     let title: &str = str::from_utf8(title_str.to_bytes()).unwrap();
 

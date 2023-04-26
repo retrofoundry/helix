@@ -109,7 +109,7 @@ impl F3DEX2 {
     pub const G_MV_LIGHT: u8 = 10;
     pub const G_MV_POINT: u8 = 12;
     pub const G_MV_MATRIX: u8 = 14;
-    pub const G_MVO_LOOKATX: u8 = (0 * 24);
+    pub const G_MVO_LOOKATX: u8 = 0; // (0 * 24);
     pub const G_MVO_LOOKATY: u8 = (1 * 24);
     pub const G_MVO_L0: u8 = (2 * 24);
     pub const G_MVO_L1: u8 = (3 * 24);

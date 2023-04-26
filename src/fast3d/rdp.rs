@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use log::trace;
-use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState, CompareFunction, Face};
+use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState, CompareFunction};
 
 use super::{
     gbi::defines::Viewport,
