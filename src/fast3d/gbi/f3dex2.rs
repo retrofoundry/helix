@@ -1367,11 +1367,8 @@ impl F3DEX2 {
             return GBIResult::Continue;
         }
 
-        let cycle_type = (rdp.other_mode_h >> OtherModeH_Layout::G_MDSFT_CYCLETYPE as u32) & 0x03;
-
-        if cycle_type == OtherModeHCycleType::G_CYC_COPY as u32
-            || cycle_type == OtherModeHCycleType::G_CYC_FILL as u32
-        {
+        let cycle_type = RDP::get_cycle_type_from_other_mode_h(rdp.other_mode_h);
+        if cycle_type == OtherModeHCycleType::G_CYC_COPY || cycle_type == OtherModeHCycleType::G_CYC_FILL {
             // Per documentation one extra pixel is added in this modes to each edge
             lrx += 1 << 2;
             lry += 1 << 2;
@@ -1379,7 +1376,7 @@ impl F3DEX2 {
 
         for i in MAX_VERTICES..MAX_VERTICES + 4 {
             let v = &mut rsp.vertex_table[i];
-            v.color = rdp.fill_color;
+            v.color.copy_from_slice(&rdp.fill_color);
         }
 
         let saved_combine_mode = rdp.combine;
