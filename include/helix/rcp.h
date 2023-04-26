@@ -5,7 +5,6 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <stdint.h>
 #include <stdbool.h>
 
 struct ShaderProgram;
@@ -45,42 +44,9 @@ struct CGraphicsDevice {
     void (*finish_render)(void);
 };
 
-struct Texture {
-    uintptr_t texture_addr;
-    uint8_t fmt, size;
-
-    uint32_t texture_id;
-    uint8_t cms, cmt;
-
-    bool linear_filter;
-};
-
-struct ColorCombiner {
-    uint32_t cc_id;
-    struct ShaderProgram *prg;
-    uint8_t shader_input_mapping[2][4];
-};
-
-struct Light_t;
-
-struct Rect {
-    uint16_t x, y, width, height;
-};
-
 struct OutputDimensions {
     uint32_t width, height;
     float aspect_ratio;
-};
-
-struct RGBA {
-    uint8_t r, g, b, a;
-};
-
-struct StagingVertex {
-    float x, y, z, w;
-    float u, v;
-    struct RGBA color;
-    uint8_t clip_reject;
 };
 
 #ifdef __cplusplus
