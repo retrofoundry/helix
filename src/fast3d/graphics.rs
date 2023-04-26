@@ -10,6 +10,15 @@ pub struct ShaderProgram {
     // .. ommiting the rest
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CullMode {
+    None = 0x00000000,
+    Front = 0x00000001,
+    Back = 0x00000002,
+    FrontAndBack = 0x00000003,
+}
+
 pub trait GraphicsAPI {
     fn as_any(&self) -> &dyn Any;
 
@@ -30,6 +39,7 @@ pub trait GraphicsAPI {
     fn set_viewport(&self, x: i32, y: i32, width: i32, height: i32);
     fn set_scissor(&self, x: i32, y: i32, width: i32, height: i32);
     fn set_blend_state(&self, blend_state: BlendState);
+    fn set_cull_mode(&self, cull_mode: CullMode);
     fn draw_triangles(&self, vertices: *const f32, count: usize, stride: usize);
     fn init(&self);
     fn on_resize(&self);
@@ -82,6 +92,7 @@ impl GraphicsAPI for DummyGraphicsDevice {
     fn set_viewport(&self, _x: i32, _y: i32, _width: i32, _height: i32) {}
     fn set_scissor(&self, _x: i32, _y: i32, _width: i32, _height: i32) {}
     fn set_blend_state(&self, _blend_state: BlendState) {}
+    fn set_cull_mode(&self, _cull_mode: CullMode) {}
     fn draw_triangles(&self, _vertices: *const f32, _count: usize, _stride: usize) {}
     fn init(&self) {}
     fn on_resize(&self) {}
@@ -111,6 +122,7 @@ pub struct CGraphicsDevice {
     pub set_viewport: extern "C" fn(i32, i32, i32, i32),
     pub set_scissor: extern "C" fn(i32, i32, i32, i32),
     pub set_blend_state: extern "C" fn(BlendState),
+    pub set_cull_mode: extern "C" fn(CullMode),
     pub draw_triangles: extern "C" fn(*const f32, usize, usize),
     pub init: extern "C" fn(),
     pub on_resize: extern "C" fn(),
@@ -200,6 +212,10 @@ impl GraphicsAPI for ExternGraphicsDevice {
 
     fn set_blend_state(&self, blend_state: BlendState) {
         unsafe { ((*self.inner).set_blend_state)(blend_state) }
+    }
+
+    fn set_cull_mode(&self, cull_mode: CullMode) {
+        unsafe { ((*self.inner).set_cull_mode)(cull_mode) }
     }
 
     fn draw_triangles(&self, vertices: *const f32, count: usize, stride: usize) {

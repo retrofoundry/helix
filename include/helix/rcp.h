@@ -11,6 +11,13 @@
 struct ShaderProgram;
 struct WGPUBlendState;
 
+typedef enum CullMode {
+    CullMode_None = 0x00000000,
+    CullMode_Front = 0x00000001,
+    CullMode_Back = 0x00000002,
+    CullMode_FrontAndBack = 0x00000003,
+} CullMode;
+
 struct CGraphicsDevice {
     bool (*z_is_from_0_to_1)(void);
     void (*unload_shader)(struct ShaderProgram *old_prg);
@@ -29,6 +36,7 @@ struct CGraphicsDevice {
     void (*set_viewport)(int x, int y, int width, int height);
     void (*set_scissor)(int x, int y, int width, int height);
     void (*set_blend_components)(struct WGPUBlendState component);
+    void (*set_cull_mode)(CullMode mode);
     void (*draw_triangles)(float buf_vbo[], size_t buf_vbo_len, size_t buf_vbo_num_tris);
     void (*init)(void);
     void (*on_resize)(void);

@@ -544,43 +544,6 @@ impl F3DEX2 {
             return GBIResult::Continue;
         }
 
-        if (rsp.geometry_mode & RSPGeometry::G_CULL_BOTH as u32) != 0 {
-            let dx1 =
-                vertex1.position.x / vertex1.position.w - vertex2.position.x / vertex2.position.w;
-            let dy1 =
-                vertex1.position.y / vertex1.position.w - vertex2.position.y / vertex2.position.w;
-            let dx2 =
-                vertex3.position.x / vertex3.position.w - vertex2.position.x / vertex2.position.w;
-            let dy2 =
-                vertex3.position.y / vertex3.position.w - vertex2.position.y / vertex2.position.w;
-            let mut cross = dx1 * dy2 - dy1 * dx2;
-
-            // If any verts are past any clipping plane..
-            if (vertex1.position.w < 0.0) ^ (vertex2.position.w < 0.0) ^ (vertex3.position.w < 0.0)
-            {
-                // If one vertex lies behind the eye, negating cross will give the correct result.
-                // If all vertices lie behind the eye, the triangle will be rejected anyway.
-                cross = -cross;
-            }
-
-            match rsp.geometry_mode & RSPGeometry::G_CULL_BOTH as u32 {
-                geometry_mode if geometry_mode == RSPGeometry::G_CULL_FRONT as u32 => {
-                    if cross <= 0.0 {
-                        return GBIResult::Continue;
-                    }
-                }
-                geometry_mode if geometry_mode == RSPGeometry::G_CULL_BACK as u32 => {
-                    if cross >= 0.0 {
-                        return GBIResult::Continue;
-                    }
-                }
-                geometry_mode if geometry_mode == RSPGeometry::G_CULL_BOTH as u32 => {
-                    return GBIResult::Continue;
-                }
-                _ => {}
-            }
-        }
-
         rdp.update_render_state(gfx_context, rsp.geometry_mode, &vertex_array);
 
         // TODO: Produce draw calls for RDP to process later?

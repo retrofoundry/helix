@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 use log::trace;
-use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState, CompareFunction};
+use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState, CompareFunction, Face};
 
 use super::{
     gbi::defines::Viewport,
-    graphics::{GraphicsContext, ShaderProgram},
+    graphics::{CullMode, GraphicsContext, ShaderProgram},
     rsp::{RSPGeometry, StagingVertex},
     utils::{
         color_combiner::{
@@ -74,12 +74,6 @@ impl OutputDimensions {
     };
 }
 
-pub struct BlendResult {
-    pub blend_state: BlendState,
-    pub use_alpha: bool,
-    pub use_texture_edge: bool,
-}
-
 pub struct RenderingState {
     pub depth_compare: CompareFunction,
     pub depth_test: bool,
@@ -90,6 +84,7 @@ pub struct RenderingState {
     pub scissor: Rect,
     pub shader_program: *mut ShaderProgram,
     pub textures: [Texture; 2],
+    pub cull_mode: CullMode,
 }
 
 impl RenderingState {
@@ -103,6 +98,7 @@ impl RenderingState {
         scissor: Rect::ZERO,
         shader_program: std::ptr::null_mut(),
         textures: [Texture::EMPTY; 2],
+        cull_mode: CullMode::None,
     };
 }
 
@@ -674,7 +670,6 @@ impl RDP {
 
         if do_blend {
             assert!(src_color == BlendParamPMColor::G_BL_CLR_IN as u32);
-            let mut use_texture_edge = false;
 
             let blend_src_factor: BlendFactor;
             if src_factor == BlendParamA::G_BL_0 as u32 {
@@ -684,7 +679,6 @@ impl RDP {
             {
                 // this is technically "coverage", admitting blending on edges
                 blend_src_factor = BlendFactor::One;
-                use_texture_edge = true;
             } else {
                 blend_src_factor = BlendFactor::SrcAlpha;
             }
@@ -716,6 +710,21 @@ impl RDP {
         }
     }
 
+    pub fn translate_cull_mode(geometry_mode: u32) -> CullMode {
+        let cull_front = (geometry_mode & RSPGeometry::G_CULL_FRONT as u32) != 0;
+        let cull_back = (geometry_mode & RSPGeometry::G_CULL_BACK as u32) != 0;
+
+        if cull_front && cull_back {
+            CullMode::FrontAndBack
+        } else if cull_front {
+            CullMode::Front
+        } else if cull_back {
+            CullMode::Back
+        } else {
+            CullMode::None
+        }
+    }
+
     pub fn update_render_state(
         &mut self,
         gfx_context: &GraphicsContext,
@@ -727,6 +736,13 @@ impl RDP {
             self.flush(gfx_context);
             gfx_context.api.set_depth_test(depth_test);
             self.rendering_state.depth_test = depth_test;
+        }
+
+        let cull_mode = RDP::translate_cull_mode(geometry_mode);
+        if cull_mode != self.rendering_state.cull_mode {
+            self.flush(gfx_context);
+            gfx_context.api.set_cull_mode(cull_mode);
+            self.rendering_state.cull_mode = cull_mode;
         }
 
         let blend_state = self.translate_blend_mode(gfx_context, self.other_mode_l);
