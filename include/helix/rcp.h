@@ -122,6 +122,8 @@ void F3DEX2_GDPSetFogColor(void* rcp, void* gfx_context, uintptr_t command);
 void F3DEX2_GDPSetFillColor(void* rcp, void* gfx_context, uintptr_t command);
 void F3DEX2_GDPSetDepthImage(void* rcp, void* gfx_context, uintptr_t command);
 void F3DEX2_GDPSetColorImage(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2_GDPTextureRectangle(void* rcp, void* gfx_context, uintptr_t command);
+void F3DEX2E_GDPTextureRectangle(void* rcp, void* gfx_context, uintptr_t command);
 
 // RSP Getters and Setters
 uint32_t RSPGetGeometryMode(void* rcp);

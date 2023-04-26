@@ -2,7 +2,7 @@ use std::slice;
 
 use log::trace;
 
-use super::defines::{Gfx, Light, Viewport, Vtx, G_MTX};
+use super::defines::{Gfx, Light, Viewport, Vtx, G_MTX, G_TEXRECT, G_TEXRECTFLIP};
 use super::utils::{get_cmd, get_segmented_address};
 use super::{
     super::{
@@ -17,7 +17,7 @@ use crate::fast3d::rdp::{
     AlphaCompare, BlendParamB, BlendParamPMColor, OtherModeLayoutL, MAX_BUFFERED,
 };
 use crate::fast3d::utils::color_combiner::{
-    CCMUX, SHADER_OPT_ALPHA, SHADER_OPT_FOG, SHADER_OPT_NOISE, SHADER_OPT_TEXTURE_EDGE,
+    ACMUX, CCMUX, SHADER_OPT_ALPHA, SHADER_OPT_FOG, SHADER_OPT_NOISE, SHADER_OPT_TEXTURE_EDGE,
 };
 use crate::{
     extensions::matrix::{calculate_normal_dir, matrix_from_fixed_point, matrix_multiply},
@@ -157,6 +157,8 @@ impl GBIDefinition for F3DEX2 {
         gbi.register(G_SET::FILLCOLOR as usize, F3DEX2::gdp_set_fill_color);
         gbi.register(G_SET::DEPTHIMG as usize, F3DEX2::gdp_set_depth_image);
         gbi.register(G_SET::COLORIMG as usize, F3DEX2::gdp_set_color_image);
+        gbi.register(G_TEXRECT as usize, F3DEX2::gdp_texture_rectangle);
+        gbi.register(G_TEXRECTFLIP as usize, F3DEX2::gdp_texture_rectangle);
     }
 }
 
@@ -1143,7 +1145,15 @@ impl F3DEX2 {
         GBIResult::Continue
     }
 
-    pub fn draw_rectangle(rdp: &mut RDP, rsp: &mut RSP, ulx: i32, uly: i32, lrx: i32, lry: i32) {
+    pub fn draw_rectangle(
+        rdp: &mut RDP,
+        rsp: &mut RSP,
+        gfx_context: &GraphicsContext,
+        ulx: i32,
+        uly: i32,
+        lrx: i32,
+        lry: i32,
+    ) {
         let saved_other_mode_h = rdp.other_mode_h;
         let cycle_type = RDP::get_cycle_type_from_other_mode_h(rdp.other_mode_h);
 
@@ -1208,8 +1218,22 @@ impl F3DEX2 {
         rdp.viewport_or_scissor_changed = true;
         rsp.geometry_mode = 0;
 
-        // TODO: call sp_tri1
-        // TODO: call sp_tri1
+        F3DEX2::gsp_tri1_raw(
+            rdp,
+            rsp,
+            gfx_context,
+            MAX_VERTICES + 0,
+            MAX_VERTICES + 1,
+            MAX_VERTICES + 3,
+        );
+        F3DEX2::gsp_tri1_raw(
+            rdp,
+            rsp,
+            gfx_context,
+            MAX_VERTICES + 1,
+            MAX_VERTICES + 2,
+            MAX_VERTICES + 3,
+        );
 
         rsp.geometry_mode = geometry_mode_saved;
         rdp.viewport = viewport_saved;
@@ -1218,6 +1242,120 @@ impl F3DEX2 {
         if cycle_type == OtherModeHCycleType::G_CYC_COPY {
             rdp.other_mode_h = saved_other_mode_h;
         }
+    }
+
+    pub fn gdp_texture_rectangle_raw(
+        rdp: &mut RDP,
+        rsp: &mut RSP,
+        gfx_context: &GraphicsContext,
+        ulx: i32,
+        uly: i32,
+        mut lrx: i32,
+        mut lry: i32,
+        _tile: u8,
+        uls: i16,
+        ult: i16,
+        mut dsdx: i16,
+        mut dtdy: i16,
+        flipped: bool,
+    ) -> GBIResult {
+        let saved_combine_mode = rdp.combine;
+        if (rdp.other_mode_h >> OtherModeH_Layout::G_MDSFT_CYCLETYPE as u32) & 0x3
+            == OtherModeHCycleType::G_CYC_COPY as u32
+        {
+            // Per RDP Command Summary Set Tile's shift s and this dsdx should be set to 4 texels
+            // Divide by 4 to get 1 instead
+            dsdx >>= 2;
+
+            // Color combiner is turned off in copy mode
+            let rhs = (CCMUX::TEXEL0 as usize & 0b111) << 15 | (ACMUX::TEXEL0 as usize & 0b111) << 9;
+            rdp.combine = CombineParams::decode(0, rhs);
+
+            // Per documentation one extra pixel is added in this modes to each edge
+            lrx += 1 << 2;
+            lry += 1 << 2;
+        }
+
+        // uls and ult are S10.5
+        // dsdx and dtdy are S5.10
+        // lrx, lry, ulx, uly are U10.2
+        // lrs, lrt are S10.5
+        if flipped {
+            dsdx = -dsdx;
+            dtdy = -dtdy;
+        }
+
+        let width = if !flipped { lrx - ulx } else { lry - uly };
+        let height = if !flipped { lry - uly } else { lrx - ulx };
+        let lrs: i32 = ((uls << 7) as i32 + (dsdx as i32) * (width as i32)) >> 7;
+        let lrt: i32 = ((ult << 7) as i32 + (dtdy as i32) * (height as i32)) >> 7;
+
+        let ul = &mut rsp.vertex_table[MAX_VERTICES + 0];
+        ul.uv[0] = uls as f32;
+        ul.uv[1] = ult as f32;
+
+        let lr = &mut rsp.vertex_table[MAX_VERTICES + 2];
+        lr.uv[0] = lrs as f32;
+        lr.uv[1] = lrt as f32;
+
+        let ll = &mut rsp.vertex_table[MAX_VERTICES + 1];
+        ll.uv[0] = if !flipped { uls as f32 } else { lrs as f32 };
+        ll.uv[1] = if !flipped { lrt as f32 } else { ult as f32 };
+
+        let ur = &mut rsp.vertex_table[MAX_VERTICES + 3];
+        ur.uv[0] = if !flipped { lrs as f32 } else { uls as f32 };
+        ur.uv[1] = if !flipped { ult as f32 } else { lrt as f32 };
+
+        F3DEX2::draw_rectangle(rdp, rsp, gfx_context, ulx, uly, lrx, lry);
+        rdp.combine = saved_combine_mode;
+
+        GBIResult::Continue
+    }
+
+    pub fn gdp_texture_rectangle(
+        rdp: &mut RDP,
+        rsp: &mut RSP,
+        gfx_context: &GraphicsContext,
+        mut command: *mut Gfx,
+    ) -> GBIResult {
+        let w0 = unsafe { (*command).words.w0 };
+        let w1 = unsafe { (*command).words.w1 };
+
+        let opcode = w0 >> 24;
+
+        let lrx = get_cmd(w0, 12, 12);
+        let lry = get_cmd(w0, 0, 12);
+        let tile = get_cmd(w1, 24, 3);
+        let ulx = get_cmd(w1, 12, 12);
+        let uly = get_cmd(w1, 0, 12);
+
+        command = unsafe { command.add(1) };
+        let w1 = unsafe { (*command).words.w1 };
+
+        let uls = get_cmd(w1, 16, 16);
+        let ult = get_cmd(w1, 0, 16);
+
+        command = unsafe { command.add(1) };
+        let w1: usize = unsafe { (*command).words.w1 };
+
+        let dsdx = get_cmd(w1, 16, 16);
+        let dtdy = get_cmd(w1, 0, 16);
+
+        F3DEX2::gdp_texture_rectangle_raw(
+            rdp,
+            rsp,
+            gfx_context,
+            ulx as i32,
+            uly as i32,
+            lrx as i32,
+            lry as i32,
+            tile as u8,
+            uls as i16,
+            ult as i16,
+            dsdx as i16,
+            dtdy as i16,
+            opcode == G_TEXRECTFLIP as usize,
+        )
     }
 }
 

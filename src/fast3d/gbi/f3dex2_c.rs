@@ -323,3 +323,16 @@ pub extern "C" fn F3DEX2_GSPTriangle1WithIndexes(
         vertex_index3 as usize,
     );
 }
+
+#[no_mangle]
+pub extern "C" fn F3DEX2_GDPTextureRectangle(
+    rcp: Option<&mut RCP>,
+    gfx_context: Option<&mut GraphicsContext>,
+    command: usize,
+) {
+    let rcp = rcp.unwrap();
+    let gfx_context = gfx_context.unwrap();
+    let command: *mut Gfx = command as *mut Gfx;
+
+    F3DEX2::gdp_texture_rectangle(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+}
