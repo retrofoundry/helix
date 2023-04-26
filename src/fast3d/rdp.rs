@@ -398,7 +398,7 @@ impl RDP {
     }
 
     pub fn get_cycle_type_from_other_mode_h(mode_h: u32) -> OtherModeHCycleType {
-        match (mode_h >> OtherModeH_Layout::G_MDSFT_CYCLETYPE as u32) & 0x3 {
+        match (mode_h >> OtherModeH_Layout::G_MDSFT_CYCLETYPE as u32) & 0x03 {
             x if x == OtherModeHCycleType::G_CYC_1CYCLE as u32 => OtherModeHCycleType::G_CYC_1CYCLE,
             x if x == OtherModeHCycleType::G_CYC_2CYCLE as u32 => OtherModeHCycleType::G_CYC_2CYCLE,
             x if x == OtherModeHCycleType::G_CYC_COPY as u32 => OtherModeHCycleType::G_CYC_COPY,

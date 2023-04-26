@@ -2,7 +2,7 @@ use std::slice;
 
 use log::trace;
 
-use super::defines::{Gfx, Light, Viewport, Vtx, G_MTX, G_TEXRECT, G_TEXRECTFLIP};
+use super::defines::{Gfx, Light, Viewport, Vtx, G_FILLRECT, G_MTX, G_TEXRECT, G_TEXRECTFLIP};
 use super::utils::{get_cmd, get_segmented_address};
 use super::{
     super::{
@@ -159,6 +159,7 @@ impl GBIDefinition for F3DEX2 {
         gbi.register(G_SET::COLORIMG as usize, F3DEX2::gdp_set_color_image);
         gbi.register(G_TEXRECT as usize, F3DEX2::gdp_texture_rectangle);
         gbi.register(G_TEXRECTFLIP as usize, F3DEX2::gdp_texture_rectangle);
+        gbi.register(G_FILLRECT as usize, F3DEX2::gdp_fill_rectangle);
     }
 }
 
@@ -1260,7 +1261,7 @@ impl F3DEX2 {
         flipped: bool,
     ) -> GBIResult {
         let saved_combine_mode = rdp.combine;
-        if (rdp.other_mode_h >> OtherModeH_Layout::G_MDSFT_CYCLETYPE as u32) & 0x3
+        if (rdp.other_mode_h >> OtherModeH_Layout::G_MDSFT_CYCLETYPE as u32) & 0x03
             == OtherModeHCycleType::G_CYC_COPY as u32
         {
             // Per RDP Command Summary Set Tile's shift s and this dsdx should be set to 4 texels
@@ -1268,7 +1269,8 @@ impl F3DEX2 {
             dsdx >>= 2;
 
             // Color combiner is turned off in copy mode
-            let rhs = (CCMUX::TEXEL0 as usize & 0b111) << 15 | (ACMUX::TEXEL0 as usize & 0b111) << 9;
+            let rhs =
+                (CCMUX::TEXEL0 as usize & 0b111) << 15 | (ACMUX::TEXEL0 as usize & 0b111) << 9;
             rdp.combine = CombineParams::decode(0, rhs);
 
             // Per documentation one extra pixel is added in this modes to each edge
@@ -1287,8 +1289,8 @@ impl F3DEX2 {
 
         let width = if !flipped { lrx - ulx } else { lry - uly };
         let height = if !flipped { lry - uly } else { lrx - ulx };
-        let lrs: i32 = ((uls << 7) as i32 + (dsdx as i32) * (width as i32)) >> 7;
-        let lrt: i32 = ((ult << 7) as i32 + (dtdy as i32) * (height as i32)) >> 7;
+        let lrs: u32 = ((uls << 7) as u32 + (dsdx as u32) * (width as u32)) >> 7;
+        let lrt: u32 = ((ult << 7) as u32 + (dtdy as u32) * (height as u32)) >> 7;
 
         let ul = &mut rsp.vertex_table[MAX_VERTICES + 0];
         ul.uv[0] = uls as f32;
@@ -1355,6 +1357,69 @@ impl F3DEX2 {
             dsdx as i16,
             dtdy as i16,
             opcode == G_TEXRECTFLIP as usize,
+        )
+    }
+
+    pub fn gdp_fill_rectangle_raw(
+        rdp: &mut RDP,
+        rsp: &mut RSP,
+        gfx_context: &GraphicsContext,
+        ulx: i32,
+        uly: i32,
+        mut lrx: i32,
+        mut lry: i32,
+    ) -> GBIResult {
+        if rdp.color_image == rdp.depth_image {
+            // used to clear depth buffer, not necessary in modern pipelines
+            return GBIResult::Continue;
+        }
+
+        let cycle_type = (rdp.other_mode_h >> OtherModeH_Layout::G_MDSFT_CYCLETYPE as u32) & 0x03;
+
+        if cycle_type == OtherModeHCycleType::G_CYC_COPY as u32
+            || cycle_type == OtherModeHCycleType::G_CYC_FILL as u32
+        {
+            // Per documentation one extra pixel is added in this modes to each edge
+            lrx += 1 << 2;
+            lry += 1 << 2;
+        }
+
+        for i in MAX_VERTICES..MAX_VERTICES + 4 {
+            let v = &mut rsp.vertex_table[i];
+            v.color = rdp.fill_color;
+        }
+
+        let saved_combine_mode = rdp.combine;
+        let rhs = (CCMUX::SHADE as usize & 0b111) << 15 | (ACMUX::SHADE as usize & 0b111) << 9;
+        rdp.combine = CombineParams::decode(0, rhs);
+        F3DEX2::draw_rectangle(rdp, rsp, gfx_context, ulx, uly, lrx, lry);
+        rdp.combine = saved_combine_mode;
+
+        GBIResult::Continue
+    }
+
+    pub fn gdp_fill_rectangle(
+        rdp: &mut RDP,
+        rsp: &mut RSP,
+        gfx_context: &GraphicsContext,
+        command: *mut Gfx,
+    ) -> GBIResult {
+        let w0 = unsafe { (*command).words.w0 };
+        let w1 = unsafe { (*command).words.w1 };
+
+        let ulx = get_cmd(w1, 12, 12);
+        let uly = get_cmd(w1, 0, 12);
+        let lrx = get_cmd(w0, 12, 12);
+        let lry = get_cmd(w0, 0, 12);
+
+        F3DEX2::gdp_fill_rectangle_raw(
+            rdp,
+            rsp,
+            gfx_context,
+            ulx as i32,
+            uly as i32,
+            lrx as i32,
+            lry as i32,
         )
     }
 }

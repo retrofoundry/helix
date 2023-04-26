@@ -1,7 +1,7 @@
 use crate::fast3d::{graphics::GraphicsContext, rcp::RCP, rdp::RDP, rsp::RSP};
 
 use super::{
-    defines::{Gfx, G_TEXRECT, G_TEXRECTFLIP},
+    defines::{Gfx, G_FILLRECT, G_TEXRECT, G_TEXRECTFLIP},
     f3dex2::F3DEX2,
     utils::get_cmd,
     GBIDefinition, GBIResult, GBI,
@@ -14,6 +14,7 @@ impl GBIDefinition for F3DEX2E {
         F3DEX2::setup(gbi);
         gbi.register(G_TEXRECT as usize, F3DEX2E::gdp_texture_rectangle);
         gbi.register(G_TEXRECTFLIP as usize, F3DEX2E::gdp_texture_rectangle);
+        gbi.register(G_FILLRECT as usize, F3DEX2E::gdp_fill_rectangle);
     }
 }
 
@@ -65,6 +66,36 @@ impl F3DEX2E {
             opcode == G_TEXRECTFLIP as usize,
         )
     }
+
+    pub fn gdp_fill_rectangle(
+        rdp: &mut RDP,
+        rsp: &mut RSP,
+        gfx_context: &GraphicsContext,
+        mut command: *mut Gfx,
+    ) -> GBIResult {
+        let w0 = unsafe { (*command).words.w0 };
+        let w1 = unsafe { (*command).words.w1 };
+
+        let lrx = get_cmd(w0, 0, 24) << 8 >> 8;
+        let lry = get_cmd(w1, 0, 24) << 8 >> 8;
+
+        command = unsafe { command.add(1) };
+        let w0 = unsafe { (*command).words.w0 };
+        let w1 = unsafe { (*command).words.w1 };
+
+        let ulx = get_cmd(w0, 0, 24) << 8 >> 8;
+        let uly = get_cmd(w1, 0, 24) << 8 >> 8;
+
+        F3DEX2::gdp_fill_rectangle_raw(
+            rdp,
+            rsp,
+            gfx_context,
+            ulx as i32,
+            uly as i32,
+            lrx as i32,
+            lry as i32,
+        )
+    }
 }
 
 // MARK: - C Bridge
@@ -80,4 +111,17 @@ pub extern "C" fn F3DEX2E_GDPTextureRectangle(
     let command: *mut Gfx = command as *mut Gfx;
 
     F3DEX2E::gdp_texture_rectangle(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
+}
+
+#[no_mangle]
+pub extern "C" fn F3DEX2E_GDPFillRectangle(
+    rcp: Option<&mut RCP>,
+    gfx_context: Option<&mut GraphicsContext>,
+    command: usize,
+) {
+    let rcp = rcp.unwrap();
+    let gfx_context = gfx_context.unwrap();
+    let command: *mut Gfx = command as *mut Gfx;
+
+    F3DEX2E::gdp_fill_rectangle(&mut rcp.rdp, &mut rcp.rsp, gfx_context, command);
 }

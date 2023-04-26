@@ -156,3 +156,4 @@ impl G_TX {
 
 pub const G_TEXRECT: u8 = 0xe4;
 pub const G_TEXRECTFLIP: u8 = 0xe5;
+pub const G_FILLRECT: u8 = 0xf6;
