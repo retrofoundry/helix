@@ -548,7 +548,7 @@ impl F3DEX2 {
             return GBIResult::Continue;
         }
 
-        rdp.update_render_state(gfx_context, rsp.geometry_mode, &vertex_array);
+        rdp.update_render_state(gfx_context, rsp.geometry_mode);
 
         // TODO: Produce draw calls for RDP to process later?
         let mut cc_id = rdp.combine.to_u32();

@@ -14,7 +14,7 @@ use super::{
     },
     graphics::{CullMode, GraphicsContext, ShaderProgram},
     rcp::RCP,
-    rsp::{RSPGeometry, StagingVertex},
+    rsp::RSPGeometry,
     utils::{
         color::Color,
         color_combiner::{
@@ -693,12 +693,7 @@ impl RDP {
         }
     }
 
-    pub fn update_render_state(
-        &mut self,
-        gfx_context: &GraphicsContext,
-        geometry_mode: u32,
-        vertices: &[&StagingVertex; 3],
-    ) {
+    pub fn update_render_state(&mut self, gfx_context: &GraphicsContext, geometry_mode: u32) {
         let depth_test = geometry_mode & RSPGeometry::G_ZBUFFER as u32 != 0;
         if depth_test != self.rendering_state.depth_test {
             self.flush(gfx_context);
