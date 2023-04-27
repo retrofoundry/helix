@@ -1,5 +1,5 @@
-use glam::{Mat4, Vec3A};
 use super::{gbi::defines::Light, utils::color::Color};
+use glam::{Mat4, Vec3A};
 
 pub const MATRIX_STACK_SIZE: usize = 11;
 pub const MAX_VERTICES: usize = 64;
@@ -111,8 +111,8 @@ impl RSP {
     }
 
     pub fn recompute_mvp_matrix(&mut self) {
-        self.modelview_projection_matrix = self.matrix_stack[self.matrix_stack_pointer - 1]
-            * self.projection_matrix;
+        self.modelview_projection_matrix =
+            self.matrix_stack[self.matrix_stack_pointer - 1] * self.projection_matrix;
     }
 
     pub fn set_num_lights(&mut self, num_lights: u8) {

@@ -25,7 +25,7 @@ use crate::fast3d::utils::color_combiner::{
     ACMUX, CCMUX, SHADER_OPT_ALPHA, SHADER_OPT_FOG, SHADER_OPT_NOISE, SHADER_OPT_TEXTURE_EDGE,
 };
 use crate::{
-    extensions::matrix::{calculate_normal_dir, matrix_from_fixed_point, matrix_multiply},
+    extensions::matrix::calculate_normal_dir,
     fast3d::{
         graphics::GraphicsContext,
         rdp::{
