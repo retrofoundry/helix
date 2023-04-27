@@ -235,6 +235,7 @@ pub struct RDP {
     pub env_color: Color,
     pub fog_color: Color,
     pub prim_color: Color,
+    pub blend_color: Color,
     pub fill_color: Color,
 
     pub depth_image: usize,
@@ -272,6 +273,7 @@ impl RDP {
             env_color: Color::TRANSPARENT,
             fog_color: Color::TRANSPARENT,
             prim_color: Color::TRANSPARENT,
+            blend_color: Color::TRANSPARENT,
             fill_color: Color::TRANSPARENT,
 
             depth_image: 0,

@@ -1,4 +1,4 @@
-use self::defines::Gfx;
+use self::defines::{Gfx, G_RDPFULLSYNC, G_RDPLOADSYNC, G_RDPPIPESYNC, G_RDPTILESYNC};
 
 use super::{graphics::GraphicsContext, rdp::RDP, rsp::RSP};
 use std::collections::HashMap;
@@ -41,6 +41,11 @@ impl GBI {
     }
 
     pub fn setup(&mut self) {
+        self.register(G_RDPLOADSYNC as usize, |_, _, _, _| GBIResult::Continue);
+        self.register(G_RDPPIPESYNC as usize, |_, _, _, _| GBIResult::Continue);
+        self.register(G_RDPTILESYNC as usize, |_, _, _, _| GBIResult::Continue);
+        self.register(G_RDPFULLSYNC as usize, |_, _, _, _| GBIResult::Continue);
+
         if cfg!(feature = "f3dzex2") {
             f3dzex2::F3DZEX2::setup(self);
         } else if cfg!(feature = "f3dex2e") {

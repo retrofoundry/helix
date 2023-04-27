@@ -158,6 +158,7 @@ impl GBIDefinition for F3DEX2 {
         gbi.register(G_SET::COMBINE as usize, F3DEX2::gdp_set_combine);
         gbi.register(G_SET::ENVCOLOR as usize, F3DEX2::gdp_set_env_color);
         gbi.register(G_SET::PRIMCOLOR as usize, F3DEX2::gdp_set_prim_color);
+        gbi.register(G_SET::BLENDCOLOR as usize, F3DEX2::gdp_set_blend_color);
         gbi.register(G_SET::FOGCOLOR as usize, F3DEX2::gdp_set_fog_color);
         gbi.register(G_SET::FILLCOLOR as usize, F3DEX2::gdp_set_fill_color);
         gbi.register(G_SET::DEPTHIMG as usize, F3DEX2::gdp_set_depth_image);
@@ -1060,6 +1061,23 @@ impl F3DEX2 {
         let a = get_cmd(w1, 0, 8) as u8;
 
         rdp.prim_color = Color::RGBA(r, g, b, a);
+        GBIResult::Continue
+    }
+
+    pub fn gdp_set_blend_color(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gfx_context: &GraphicsContext,
+        command: &mut *mut Gfx,
+    ) -> GBIResult {
+        let w1 = unsafe { (*(*command)).words.w1 };
+
+        let r = get_cmd(w1, 24, 8) as u8;
+        let g = get_cmd(w1, 16, 8) as u8;
+        let b = get_cmd(w1, 8, 8) as u8;
+        let a = get_cmd(w1, 0, 8) as u8;
+
+        rdp.blend_color = Color::RGBA(r, g, b, a);
         GBIResult::Continue
     }
 

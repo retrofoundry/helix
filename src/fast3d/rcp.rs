@@ -50,7 +50,9 @@ impl RCP {
                 .handle_command(&mut self.rdp, &mut self.rsp, gfx_context, &mut command)
             {
                 GBIResult::Recurse(new_command) => self.run_dl(gfx_context, new_command),
-                GBIResult::Unknown(_opcode) => { /*trace!("Unknown GBI command: {:#x}", opcode) */ },
+                GBIResult::Unknown(opcode) => {
+                    trace!("Unknown GBI command: {:#x}", opcode)
+                }
                 GBIResult::Return => return,
                 GBIResult::Continue => {}
             }
