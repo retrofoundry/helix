@@ -1,3 +1,5 @@
+use crate::fast3d::utils::color::Color;
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct GWords {
@@ -70,7 +72,7 @@ pub struct Vtx_t {
     pub position: [i16; 3], // in object space
     flag: u16, // unused
     pub texture_coords: [i16; 2],
-    pub color: [u8; 4],
+    pub color: Color,
 }
 
 #[repr(C)]

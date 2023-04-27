@@ -17,9 +17,8 @@ use super::{
 };
 use super::{GBIDefinition, GBIResult, GBI};
 use crate::fast3d::gbi::defines::G_TX;
-use crate::fast3d::rdp::{
-    AlphaCompare, BlendParamB, BlendParamPMColor, OtherModeLayoutL, MAX_BUFFERED,
-};
+use crate::fast3d::rdp::MAX_BUFFERED;
+use crate::fast3d::utils::color::Color;
 use crate::fast3d::utils::color_combiner::{
     ACMUX, CCMUX, SHADER_OPT_ALPHA, SHADER_OPT_FOG, SHADER_OPT_NOISE, SHADER_OPT_TEXTURE_EDGE,
 };
@@ -442,9 +441,9 @@ impl F3DEX2 {
                     }
                 }
 
-                staging_vertex.color[0] = if r > 255.0 { 255 } else { r as u8 };
-                staging_vertex.color[1] = if g > 255.0 { 255 } else { g as u8 };
-                staging_vertex.color[2] = if b > 255.0 { 255 } else { b as u8 };
+                staging_vertex.color.r = if r > 255.0 { 255 } else { r as u8 };
+                staging_vertex.color.g = if g > 255.0 { 255 } else { g as u8 };
+                staging_vertex.color.b = if b > 255.0 { 255 } else { b as u8 };
 
                 if rsp.geometry_mode & RSPGeometry::G_TEXTURE_GEN as u32 > 0 {
                     let dotx = vertex_normal.normal[0] as f32 * rsp.lookat_coeffs[0][0]
@@ -459,9 +458,9 @@ impl F3DEX2 {
                     V = ((doty / 127.0 + 1.0) / 4.0) as i16 * rdp.texture_state.scale_t as i16;
                 }
             } else {
-                staging_vertex.color[0] = vertex.color[0];
-                staging_vertex.color[1] = vertex.color[1];
-                staging_vertex.color[2] = vertex.color[2];
+                staging_vertex.color.r = vertex.color.r;
+                staging_vertex.color.g = vertex.color.g;
+                staging_vertex.color.b = vertex.color.b;
             }
 
             staging_vertex.uv[0] = U as f32;
@@ -503,9 +502,9 @@ impl F3DEX2 {
                 let fog = if fog < 0.0 { 0.0 } else { fog };
                 let fog = if fog > 255.0 { 255.0 } else { fog };
 
-                staging_vertex.color[3] = fog as u8;
+                staging_vertex.color.a = fog as u8;
             } else {
-                staging_vertex.color[3] = vertex.color[3];
+                staging_vertex.color.a = vertex.color.a;
             }
 
             write_index += 1;
@@ -631,14 +630,14 @@ impl F3DEX2 {
             }
 
             if use_fog {
-                rdp.add_to_buf_vbo(rdp.fog_color[0] as f32 / 255.0);
-                rdp.add_to_buf_vbo(rdp.fog_color[1] as f32 / 255.0);
-                rdp.add_to_buf_vbo(rdp.fog_color[2] as f32 / 255.0);
-                rdp.add_to_buf_vbo(vertex_array[i].color[3] as f32 / 255.0);
+                rdp.add_to_buf_vbo(rdp.fog_color.r as f32 / 255.0);
+                rdp.add_to_buf_vbo(rdp.fog_color.g as f32 / 255.0);
+                rdp.add_to_buf_vbo(rdp.fog_color.b as f32 / 255.0);
+                rdp.add_to_buf_vbo(vertex_array[i].color.a as f32 / 255.0);
             }
 
             for j in 0..num_inputs {
-                let mut color: [u8; 4];
+                let mut color: Color;
                 for k in 0..1 + if use_alpha { 1 } else { 0 } {
                     match shader_input_mapping[k][j as usize] {
                         x if x == CCMUX::PRIMITIVE as u8 => {
@@ -658,27 +657,27 @@ impl F3DEX2 {
                             if distance_frac > 1.0 {
                                 distance_frac = 1.0
                             }
-                            color = [
+                            color = Color::RGBA(
                                 (distance_frac * 255.0) as u8,
                                 (distance_frac * 255.0) as u8,
                                 (distance_frac * 255.0) as u8,
                                 (distance_frac * 255.0) as u8,
-                            ];
+                            );
                         }
                         _ => {
-                            color = [0; 4];
+                            color = Color::TRANSPARENT;
                         }
                     }
 
                     if k == 0 {
-                        rdp.add_to_buf_vbo(color[0] as f32 / 255.0);
-                        rdp.add_to_buf_vbo(color[1] as f32 / 255.0);
-                        rdp.add_to_buf_vbo(color[2] as f32 / 255.0);
+                        rdp.add_to_buf_vbo(color.r as f32 / 255.0);
+                        rdp.add_to_buf_vbo(color.g as f32 / 255.0);
+                        rdp.add_to_buf_vbo(color.b as f32 / 255.0);
                     } else {
                         if use_fog && color == vertex_array[i].color {
                             rdp.add_to_buf_vbo(1.0);
                         } else {
-                            rdp.add_to_buf_vbo(color[3] as f32 / 255.0);
+                            rdp.add_to_buf_vbo(color.a as f32 / 255.0);
                         }
                     }
                 }
@@ -1045,7 +1044,7 @@ impl F3DEX2 {
         let b = get_cmd(w1, 8, 8) as u8;
         let a = get_cmd(w1, 0, 8) as u8;
 
-        rdp.env_color = [r, g, b, a];
+        rdp.env_color = Color::RGBA(r, g, b, a);
         GBIResult::Continue
     }
 
@@ -1062,7 +1061,7 @@ impl F3DEX2 {
         let b = get_cmd(w1, 8, 8) as u8;
         let a = get_cmd(w1, 0, 8) as u8;
 
-        rdp.prim_color = [r, g, b, a];
+        rdp.prim_color = Color::RGBA(r, g, b, a);
         GBIResult::Continue
     }
 
@@ -1079,7 +1078,7 @@ impl F3DEX2 {
         let b = get_cmd(w1, 8, 8) as u8;
         let a = get_cmd(w1, 0, 8) as u8;
 
-        rdp.fog_color = [r, g, b, a];
+        rdp.fog_color = Color::RGBA(r, g, b, a);
         GBIResult::Continue
     }
 
@@ -1090,11 +1089,9 @@ impl F3DEX2 {
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };
-
         let packed_color = w1 as u16;
-        let color = R5G5B5A1::to_rgba(packed_color);
+        rdp.fill_color = R5G5B5A1::to_rgba(packed_color);
 
-        rdp.fill_color = [color[0], color[1], color[2], color[3]];
         GBIResult::Continue
     }
 
@@ -1370,7 +1367,7 @@ impl F3DEX2 {
 
         for i in MAX_VERTICES..MAX_VERTICES + 4 {
             let v = &mut rsp.vertex_table[i];
-            v.color.copy_from_slice(&rdp.fill_color);
+            v.color = rdp.fill_color;
         }
 
         let saved_combine_mode = rdp.combine;

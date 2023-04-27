@@ -16,6 +16,7 @@ use super::{
     rcp::RCP,
     rsp::{RSPGeometry, StagingVertex},
     utils::{
+        color::Color,
         color_combiner::{
             ColorCombiner, ColorCombinerManager, CombineParams, ACMUX, CCMUX, SHADER,
         },
@@ -231,10 +232,10 @@ pub struct RDP {
     pub buf_vbo_len: usize,
     pub buf_vbo_num_tris: usize,
 
-    pub env_color: [u8; 4],
-    pub fog_color: [u8; 4],
-    pub prim_color: [u8; 4],
-    pub fill_color: [u8; 4],
+    pub env_color: Color,
+    pub fog_color: Color,
+    pub prim_color: Color,
+    pub fill_color: Color,
 
     pub depth_image: usize,
     pub color_image: usize,
@@ -268,10 +269,10 @@ impl RDP {
             buf_vbo_len: 0,
             buf_vbo_num_tris: 0,
 
-            env_color: [0; 4],
-            fog_color: [0; 4],
-            prim_color: [0; 4],
-            fill_color: [0; 4],
+            env_color: Color::TRANSPARENT,
+            fog_color: Color::TRANSPARENT,
+            prim_color: Color::TRANSPARENT,
+            fill_color: Color::TRANSPARENT,
 
             depth_image: 0,
             color_image: 0,

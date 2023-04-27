@@ -1,6 +1,6 @@
 use crate::extensions::matrix::matrix_multiply;
 
-use super::{gbi::defines::Light, rcp::RCP};
+use super::{gbi::defines::Light, utils::color::Color};
 
 pub const MATRIX_STACK_SIZE: usize = 11;
 pub const MAX_VERTICES: usize = 64;
@@ -29,7 +29,7 @@ impl Position {
 pub struct StagingVertex {
     pub position: Position,
     pub uv: [f32; 2],
-    pub color: [u8; 4],
+    pub color: Color,
     pub clip_reject: u8,
 }
 
@@ -37,7 +37,7 @@ impl StagingVertex {
     pub const ZERO: Self = Self {
         position: Position::ZERO,
         uv: [0.0; 2],
-        color: [0; 4],
+        color: Color::TRANSPARENT,
         clip_reject: 0,
     };
 }
