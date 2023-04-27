@@ -42,11 +42,11 @@ pub trait Vec3AMul {
 impl Vec3AMul for Vec3A {
     #[inline]
     fn mul_mat4(&self, matrix: &Mat4) -> Self {
-        Self {
-            x: self.dot(matrix.row(0).xyz().into()),
-            y: self.dot(matrix.row(1).xyz().into()),
-            z: self.dot(matrix.row(2).xyz().into()),
-        }
+        Self::new(
+            self.dot(matrix.row(0).xyz().into()),
+            self.dot(matrix.row(1).xyz().into()),
+            self.dot(matrix.row(2).xyz().into()),
+        )
     }
 }
 
