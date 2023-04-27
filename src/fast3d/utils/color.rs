@@ -12,3 +12,19 @@ impl R5G5B5A1 {
         vec![r * 8, g * 8, b * 8, a * 255]
     }
 }
+
+pub struct Color {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
+}
+
+impl Color {
+    pub const ZERO: Color = Color {
+        r: 0,
+        g: 0,
+        b: 0,
+        a: 0,
+    };
+}

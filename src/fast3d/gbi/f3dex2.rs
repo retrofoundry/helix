@@ -3,7 +3,11 @@ use std::slice;
 use log::trace;
 
 use super::defines::{Gfx, Light, Viewport, Vtx, G_FILLRECT, G_MTX, G_TEXRECT, G_TEXRECTFLIP};
-use super::utils::{get_cmd, get_segmented_address};
+use super::utils::{
+    get_cmd, get_cycle_type_from_other_mode_h, get_segmented_address,
+    get_textfilter_from_other_mode_h, other_mode_l_uses_alpha, other_mode_l_uses_fog,
+    other_mode_l_uses_noise, other_mode_l_uses_texture_edge,
+};
 use super::{
     super::{
         rdp::RDP,
@@ -550,10 +554,10 @@ impl F3DEX2 {
 
         // TODO: Produce draw calls for RDP to process later?
         let mut cc_id = rdp.combine.to_u32();
-        let mut use_alpha = F3DEX2::other_mode_l_uses_alpha(rdp.other_mode_l);
-        let use_texture_edge = F3DEX2::other_mode_l_uses_texture_edge(rdp.other_mode_l);
-        let use_fog = F3DEX2::other_mode_l_uses_fog(rdp.other_mode_l);
-        let use_noise = F3DEX2::other_mode_l_uses_noise(rdp.other_mode_l);
+        let mut use_alpha = other_mode_l_uses_alpha(rdp.other_mode_l);
+        let use_texture_edge = other_mode_l_uses_texture_edge(rdp.other_mode_l);
+        let use_fog = other_mode_l_uses_fog(rdp.other_mode_l);
+        let use_noise = other_mode_l_uses_noise(rdp.other_mode_l);
 
         if use_texture_edge {
             use_alpha = true;
@@ -617,7 +621,7 @@ impl F3DEX2 {
                 let mut u = (vertex_array[i].uv[0] - (current_tile.uls as f32) * 8.0) / 32.0;
                 let mut v = (vertex_array[i].uv[1] - (current_tile.ult as f32) * 8.0) / 32.0;
 
-                if RDP::get_textfilter_from_other_mode_h(rdp.other_mode_h) != TextFilt::G_TF_POINT {
+                if get_textfilter_from_other_mode_h(rdp.other_mode_h) != TextFilt::G_TF_POINT {
                     u += 0.5;
                     v += 0.5;
                 }
@@ -725,24 +729,6 @@ impl F3DEX2 {
         F3DEX2::gsp_tri1_raw(rdp, rsp, gfx_context, vertex_id1, vertex_id2, vertex_id3)
     }
 
-    fn other_mode_l_uses_texture_edge(other_mode_l: u32) -> bool {
-        return other_mode_l >> (OtherModeLayoutL::CVG_X_ALPHA as u32) & 0x01 == 0x01;
-    }
-
-    fn other_mode_l_uses_alpha(other_mode_l: u32) -> bool {
-        return other_mode_l & ((BlendParamB::G_BL_A_MEM as u32) << (OtherModeLayoutL::B_1 as u32))
-            == 0;
-    }
-
-    fn other_mode_l_uses_fog(other_mode_l: u32) -> bool {
-        return (other_mode_l >> OtherModeLayoutL::P_1 as u32)
-            == BlendParamPMColor::G_BL_CLR_FOG as u32;
-    }
-
-    fn other_mode_l_uses_noise(other_mode_l: u32) -> bool {
-        return other_mode_l & AlphaCompare::G_AC_DITHER as u32 == AlphaCompare::G_AC_DITHER as u32;
-    }
-
     pub fn sub_dl(
         _rdp: &mut RDP,
         _rsp: &mut RSP,
@@ -759,7 +745,9 @@ impl F3DEX2 {
         } else {
             let new_addr = get_segmented_address(w1);
             let cmd = new_addr as *mut Gfx;
-            unsafe { *command = cmd.sub(1); }
+            unsafe {
+                *command = cmd.sub(1);
+            }
             return GBIResult::Continue;
         }
     }
@@ -1149,7 +1137,7 @@ impl F3DEX2 {
         lry: i32,
     ) {
         let saved_other_mode_h = rdp.other_mode_h;
-        let cycle_type = RDP::get_cycle_type_from_other_mode_h(rdp.other_mode_h);
+        let cycle_type = get_cycle_type_from_other_mode_h(rdp.other_mode_h);
 
         if cycle_type == OtherModeHCycleType::G_CYC_COPY {
             rdp.other_mode_h = (rdp.other_mode_h
@@ -1324,13 +1312,17 @@ impl F3DEX2 {
         let ulx = get_cmd(w1, 12, 12);
         let uly = get_cmd(w1, 0, 12);
 
-        unsafe { *command = (*command).add(1); }
+        unsafe {
+            *command = (*command).add(1);
+        }
         let w1 = unsafe { (*(*command)).words.w1 };
 
         let uls = get_cmd(w1, 16, 16);
         let ult = get_cmd(w1, 0, 16);
 
-        unsafe { *command = (*command).add(1); }
+        unsafe {
+            *command = (*command).add(1);
+        }
         let w1 = unsafe { (*(*command)).words.w1 };
 
         let dsdx = get_cmd(w1, 16, 16);
@@ -1367,8 +1359,10 @@ impl F3DEX2 {
             return GBIResult::Continue;
         }
 
-        let cycle_type = RDP::get_cycle_type_from_other_mode_h(rdp.other_mode_h);
-        if cycle_type == OtherModeHCycleType::G_CYC_COPY || cycle_type == OtherModeHCycleType::G_CYC_FILL {
+        let cycle_type = get_cycle_type_from_other_mode_h(rdp.other_mode_h);
+        if cycle_type == OtherModeHCycleType::G_CYC_COPY
+            || cycle_type == OtherModeHCycleType::G_CYC_FILL
+        {
             // Per documentation one extra pixel is added in this modes to each edge
             lrx += 1 << 2;
             lry += 1 << 2;

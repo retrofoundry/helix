@@ -3,8 +3,15 @@ use std::collections::HashMap;
 use log::trace;
 use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState, CompareFunction};
 
+use crate::fast3d::gbi::utils::translate_blend_param_b;
+
 use super::{
-    gbi::defines::Viewport,
+    gbi::{
+        defines::Viewport,
+        utils::{
+            get_cycle_type_from_other_mode_h, get_textfilter_from_other_mode_h, translate_cull_mode,
+        },
+    },
     graphics::{CullMode, GraphicsContext, ShaderProgram},
     rcp::RCP,
     rsp::{RSPGeometry, StagingVertex},
@@ -273,6 +280,8 @@ impl RDP {
 
     pub fn reset(&mut self) {}
 
+    // Viewport
+
     pub fn calculate_and_set_viewport(&mut self, viewport: Viewport) {
         let mut width = 2.0 * viewport.vscale[0] as f32 / 4.0;
         let mut height = 2.0 * viewport.vscale[1] as f32 / 4.0;
@@ -291,6 +300,13 @@ impl RDP {
 
         self.viewport_or_scissor_changed = true;
     }
+
+    pub fn adjust_x_for_viewport(&self, x: f32) -> f32 {
+        x * (4.0 / 3.0)
+            / (self.output_dimensions.width as f32 / self.output_dimensions.height as f32)
+    }
+
+    // Textures
 
     pub fn lookup_texture(
         &mut self,
@@ -398,28 +414,8 @@ impl RDP {
             .upload_texture(texture, width as i32, height as i32);
     }
 
-    pub fn get_cycle_type_from_other_mode_h(mode_h: u32) -> OtherModeHCycleType {
-        match (mode_h >> OtherModeH_Layout::G_MDSFT_CYCLETYPE as u32) & 0x03 {
-            x if x == OtherModeHCycleType::G_CYC_1CYCLE as u32 => OtherModeHCycleType::G_CYC_1CYCLE,
-            x if x == OtherModeHCycleType::G_CYC_2CYCLE as u32 => OtherModeHCycleType::G_CYC_2CYCLE,
-            x if x == OtherModeHCycleType::G_CYC_COPY as u32 => OtherModeHCycleType::G_CYC_COPY,
-            x if x == OtherModeHCycleType::G_CYC_FILL as u32 => OtherModeHCycleType::G_CYC_FILL,
-            _ => panic!("Invalid cycle type"),
-        }
-    }
-
-    pub fn get_textfilter_from_other_mode_h(mode_h: u32) -> TextFilt {
-        match (mode_h >> OtherModeH_Layout::G_MDSFT_TEXTFILT as u32) & 0x3 {
-            x if x == TextFilt::G_TF_POINT as u32 => TextFilt::G_TF_POINT,
-            x if x == TextFilt::G_TF_AVERAGE as u32 => TextFilt::G_TF_AVERAGE,
-            x if x == TextFilt::G_TF_BILERP as u32 => TextFilt::G_TF_BILERP,
-            _ => panic!("Invalid text filter"),
-        }
-    }
-
     pub fn uses_texture1(&self) -> bool {
-        RDP::get_cycle_type_from_other_mode_h(self.other_mode_h)
-            == OtherModeHCycleType::G_CYC_2CYCLE
+        get_cycle_type_from_other_mode_h(self.other_mode_h) == OtherModeHCycleType::G_CYC_2CYCLE
             && self.combine.uses_texture1()
     }
 
@@ -452,8 +448,8 @@ impl RDP {
 
                     let tile_descriptor =
                         self.tile_descriptors[(self.texture_state.tile + i) as usize];
-                    let linear_filter = RDP::get_textfilter_from_other_mode_h(self.other_mode_h)
-                        != TextFilt::G_TF_POINT;
+                    let linear_filter =
+                        get_textfilter_from_other_mode_h(self.other_mode_h) != TextFilt::G_TF_POINT;
                     let texture = self.rendering_state.textures[i as usize];
                     if linear_filter != texture.linear_filter
                         || tile_descriptor.cm_s != texture.cms
@@ -474,11 +470,6 @@ impl RDP {
         }
     }
 
-    pub fn adjust_x_for_viewport(&self, x: f32) -> f32 {
-        x * (4.0 / 3.0)
-            / (self.output_dimensions.width as f32 / self.output_dimensions.height as f32)
-    }
-
     pub fn flush(&mut self, gfx_context: &GraphicsContext) {
         if self.buf_vbo_len > 0 {
             gfx_context.api.draw_triangles(
@@ -490,6 +481,8 @@ impl RDP {
             self.buf_vbo_num_tris = 0;
         }
     }
+
+    // MARK: - Shader Programs
 
     pub fn lookup_or_create_shader_program(
         &mut self,
@@ -507,6 +500,8 @@ impl RDP {
 
         shader_program
     }
+
+    // MARK: - Color Combiners
 
     pub fn create_color_combiner(
         &mut self,
@@ -595,23 +590,7 @@ impl RDP {
             .insert(cc_id, combiner);
     }
 
-    fn translate_blend_param_b(param: u32, src: BlendFactor) -> BlendFactor {
-        match param {
-            x if x == BlendParamB::G_BL_1MA as u32 => {
-                if src == BlendFactor::SrcAlpha {
-                    BlendFactor::OneMinusSrcAlpha
-                } else if src == BlendFactor::One {
-                    BlendFactor::Zero
-                } else {
-                    BlendFactor::One
-                }
-            }
-            x if x == BlendParamB::G_BL_A_MEM as u32 => BlendFactor::DstAlpha,
-            x if x == BlendParamB::G_BL_1 as u32 => BlendFactor::One,
-            x if x == BlendParamB::G_BL_0 as u32 => BlendFactor::Zero,
-            _ => panic!("Unknown Blend Param B: {}", param),
-        }
-    }
+    // MARK: - Blend
 
     fn translate_blend_mode(
         &mut self,
@@ -686,7 +665,7 @@ impl RDP {
 
             let blend_component = BlendComponent {
                 src_factor: blend_src_factor,
-                dst_factor: RDP::translate_blend_param_b(dst_factor, blend_src_factor),
+                dst_factor: translate_blend_param_b(dst_factor, blend_src_factor),
                 operation: BlendOperation::Add,
             };
 
@@ -711,21 +690,6 @@ impl RDP {
         }
     }
 
-    pub fn translate_cull_mode(geometry_mode: u32) -> CullMode {
-        let cull_front = (geometry_mode & RSPGeometry::G_CULL_FRONT as u32) != 0;
-        let cull_back = (geometry_mode & RSPGeometry::G_CULL_BACK as u32) != 0;
-
-        if cull_front && cull_back {
-            CullMode::FrontAndBack
-        } else if cull_front {
-            CullMode::Front
-        } else if cull_back {
-            CullMode::Back
-        } else {
-            CullMode::None
-        }
-    }
-
     pub fn update_render_state(
         &mut self,
         gfx_context: &GraphicsContext,
@@ -739,7 +703,7 @@ impl RDP {
             self.rendering_state.depth_test = depth_test;
         }
 
-        let cull_mode = RDP::translate_cull_mode(geometry_mode);
+        let cull_mode = translate_cull_mode(geometry_mode);
         if cull_mode != self.rendering_state.cull_mode {
             self.flush(gfx_context);
             gfx_context.api.set_cull_mode(cull_mode);
@@ -782,18 +746,7 @@ impl RDP {
         }
     }
 
-    pub fn add_to_buf_vbo(&mut self, data: f32) {
-        self.buf_vbo[self.buf_vbo_len] = data;
-        self.buf_vbo_len += 1;
-    }
-
     // MARK: - Helpers
-
-    fn blend_component_state_none(component: BlendComponent) -> bool {
-        component.src_factor == BlendFactor::One
-            && component.dst_factor == BlendFactor::Zero
-            && component.operation == BlendOperation::Add
-    }
 
     pub fn scaled_x(&self) -> f32 {
         self.output_dimensions.width as f32 / SCREEN_WIDTH
@@ -801,6 +754,11 @@ impl RDP {
 
     pub fn scaled_y(&self) -> f32 {
         self.output_dimensions.height as f32 / SCREEN_HEIGHT
+    }
+
+    pub fn add_to_buf_vbo(&mut self, data: f32) {
+        self.buf_vbo[self.buf_vbo_len] = data;
+        self.buf_vbo_len += 1;
     }
 }
 

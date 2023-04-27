@@ -34,7 +34,9 @@ impl F3DEX2E {
         let lry = get_cmd(w1, 0, 24) << 8 >> 8;
         let tile = get_cmd(w1, 24, 3);
 
-        unsafe { *command = (*command).add(1); }
+        unsafe {
+            *command = (*command).add(1);
+        }
         let w0 = unsafe { (*(*command)).words.w0 };
         let w1 = unsafe { (*(*command)).words.w1 };
 
@@ -42,7 +44,9 @@ impl F3DEX2E {
         let uls = get_cmd(w1, 16, 16);
         let ult = get_cmd(w1, 0, 16);
 
-        unsafe { *command = (*command).add(1); }
+        unsafe {
+            *command = (*command).add(1);
+        }
         let w0 = unsafe { (*(*command)).words.w0 };
         let w1 = unsafe { (*(*command)).words.w1 };
 
@@ -79,7 +83,9 @@ impl F3DEX2E {
         let lrx = get_cmd(w0, 0, 24) << 8 >> 8;
         let lry = get_cmd(w1, 0, 24) << 8 >> 8;
 
-        unsafe { *command = (*command).add(1); }
+        unsafe {
+            *command = (*command).add(1);
+        }
         let w0 = unsafe { (*(*command)).words.w0 };
         let w1 = unsafe { (*(*command)).words.w1 };
 

@@ -7,7 +7,6 @@ pub mod gui;
 pub mod network;
 #[cfg(feature = "speech")]
 pub mod speech;
-mod utils;
 
 pub fn init() {
     env_logger::init();
