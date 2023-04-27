@@ -1,5 +1,6 @@
 use std::slice;
 
+use glam::Mat4;
 use log::trace;
 
 use super::defines::{Gfx, Light, Viewport, Vtx, G_FILLRECT, G_MTX, G_TEXRECT, G_TEXRECTFLIP};
@@ -16,6 +17,7 @@ use super::{
     defines::{G_LOAD, G_MW, G_SET},
 };
 use super::{GBIDefinition, GBIResult, GBI};
+use crate::extensions::matrix::MatrixFrom;
 use crate::fast3d::gbi::defines::G_TX;
 use crate::fast3d::rdp::MAX_BUFFERED;
 use crate::fast3d::utils::color::Color;
@@ -178,30 +180,26 @@ impl F3DEX2 {
 
         let params = get_cmd(w0, 0, 8) as u8 ^ G_MTX::PUSH as u8;
 
-        let matrix: [[f32; 4]; 4];
+        let matrix: Mat4;
 
         if cfg!(feature = "gbifloats") {
             let addr = get_segmented_address(w1) as *const f32;
-            matrix = unsafe { slice::from_raw_parts(addr, 16) }
-                .chunks(4)
-                .map(|row| [row[0], row[1], row[2], row[3]])
-                .collect::<Vec<[f32; 4]>>()
-                .try_into()
-                .unwrap();
+            let slice = unsafe { slice::from_raw_parts(addr, 16) };
+            matrix = Mat4::from_floats(slice);
         } else {
             let addr = get_segmented_address(w1) as *const i32;
             let slice = unsafe { slice::from_raw_parts(addr, 16) };
-            matrix = matrix_from_fixed_point(slice);
+            matrix = Mat4::from_fixed_point(slice);
         }
 
         if params & G_MTX::PROJECTION as u8 != 0 {
             if (params & G_MTX::LOAD as u8) != 0 {
                 // Load the input matrix into the projection matrix
-                rsp.projection_matrix.copy_from_slice(&matrix);
+                // rsp.projection_matrix.copy_from_slice(&matrix);
+                rsp.projection_matrix = matrix;
             } else {
                 // Multiply the current projection matrix with the input matrix
-                let result = matrix_multiply(&matrix, &rsp.projection_matrix);
-                rsp.projection_matrix.copy_from_slice(&result);
+                rsp.projection_matrix = matrix * rsp.projection_matrix;
             }
         } else {
             // Modelview matrix
@@ -212,17 +210,16 @@ impl F3DEX2 {
                 let src_index = rsp.matrix_stack_pointer - 2;
                 let dst_index = rsp.matrix_stack_pointer - 1;
                 let (left, right) = rsp.matrix_stack.split_at_mut(dst_index);
-                right[0].copy_from_slice(&left[src_index]);
+                right[0] = left[src_index];
             }
 
             if params & G_MTX::LOAD as u8 != 0 {
                 // Load the input matrix into the current matrix
-                rsp.matrix_stack[rsp.matrix_stack_pointer - 1].copy_from_slice(&matrix);
+                rsp.matrix_stack[rsp.matrix_stack_pointer - 1] = matrix;
             } else {
                 // Multiply the current matrix with the input matrix
-                let result =
-                    matrix_multiply(&matrix, &rsp.matrix_stack[rsp.matrix_stack_pointer - 1]);
-                rsp.matrix_stack[rsp.matrix_stack_pointer - 1].copy_from_slice(&result);
+                let result = matrix * rsp.matrix_stack[rsp.matrix_stack_pointer - 1];
+                rsp.matrix_stack[rsp.matrix_stack_pointer - 1] = result;
             }
 
             // Clear the lights_valid flag
@@ -367,25 +364,26 @@ impl F3DEX2 {
             let vertex_normal = unsafe { &(*vertices.offset(i as isize)).normal };
             let staging_vertex = &mut rsp.vertex_table[write_index as usize];
 
-            let mut x = vertex.position[0] as f32 * rsp.modelview_projection_matrix[0][0]
-                + vertex.position[1] as f32 * rsp.modelview_projection_matrix[1][0]
-                + vertex.position[2] as f32 * rsp.modelview_projection_matrix[2][0]
-                + rsp.modelview_projection_matrix[3][0];
+            // translate to going via row-major order
+            let mut x = vertex.position[0] as f32 * rsp.modelview_projection_matrix.col(0).x
+                + vertex.position[1] as f32 * rsp.modelview_projection_matrix.col(0).y
+                + vertex.position[2] as f32 * rsp.modelview_projection_matrix.col(0).z
+                + rsp.modelview_projection_matrix.col(0).w;
 
-            let y = vertex.position[0] as f32 * rsp.modelview_projection_matrix[0][1]
-                + vertex.position[1] as f32 * rsp.modelview_projection_matrix[1][1]
-                + vertex.position[2] as f32 * rsp.modelview_projection_matrix[2][1]
-                + rsp.modelview_projection_matrix[3][1];
+            let y = vertex.position[0] as f32 * rsp.modelview_projection_matrix.col(1).x
+                + vertex.position[1] as f32 * rsp.modelview_projection_matrix.col(1).y
+                + vertex.position[2] as f32 * rsp.modelview_projection_matrix.col(1).z
+                + rsp.modelview_projection_matrix.col(1).w;
 
-            let z = vertex.position[0] as f32 * rsp.modelview_projection_matrix[0][2]
-                + vertex.position[1] as f32 * rsp.modelview_projection_matrix[1][2]
-                + vertex.position[2] as f32 * rsp.modelview_projection_matrix[2][2]
-                + rsp.modelview_projection_matrix[3][2];
+            let z = vertex.position[0] as f32 * rsp.modelview_projection_matrix.col(2).x
+                + vertex.position[1] as f32 * rsp.modelview_projection_matrix.col(2).y
+                + vertex.position[2] as f32 * rsp.modelview_projection_matrix.col(2).z
+                + rsp.modelview_projection_matrix.col(2).w;
 
-            let w = vertex.position[0] as f32 * rsp.modelview_projection_matrix[0][3]
-                + vertex.position[1] as f32 * rsp.modelview_projection_matrix[1][3]
-                + vertex.position[2] as f32 * rsp.modelview_projection_matrix[2][3]
-                + rsp.modelview_projection_matrix[3][3];
+            let w = vertex.position[0] as f32 * rsp.modelview_projection_matrix.col(3).x
+                + vertex.position[1] as f32 * rsp.modelview_projection_matrix.col(3).y
+                + vertex.position[2] as f32 * rsp.modelview_projection_matrix.col(3).z
+                + rsp.modelview_projection_matrix.col(3).w;
 
             x = rdp.adjust_x_for_viewport(x);
 

@@ -1,5 +1,4 @@
-use crate::extensions::matrix::matrix_multiply;
-
+use glam::{Mat4, Vec3A};
 use super::{gbi::defines::Light, utils::color::Color};
 
 pub const MATRIX_STACK_SIZE: usize = 11;
@@ -61,12 +60,12 @@ pub enum RSPGeometry {
 
 pub struct RSP {
     pub geometry_mode: u32,
-    pub projection_matrix: [[f32; 4]; 4],
+    pub projection_matrix: Mat4,
 
-    pub matrix_stack: [[[f32; 4]; 4]; MATRIX_STACK_SIZE],
+    pub matrix_stack: [Mat4; MATRIX_STACK_SIZE],
     pub matrix_stack_pointer: usize,
 
-    pub modelview_projection_matrix: [[f32; 4]; 4],
+    pub modelview_projection_matrix: Mat4,
 
     pub lights_valid: bool,
     pub num_lights: u8,
@@ -77,20 +76,20 @@ pub struct RSP {
 
     pub vertex_table: [StagingVertex; MAX_VERTICES + 4],
 
-    pub lights_coeffs: [[f32; 3]; MAX_LIGHTS],
-    pub lookat_coeffs: [[f32; 3]; 2], // lookat_x, lookat_y
+    pub lights_coeffs: [Vec3A; MAX_LIGHTS],
+    pub lookat_coeffs: [Vec3A; 2], // lookat_x, lookat_y
 }
 
 impl RSP {
     pub fn new() -> Self {
         RSP {
             geometry_mode: 0,
-            projection_matrix: [[0.0; 4]; 4],
+            projection_matrix: Mat4::ZERO,
 
-            matrix_stack: [[[0.0; 4]; 4]; MATRIX_STACK_SIZE],
+            matrix_stack: [Mat4::ZERO; MATRIX_STACK_SIZE],
             matrix_stack_pointer: 0,
 
-            modelview_projection_matrix: [[0.0; 4]; 4],
+            modelview_projection_matrix: Mat4::ZERO,
 
             lights_valid: true,
             num_lights: 0,
@@ -101,8 +100,8 @@ impl RSP {
 
             vertex_table: [StagingVertex::ZERO; MAX_VERTICES + 4],
 
-            lights_coeffs: [[0.0; 3]; MAX_LIGHTS],
-            lookat_coeffs: [[0.0; 3]; 2],
+            lights_coeffs: [Vec3A::ZERO; MAX_LIGHTS],
+            lookat_coeffs: [Vec3A::ZERO; 2],
         }
     }
 
@@ -112,11 +111,8 @@ impl RSP {
     }
 
     pub fn recompute_mvp_matrix(&mut self) {
-        self.modelview_projection_matrix
-            .copy_from_slice(&matrix_multiply(
-                &self.matrix_stack[self.matrix_stack_pointer - 1],
-                &self.projection_matrix,
-            ));
+        self.modelview_projection_matrix = self.matrix_stack[self.matrix_stack_pointer - 1]
+            * self.projection_matrix;
     }
 
     pub fn set_num_lights(&mut self, num_lights: u8) {
