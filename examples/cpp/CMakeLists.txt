@@ -28,7 +28,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Corrosion)
 
-corrosion_import_crate(MANIFEST_PATH ../../Cargo.toml FEATURES cpp speech network)
+corrosion_import_crate(MANIFEST_PATH ../../Cargo.toml FEATURES speech network)
 
 # ---- Declare executable ----
 
