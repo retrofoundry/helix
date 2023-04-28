@@ -1,16 +1,21 @@
+mod imgui_sdl_support;
+
 use anyhow::Result;
-use imgui::{FontSource, MouseCursor, Ui};
+use imgui::{Context, FontSource, Ui};
 use imgui_wgpu::{Renderer, RendererConfig};
-use imgui_winit_support::winit::{
-    dpi::PhysicalSize,
-    event::{Event, WindowEvent},
-    event_loop::EventLoop,
-    window::{Window, WindowBuilder},
-};
+use log::trace;
 use pollster::block_on;
-use std::ffi::CStr;
+use sdl2::{
+    event::{Event, WindowEvent},
+    video::Window,
+    EventPump,
+};
 use std::str;
-use std::time::Instant;
+use std::{ffi::CStr, time::Instant};
+
+use crate::fast3d::{graphics::GraphicsContext, rcp::RCP};
+
+use self::imgui_sdl_support::SdlPlatform;
 
 pub struct Gui {
     // window
@@ -22,73 +27,89 @@ pub struct Gui {
     surface: wgpu::Surface,
     device: wgpu::Device,
     queue: wgpu::Queue,
+
+    // render
     renderer: Renderer,
+    platform: SdlPlatform,
+    event_pump: EventPump,
 
     // imgui
-    imgui: imgui::Context,
-    imgui_winit_platform: imgui_winit_support::WinitPlatform,
+    imgui: Context,
 
     // ui state
     ui_state: UIState,
 
     // draw callbacks
     draw_menu_callback: Box<dyn Fn(&Ui) + 'static>,
-    draw_main_callback: Box<dyn Fn(&Ui) + 'static>,
+
+    // game renderer
+    rcp: RCP,
 }
 
 pub struct UIState {
-    last_frame: Instant,
-    last_cursor: Option<MouseCursor>,
-}
-
-pub struct EventLoopWrapper {
-    event_loop: EventLoop<()>,
+    last_frame_time: Instant,
 }
 
 impl Gui {
-    pub fn new<D, E>(
-        title: &str,
-        event_loop_wrapper: &EventLoopWrapper,
-        draw_menu: D,
-        draw_main: E,
-    ) -> Result<Self>
+    pub fn new<D>(title: &str, draw_menu: D) -> Result<Self>
     where
         D: Fn(&Ui) + 'static,
-        E: Fn(&Ui) + 'static,
     {
         let (width, height) = (800, 600);
 
-        let window = WindowBuilder::new()
-            .with_title(title)
-            .with_inner_size(PhysicalSize::new(width, height))
-            .with_resizable(true)
-            .build(&event_loop_wrapper.event_loop)?;
+        // Initialize sdl
+        let sdl =
+            sdl2::init().map_err(|e| anyhow::anyhow!("Failed to create sdl context: {}", e))?;
 
+        // Create the video subsystem
+        let video_subsystem = sdl
+            .video()
+            .map_err(|e| anyhow::anyhow!("Failed to initialize sdl video subsystem: {}", e))?;
+
+        // Create the sdl window
+        let window = video_subsystem
+            .window(title, width, height)
+            .position_centered()
+            .resizable()
+            // .allow_highdpi()
+            .metal_view()
+            .build()?;
+
+        // Get the sdl event pump
+        let event_pump = sdl
+            .event_pump()
+            .map_err(|e| anyhow::anyhow!("Failed to get sdl event pump: {}", e))?;
+
+        // Create the wgpu instance
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
             ..Default::default()
         });
 
-        let surface = unsafe { instance.create_surface(&window) }?;
+        // Create the wgpu surface
+        let surface = unsafe { instance.create_surface(&window)? };
 
-        let hidpi_factor = window.scale_factor();
-
+        // Request the adapter
         let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
             compatible_surface: Some(&surface),
             force_fallback_adapter: false,
         }))
-        .unwrap();
+        .ok_or(anyhow::anyhow!("Failed to request the adapter."))?;
 
+        // Request the device and queue
         let (device, queue) =
-            block_on(adapter.request_device(&wgpu::DeviceDescriptor::default(), None)).unwrap();
+            block_on(adapter.request_device(&wgpu::DeviceDescriptor::default(), None))?;
 
+        // Get surface format
+        let surface_format = surface.get_capabilities(&adapter).formats[0];
+        // Configure the surface
         let surface_desc = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT, // | wgpu::TextureUsages::COPY_DST,
+            format: surface_format,
             width,
             height,
-            present_mode: wgpu::PresentMode::Fifo,
+            present_mode: wgpu::PresentMode::Fifo, // wgpu::PresentMode::AutoVsync,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             view_formats: vec![wgpu::TextureFormat::Bgra8Unorm],
         };
@@ -97,13 +118,15 @@ impl Gui {
 
         // Setup ImGui
         let mut imgui = imgui::Context::create();
-        let mut imgui_winit_platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
-        imgui_winit_platform.attach_window(
-            imgui.io_mut(),
-            &window,
-            imgui_winit_support::HiDpiMode::Default,
-        );
+
+        // Create the egui + sdl2 platform
+        let platform = SdlPlatform::init(&mut imgui);
+
+        // Setup Dear ImGui style
         imgui.set_ini_filename(None);
+
+        // TODO: Get this via SDL
+        let hidpi_factor: f32 = 2.0; //window.scale_factor();
 
         let font_size = (13.0 * hidpi_factor) as f32;
         imgui.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
@@ -123,11 +146,11 @@ impl Gui {
             ..Default::default()
         };
 
+        // Create the egui render pass
         let renderer = Renderer::new(&mut imgui, &device, &queue, renderer_config);
 
         // Initial UI state
-        let last_frame = Instant::now();
-        let last_cursor = None;
+        let last_frame_time = Instant::now();
 
         Ok(Self {
             width,
@@ -137,27 +160,26 @@ impl Gui {
             device,
             queue,
             renderer,
+            platform,
+            event_pump,
             imgui,
-            imgui_winit_platform,
-            ui_state: UIState {
-                last_frame,
-                last_cursor,
-            },
+            ui_state: UIState { last_frame_time },
             draw_menu_callback: Box::new(draw_menu),
-            draw_main_callback: Box::new(draw_main),
+            rcp: RCP::new(),
         })
     }
 
-    pub fn recreate_swapchain(&mut self) -> Result<()> {
-        let size = self.window.inner_size();
-        self.width = size.width;
-        self.height = size.height;
+    fn recreate_swapchain(&mut self) -> Result<()> {
+        let (width, height) = self.window.size();
+        trace!("Recreating swapchain: {}x{}", width, height);
+        self.width = width;
+        self.height = height;
 
         let surface_desc = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: wgpu::TextureFormat::Bgra8UnormSrgb,
-            width: size.width,
-            height: size.height,
+            width,
+            height,
             present_mode: wgpu::PresentMode::Fifo,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             view_formats: vec![wgpu::TextureFormat::Bgra8Unorm],
@@ -167,50 +189,80 @@ impl Gui {
         Ok(())
     }
 
-    pub fn forward_event(&mut self, event: &Event<()>) {
-        self.imgui_winit_platform
-            .handle_event(self.imgui.io_mut(), &self.window, event);
+    fn handle_events(&mut self) {
+        for event in self.event_pump.poll_iter() {
+            // Handle sdl events
+            match event {
+                Event::Window {
+                    window_id,
+                    win_event,
+                    ..
+                } if window_id == self.window.id() => match win_event {
+                    WindowEvent::Close => {
+                        std::process::exit(0);
+                    }
+                    WindowEvent::Resized(_w, _h) => {
+                        self.recreate_swapchain().unwrap();
+                        break;
+                    }
+                    WindowEvent::SizeChanged(_w, _h) => {
+                        self.recreate_swapchain().unwrap();
+                        break;
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
+
+            // Let the ImGui platform handle the event
+            self.platform.handle_event(&mut self.imgui, &event);
+        }
     }
 
-    pub fn draw(&mut self) -> Result<()> {
-        if self.width == 0 || self.height == 0 {
-            return Ok(());
-        }
+    pub fn start_frame(&mut self) {
+        // Handle events
+        self.handle_events();
 
+        // Update the time
         let now = Instant::now();
         self.imgui
             .io_mut()
-            .update_delta_time(now - self.ui_state.last_frame);
-        self.ui_state.last_frame = now;
+            .update_delta_time(now - self.ui_state.last_frame_time);
+        self.ui_state.last_frame_time = now;
 
-        let frame = self.surface.get_current_texture()?;
-        self.imgui_winit_platform
-            .prepare_frame(self.imgui.io_mut(), &self.window)?;
+        // Get the ImGui context and begin drawing the frame
+        self.platform
+            .prepare_frame(&mut self.imgui, &self.window, &self.event_pump);
+    }
+
+    fn render(&mut self) -> Result<()> {
+        // Begin drawing UI
         let ui = self.imgui.frame();
+        ui.main_menu_bar(|| {
+            (self.draw_menu_callback)(ui);
+        });
 
-        {
-            ui.main_menu_bar(|| {
-                (self.draw_menu_callback)(ui);
-            });
+        // TODO: Draw game image here
+        // let available_size = ui.content_region_avail();
+        // Image::new(texture_id, available_size).build(ui);
 
-            (self.draw_main_callback)(ui);
+        // Demo window for now
+        let mut opened = true;
+        ui.show_metrics_window(&mut opened);
 
-            // let available_size = ui.content_region_avail();
-            // Image::new(texture_id, available_size).build(ui);
-        }
+        // Get the output frame
+        let frame = self.surface.get_current_texture()?;
 
-        let mut encoder: wgpu::CommandEncoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-
-        if self.ui_state.last_cursor != ui.mouse_cursor() {
-            self.ui_state.last_cursor = ui.mouse_cursor();
-            self.imgui_winit_platform.prepare_render(ui, &self.window);
-        }
+        let mut encoder: wgpu::CommandEncoder =
+            self.device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Main Command Encoder"),
+                });
 
         let view = frame
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
+
         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -240,97 +292,70 @@ impl Gui {
 
         Ok(())
     }
-}
 
-// static methods
-impl Gui {
-    pub fn create_event_loop() -> EventLoopWrapper {
-        let event_loop = EventLoop::new();
-        EventLoopWrapper { event_loop }
+    pub fn draw_lists(&mut self, gfx_context: &GraphicsContext, commands: usize) -> Result<()> {
+        self.rcp.run(gfx_context, commands);
+        // TODO: Draw rendered game image
+        // let image = self.rcp.finish();
+
+        self.render()?;
+
+        Ok(())
     }
 
-    pub fn start(event_loop_wrapper: EventLoopWrapper, mut gui: Gui) {
-        // let event_loop = EventLoop::new();
-        // let mut gui = Gui::new(&event_loop).unwrap();
-
-        event_loop_wrapper
-            .event_loop
-            .run(move |event, _, control_flow| {
-                control_flow.set_wait();
-                // println!("{event:?}");
-
-                match event {
-                    Event::WindowEvent {
-                        event: WindowEvent::Resized(_),
-                        ..
-                    } => {
-                        gui.recreate_swapchain().unwrap();
-                    }
-                    Event::WindowEvent {
-                        event: WindowEvent::ScaleFactorChanged { .. },
-                        ..
-                    } => {
-                        gui.recreate_swapchain().unwrap();
-                    }
-                    Event::WindowEvent {
-                        event: WindowEvent::CloseRequested,
-                        ..
-                    } => {
-                        control_flow.set_exit();
-                    }
-                    Event::MainEventsCleared => gui.window.request_redraw(),
-                    Event::RedrawRequested(_window_id) => gui.draw().unwrap(),
-                    _ => (),
-                }
-
-                gui.forward_event(&event);
-            });
+    pub fn draw_lists_dummy(&mut self) -> Result<()> {
+        self.render()?;
+        Ok(())
     }
+
+    pub fn end_frame(&mut self) {}
 }
 
 // MARK: - C API
 
-#[no_mangle]
-pub extern "C" fn GUICreateEventLoop() -> Box<EventLoopWrapper> {
-    let event_loop = Gui::create_event_loop();
-    Box::new(event_loop)
-}
-
 type OnDraw = unsafe extern "C" fn();
 
 #[no_mangle]
-pub extern "C" fn GUICreate(
-    title_raw: *const i8,
-    event_loop: Option<&mut EventLoopWrapper>,
-    draw_menu: Option<OnDraw>,
-    draw_main: Option<OnDraw>,
-) -> Box<Gui> {
+pub unsafe extern "C" fn GUICreate(title_raw: *const i8, draw_menu: Option<OnDraw>) -> Box<Gui> {
     let title_str: &CStr = unsafe { CStr::from_ptr(title_raw) };
     let title: &str = str::from_utf8(title_str.to_bytes()).unwrap();
 
-    let event_loop = event_loop.unwrap();
-    let gui = Gui::new(
-        title,
-        event_loop,
-        move |_ui| unsafe {
-            if let Some(draw_menu) = draw_menu {
-                draw_menu();
-            }
-        },
-        move |_ui| unsafe {
-            if let Some(draw_main) = draw_main {
-                draw_main();
-            }
-        },
-    )
+    let gui = Gui::new(title, move |_ui| unsafe {
+        if let Some(draw_menu) = draw_menu {
+            draw_menu();
+        }
+    })
     .unwrap();
 
     Box::new(gui)
 }
 
 #[no_mangle]
-pub extern "C" fn GUIStart(event_loop: Option<Box<EventLoopWrapper>>, gui: Option<Box<Gui>>) {
-    let event_loop = event_loop.unwrap();
+pub extern "C" fn GUIStartFrame(gui: Option<&mut Gui>) {
     let gui = gui.unwrap();
-    Gui::start(*event_loop, *gui);
+    gui.start_frame();
+}
+
+#[no_mangle]
+pub extern "C" fn GUIDrawLists(
+    gui: Option<&mut Gui>,
+    gfx_context: Option<&mut GraphicsContext>,
+    commands: u64,
+) {
+    let gui = gui.unwrap();
+    let gfx_context = gfx_context.unwrap();
+    gui.draw_lists(gfx_context, commands.try_into().unwrap())
+        .unwrap();
+}
+
+#[no_mangle]
+pub extern "C" fn GUIDrawListsDummy(gui: Option<&mut Gui>) {
+    let gui = gui.unwrap();
+    gui.draw_lists_dummy().unwrap();
+}
+
+#[no_mangle]
+pub extern "C" fn GUIEndFrame(gui: Option<&mut Gui>) {
+    let gui = gui.unwrap();
+    gui.end_frame();
 }

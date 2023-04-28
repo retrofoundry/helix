@@ -7,22 +7,34 @@ edition = "2021"
 name = "helix"
 crate-type = ["lib", "staticlib"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [features]
-default = []
+default = ["f3dex2"]
+
+# Graphics Features
+f3dex2 = []
+f3dex2e = ["gbifloats", "f3dex2"]
+f3dzex2 = ["f3dex2"]
+
+gbifloats = []
+
+# Additional Features
 speech = ["dep:tts"]
 network = ["dep:tokio"]
 
 [dependencies]
 anyhow = "1.0.70"
+approx = "0.5.1"
 arie = "0.1.0"
+env_logger = "0.10.0"
+farbe = "0.2.0"
+glam = { git = "https://github.com/bitshifter/glam-rs.git", branch = "neon", features = ["approx"] }
 imgui = { version = "0.10.0", features = ["docking"] }
 imgui-wgpu = "0.22.0"
-imgui-winit-support = "0.10.0"
 libc = "0.2.139"
+log = "0.4.17"
 pollster = "0.3.0"
+sdl2 = { git = "https://github.com/Rust-SDL2/rust-sdl2", revion = "31e830e", features = ["raw-window-handle"] }
 tokio = { version = "1.26.0", features = ["full"], optional = true }
 tts = { version = "0.25.0", optional = true }
 wgpu = "0.15.1"
-winit = { version = "0.27.2", features = ["x11", "wayland", "wayland-dlopen", "wayland-csd-adwaita"] }
+
