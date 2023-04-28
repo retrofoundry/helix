@@ -303,6 +303,11 @@ impl Gui {
         Ok(())
     }
 
+    pub fn draw_lists_dummy(&mut self) -> Result<()> {
+        self.render()?;
+        Ok(())
+    }
+
     pub fn end_frame(&mut self) {}
 }
 
@@ -341,6 +346,12 @@ pub extern "C" fn GUIDrawLists(
     let gfx_context = gfx_context.unwrap();
     gui.draw_lists(gfx_context, commands.try_into().unwrap())
         .unwrap();
+}
+
+#[no_mangle]
+pub extern "C" fn GUIDrawListsDummy(gui: Option<&mut Gui>) {
+    let gui = gui.unwrap();
+    gui.draw_lists_dummy().unwrap();
 }
 
 #[no_mangle]

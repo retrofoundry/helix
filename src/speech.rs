@@ -1,5 +1,5 @@
 use anyhow::Result;
-use log::error;
+use log::{error, warn};
 use std::ffi::CStr;
 use std::str;
 use tts::{Gender, LanguageTag, Tts, Voice};

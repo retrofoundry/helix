@@ -1,4 +1,4 @@
-use log::{error, trace};
+use log::{error, trace, warn};
 use std::ffi::CStr;
 use std::io::{Read, Write};
 use std::net::TcpStream as Stream;

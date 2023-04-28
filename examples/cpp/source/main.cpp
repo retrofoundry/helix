@@ -33,7 +33,7 @@ auto main() -> int
   
   while (true) {
     GUIStartFrame(gui);
-    GUIDrawLists(gui);
+    GUIDrawListsDummy(gui);
     GUIEndFrame(gui);
   }
 

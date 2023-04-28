@@ -22,7 +22,7 @@ fn main() {
 
     loop {
         gui.start_frame();
-        gui.draw_lists();
+        gui.draw_lists_dummy();
         gui.end_frame();
     }
 }
