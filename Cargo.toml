@@ -7,21 +7,34 @@ edition = "2021"
 name = "helix"
 crate-type = ["lib", "staticlib"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [features]
-default = ["cpp"]
-cpp = [] # defines that the lib will be used from C++
+default = ["f3dex2"]
+
+# Graphics Features
+f3dex2 = []
+f3dex2e = ["gbifloats", "f3dex2"]
+f3dzex2 = ["f3dex2"]
+
+gbifloats = []
+
+# Additional Features
 speech = ["dep:tts"]
 network = ["dep:tokio"]
 
 [dependencies]
-byteorder = "1.4.3"
-cpal = "0.15.0"
-gilrs = "0.10.1"
-lazy_static = "1.4.0"
+anyhow = "1.0.70"
+approx = "0.5.1"
+arie = "0.1.0"
+env_logger = "0.10.0"
+farbe = "0.2.0"
+gilrs = { version = "0.10.2", features = ["serde", "serde-serialize", "xinput"] }
+glam = { git = "https://github.com/bitshifter/glam-rs.git", branch = "neon", features = ["approx"] }
+imgui = { version = "0.10.0", features = ["docking"] }
+imgui-wgpu = "0.22.0"
 libc = "0.2.139"
-ringbuf = "0.3.2"
-rubato = "0.12.0"
+log = "0.4.17"
+pollster = "0.3.0"
+sdl2 = { git = "https://github.com/Rust-SDL2/rust-sdl2", revion = "31e830e", features = ["raw-window-handle"] }
 tokio = { version = "1.26.0", features = ["full"], optional = true }
 tts = { version = "0.25.0", optional = true }
+wgpu = "0.15.1"

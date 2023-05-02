@@ -5,6 +5,7 @@
 #include "audio.h"
 #include "network.h"
 #include "controller.h"
+#include "gui.h"
 
 #ifdef __cplusplus
 extern "C" {

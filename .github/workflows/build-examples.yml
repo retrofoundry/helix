@@ -13,7 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Install deps
-      run: brew install ninja
+      run: brew install ninja SDL2
     - name: Build
       working-directory: examples/cpp
       run: |
@@ -24,11 +24,11 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Install deps
-      run: brew install ninja
+      run: brew install ninja SDL2
     - name: Build
-      working-directory: examples/cpp
+      working-directory: examples/rust
       run: |
-        cargo build --features "speech network"
+        cargo build --all-features
   ubuntu-cpp-example:
     runs-on: ubuntu-latest
     steps:
@@ -39,6 +39,18 @@ jobs:
       run: |
         sudo apt-get install ninja-build
         sudo apt-get install libasound2-dev
+        sudo apt-get install libspeechd-dev
+        sudo apt-get install libsdl2-dev
+    - name: Install latest SDL
+      run: |
+        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
+        wget https://www.libsdl.org/release/SDL2-2.26.1.tar.gz
+        tar -xzf SDL2-2.26.1.tar.gz
+        cd SDL2-2.26.1
+        ./configure
+        make -j 10
+        sudo make install
+        sudo cp -av /usr/local/lib/libSDL* /lib/x86_64-linux-gnu/
     - name: Build
       working-directory: examples/cpp
       run: |
@@ -54,16 +66,35 @@ jobs:
       run: |
         sudo apt-get install ninja-build
         sudo apt-get install libasound2-dev
-    - name: Build
-      working-directory: examples/cpp
+        sudo apt-get install libspeechd-dev
+        sudo apt-get install libsdl2-dev
+    - name: Install latest SDL
       run: |
-        cargo build --features "network"
+        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
+        wget https://www.libsdl.org/release/SDL2-2.26.1.tar.gz
+        tar -xzf SDL2-2.26.1.tar.gz
+        cd SDL2-2.26.1
+        ./configure
+        make -j 10
+        sudo make install
+        sudo cp -av /usr/local/lib/libSDL* /lib/x86_64-linux-gnu/
+    - name: Build
+      working-directory: examples/rust
+      run: |
+        cargo build --all-features
   windows-cpp-example:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v2
     - name: Install deps
-      run: choco install ninja
+      run: |
+        choco install ninja
+        vcpkg integrate install
+        vcpkg install sdl2-ttf sdl2
+
+        "C:\vcpkg\installed\x64-windows\bin" >> $env:GITHUB_PATH
+        "C:\vcpkg\installed\x64-windows\include" >> $env:GITHUB_PATH
+        "C:\vcpkg\installed\x64-windows\lib" >> $env:GITHUB_PATH
     - name: Build
       working-directory: examples/cpp
       run: |
@@ -74,8 +105,15 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Install deps
-      run: choco install ninja
-    - name: Build
-      working-directory: examples/cpp
       run: |
-        cargo build --features "speech network"
+        choco install ninja
+        vcpkg integrate install
+        vcpkg install sdl2-ttf sdl2
+
+        "C:\vcpkg\installed\x64-windows\bin" >> $env:GITHUB_PATH
+        "C:\vcpkg\installed\x64-windows\include" >> $env:GITHUB_PATH
+        "C:\vcpkg\installed\x64-windows\lib" >> $env:GITHUB_PATH
+    - name: Build
+      working-directory: examples/rust
+      run: |
+        cargo build --all-features

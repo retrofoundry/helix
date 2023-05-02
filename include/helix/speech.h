@@ -8,20 +8,19 @@ extern "C" {
 #endif
 
 typedef enum {
-    HLXSpeechSynthesizerGenderMale,
-    HLXSpeechSynthesizerGenderFemale,
-    HLXSpeechSynthesizerGenderNeutral
-} HLXSpeechSynthesizerGender;
+    SpeechSynthesizerGenderMale,
+    SpeechSynthesizerGenderFemale,
+    SpeechSynthesizerGenderNeutral
+} SpeechSynthesizerGender;
 
-void* HLXSpeechSynthesizerCreate(void);
-bool HLXSpeechSynthesizerInit(void* synthesizer);
-void HLXSpeechSynthesizerDeinit(void* synthesizer);
+void* SpeechSynthesizerCreate(void);
+void SpeechSynthesizerFree(void* synthesizer);
 
-void HLXSpeechSynthesizerSetVolume(void* synthesizer, float volume);
-void HLXSpeechSynthesizerSetLanguage(void* synthesizer, const char* language);
-void HLXSpeechSynthesizerSetGender(void* synthesizer, HLXSpeechSynthesizerGender gender);
+void SpeechSynthesizerSetVolume(void* synthesizer, float volume);
+void SpeechSynthesizerSetLanguage(void* synthesizer, const char* language);
+void SpeechSynthesizerSetGender(void* synthesizer, SpeechSynthesizerGender gender);
 
-void HLXSpeechSynthesizerSpeak(void* synthesizer, const char* text, uint8_t interrupt);
+void SpeechSynthesizerSpeak(void* synthesizer, const char* text, uint8_t interrupt);
 
 #ifdef __cplusplus
 }

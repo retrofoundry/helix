@@ -1,21 +1,28 @@
-use helix::speech::SpeechSynthesizer;
-use helix::controller::hub::ControllerHub;
+use helix::gui::Gui;
 
 fn main() {
-    println!("Hello, world!");
+    let mut gui = Gui::new("Helix Example", |ui| {
+        ui.menu("File", || {
+            ui.menu_item_config("Quit")
+                .shortcut("Ctrl+Q")
+                .build();
+        });
+        ui.separator();
+        ui.menu("Edit", || {
 
-    let mut control_hub = ControllerHub::new();
-    control_hub.init(Box::new(0));
-    
-    #[cfg(not(target_os = "linux"))]
-    let mut speech_synthesizer = SpeechSynthesizer::new();
-    
-    #[cfg(not(target_os = "linux"))] {
-        speech_synthesizer.init();
-        speech_synthesizer.set_volume(1.0);
-        speech_synthesizer.speak("Hello, world!", true);
+        });
+    }).unwrap();
+
+    std::thread::spawn(move || {
+        loop {
+            println!("Hello, world!");
+            std::thread::sleep(std::time::Duration::from_millis(1000));
+        }
+    });
+
+    loop {
+        gui.start_frame();
+        gui.draw_lists_dummy();
+        gui.end_frame();
     }
-
-    // Wait for the speech to finish.
-    std::thread::sleep(std::time::Duration::from_secs(2));
 }

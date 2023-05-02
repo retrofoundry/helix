@@ -20,22 +20,43 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v2
+    - name: Install dependencies
+      run: brew install SDL2
     - name: Test
-      run: cargo test --features "speech network"
+      run: cargo test --all-features
   ubuntu-check:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - name: Update apt
       run: sudo apt update
-    - name: Install alsa
+    - name: Install dependencies
       run: |
         sudo apt-get install libasound2-dev
+        sudo apt-get install libspeechd-dev
+        sudo apt-get install libsdl2-dev
+    - name: Install latest SDL
+      run: |
+        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
+        wget https://www.libsdl.org/release/SDL2-2.26.1.tar.gz
+        tar -xzf SDL2-2.26.1.tar.gz
+        cd SDL2-2.26.1
+        ./configure
+        make -j 10
+        sudo make install
+        sudo cp -av /usr/local/lib/libSDL* /lib/x86_64-linux-gnu/
     - name: Test
-      run: cargo test --features "network"
+      run: cargo test --all-features
   windows-check:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v2
+    - name: Install dependencies
+      run: |
+        vcpkg integrate install
+        vcpkg install sdl2-ttf sdl2
+
+        # copy SDL lib files from C:\vcpkg\installed\x64-windows\lib to C:\\Users\\runneradmin\\.rustup\\toolchains\\stable-x86_64-pc-windows-msvc\\lib\\rustlib\\x86_64-pc-windows-msvc\\lib
+        cp C:\vcpkg\installed\x64-windows\lib\SDL*.lib C:\\Users\\runneradmin\\.rustup\\toolchains\\stable-x86_64-pc-windows-msvc\\lib\\rustlib\\x86_64-pc-windows-msvc\\lib
     - name: Test
-      run: cargo test --features "speech network"
+      run: cargo test --all-features

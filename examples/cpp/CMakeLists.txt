@@ -28,11 +28,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Corrosion)
 
-if(UNIX AND NOT APPLE)
-    corrosion_import_crate(MANIFEST_PATH ../../Cargo.toml FEATURES cpp network)
-else()
-    corrosion_import_crate(MANIFEST_PATH ../../Cargo.toml FEATURES cpp speech network)
-endif()
+corrosion_import_crate(MANIFEST_PATH ../../Cargo.toml FEATURES speech network)
 
 # ---- Declare executable ----
 
@@ -47,21 +43,27 @@ target_link_libraries(cpp_exe PRIVATE helix)
 target_include_directories(cpp_exe PRIVATE ../../include)
 
 if(APPLE)
-    target_link_libraries(cpp_exe PRIVATE "-framework Foundation")
-    target_link_libraries(cpp_exe PRIVATE "-framework AVFoundation")
-    target_link_libraries(cpp_exe PRIVATE "-framework CoreFoundation")
-    target_link_libraries(cpp_exe PRIVATE "-framework CoreAudio")
-    target_link_libraries(cpp_exe PRIVATE "-framework AudioToolbox")
-    target_link_libraries(cpp_exe PRIVATE "-framework IOKit")
+    find_package(SDL2 REQUIRED)
+    target_link_libraries(helix INTERFACE SDL2::SDL2)
+    target_link_libraries(helix INTERFACE "-framework Foundation")
+    target_link_libraries(helix INTERFACE "-framework CoreFoundation -framework AVFoundation -framework CoreAudio -framework AudioToolbox")
+    target_link_libraries(helix INTERFACE "-framework Metal -framework QuartzCore")
+elseif(WIN32)
+    find_package(SDL2 CONFIG REQUIRED)
+    target_link_libraries(helix INTERFACE ntdll)
+    target_link_libraries(helix INTERFACE
+        $<TARGET_NAME_IF_EXISTS:SDL2::SDL2main>
+        $<IF:$<TARGET_EXISTS:SDL2::SDL2>,SDL2::SDL2,SDL2::SDL2-static>
+    )
+else()
+    find_package(SDL2 REQUIRED)
+    target_link_libraries(helix INTERFACE SDL2::SDL2)
+    target_link_libraries(helix INTERFACE asound speechd)
 endif()
 
-if(WIN32)
-    target_link_libraries(cpp_exe PRIVATE ntdll)
-endif()
 
 # ---- Install rules ----
 
 if(NOT CMAKE_SKIP_INSTALL_RULES)
   include(cmake/install-rules.cmake)
 endif()
-

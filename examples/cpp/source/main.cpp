@@ -2,28 +2,42 @@
 #include <string>
 #include <thread>
 
-#include <helix/speech.h>
-#include <libultra/os.h>
+#include <helix/gui.h>
+#include <imgui/imgui.h>
+
+static bool show_app_metrics = true;
+
+void draw_menu_bar() {
+  if (ImGui::BeginMenu("File")) {
+    if (ImGui::MenuItem("Quit", "Ctrl+Q")) {}
+    ImGui::EndMenu();
+  }
+
+  ImGui::Separator();
+
+  if (ImGui::BeginMenu("Edit")) {
+    ImGui::EndMenu();
+  }
+}
 
 auto main() -> int
 {
-  auto const message = "Hello, world!";
-  std::cout << message << '\n';
+  auto gui = GUICreate("Helix Example", &draw_menu_bar);
 
-  auto controllHub = HLXCreateControllerHub();
-  __osControlHubInstance = controllHub;
+  auto event_loop_thread = std::thread([] {
+    while (true) {
+      std::cout << "Hello World!" << std::endl;
+      std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+  });
 
-  osContInit(nullptr, nullptr, nullptr);
+  while (true) {
+    GUIStartFrame(gui);
+    GUIDrawListsDummy(gui);
+    GUIEndFrame(gui);
+  }
 
-#if defined(__APPLE__) || defined(__WIN32)
-  auto speechSynthesizer = HLXSpeechSynthesizerCreate();
-  HLXSpeechSynthesizerInit(speechSynthesizer);
-  HLXSpeechSynthesizerSetVolume(speechSynthesizer, 1.0);
-  HLXSpeechSynthesizerSpeak(speechSynthesizer, "Hello, world!", true);
-#endif
-
-  // Wait for the speech to finish.
-  std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+  event_loop_thread.join();
 
   return 0;
 }
