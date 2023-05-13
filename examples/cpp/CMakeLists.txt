@@ -55,6 +55,7 @@ elseif(WIN32)
         $<TARGET_NAME_IF_EXISTS:SDL2::SDL2main>
         $<IF:$<TARGET_EXISTS:SDL2::SDL2>,SDL2::SDL2,SDL2::SDL2-static>
     )
+    target_link_libraries(helix INTERFACE D3DCompiler)
 else()
     find_package(SDL2 REQUIRED)
     target_link_libraries(helix INTERFACE SDL2::SDL2)
