@@ -51,12 +51,14 @@ jobs:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Install dependencies
+    - name: Install deps
       run: |
-        vcpkg integrate install
-        vcpkg install sdl2-ttf sdl2
-
-        # copy SDL lib files from C:\vcpkg\installed\x64-windows\lib to C:\\Users\\runneradmin\\.rustup\\toolchains\\stable-x86_64-pc-windows-msvc\\lib\\rustlib\\x86_64-pc-windows-msvc\\lib
-        cp C:\vcpkg\installed\x64-windows\lib\SDL*.lib C:\\Users\\runneradmin\\.rustup\\toolchains\\stable-x86_64-pc-windows-msvc\\lib\\rustlib\\x86_64-pc-windows-msvc\\lib
+        choco install ninja
+        vcpkg install sdl2-ttf sdl2 --triplet x64-windows
+    - name: Export VCPKG environment
+      run: |
+        "C:\vcpkg\installed\x64-windows-static\bin" >> $env:GITHUB_PATH
+        echo "INCLUDE=C:\vcpkg\installed\x64-windows\include" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        echo "LIB=C:\vcpkg\installed\x64-windows\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
     - name: Test
       run: cargo test --all-features
