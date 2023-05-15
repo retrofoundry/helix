@@ -89,12 +89,9 @@ jobs:
     - name: Install deps
       run: |
         choco install ninja
-        vcpkg integrate install
         vcpkg install sdl2-ttf sdl2 --triplet x64-windows-static
 
         "C:\vcpkg\installed\x64-windows-static\bin" >> $env:GITHUB_PATH
-        "C:\vcpkg\installed\x64-windows-static\include" >> $env:INCLUDE
-        "C:\vcpkg\installed\x64-windows-static\lib" >> $env:LIB
     - name: Build
       working-directory: examples/cpp
       run: |
@@ -110,7 +107,7 @@ jobs:
         vcpkg install sdl2-ttf sdl2 --triplet x64-windows
     - name: Export VCPKG environment
       run: |
-        "C:\vcpkg\installed\x64-windows-static\bin" >> $env:GITHUB_PATH
+        "C:\vcpkg\installed\x64-windows\bin" >> $env:GITHUB_PATH
         echo "INCLUDE=C:\vcpkg\installed\x64-windows\include" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
         echo "LIB=C:\vcpkg\installed\x64-windows\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
     - name: Build
