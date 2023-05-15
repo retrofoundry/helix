@@ -12,3 +12,4 @@ Cargo.lock
 # macOS files
 .DS_Store
 examples/rust/target
+/.idea
