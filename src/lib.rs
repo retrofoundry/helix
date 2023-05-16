@@ -13,7 +13,7 @@ pub fn init() {
     let mut builder = Builder::from_default_env();
 
     #[cfg(debug_assertions)]
-    builder.filter_level(log::LevelFilter::Trace);
+    builder.filter_level(log::LevelFilter::Info);
     #[cfg(not(debug_assertions))]
     builder.filter_level(log::LevelFilter::Info);
 

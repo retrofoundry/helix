@@ -12,6 +12,7 @@ s32 osContInit(OSMesgQueue *mq, u8 *controller_bits, OSContStatus *status) {
 }
 
 s32 osContStartReadData(OSMesgQueue *mesg) {
+    ControllerManagerProcessEvents(_controller_manager);
     return 0;
 }
 

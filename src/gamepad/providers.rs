@@ -10,6 +10,7 @@ pub enum GamepadService {
 
 pub trait GamepadProvider {
     fn scan(&self) -> Vec<Gamepad>;
+    fn process_events(&mut self);
     fn read(&self, controllers: &Gamepad, pad: *mut OSControllerPad);
 }
 

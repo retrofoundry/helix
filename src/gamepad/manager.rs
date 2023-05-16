@@ -34,20 +34,21 @@ impl GamepadManager {
         self.gamepad_bits = gamepad_bits;
     }
 
-    fn scan_for_controllers(&mut self) {
-        self.gamepads.clear();
-
-        for provider in self.providers.iter() {
-            for device in provider.scan() {
-                self.gamepads.push(device);
-            }
+    pub fn process_events(&mut self) {
+        for provider in self.providers.iter_mut() {
+            provider.process_events();
         }
-
-        // TODO: Register a keyboard device?
     }
 
-    pub fn write(&mut self, pad: *mut OSControllerPad) {
+    pub fn read(&mut self, pad: *mut OSControllerPad) {
         // TODO: Handle current slot (*)
+
+        unsafe {
+            (*pad).button = 0;
+            (*pad).stick_x = 0;
+            (*pad).stick_y = 0;
+            (*pad).errno = 0;
+        }
 
         for controller in &self.gamepads {
             match controller.service {
@@ -61,6 +62,18 @@ impl GamepadManager {
                 }
             }
         }
+    }
+
+    fn scan_for_controllers(&mut self) {
+        self.gamepads.clear();
+
+        for provider in self.providers.iter() {
+            for device in provider.scan() {
+                self.gamepads.push(device);
+            }
+        }
+
+        // TODO: Register a keyboard device?
     }
 }
 
@@ -84,14 +97,16 @@ extern "C" fn ControllerManagerInit(
 }
 
 #[no_mangle]
+extern "C" fn ControllerManagerProcessEvents(manager: Option<&mut GamepadManager>) {
+    let manager = manager.unwrap();
+    manager.process_events();
+}
+
+#[no_mangle]
 extern "C" fn ControllerGetReadData(
     manager: Option<&mut GamepadManager>,
     pad: *mut OSControllerPad,
 ) {
-    unsafe {
-        ptr::write_bytes(pad, 0, size_of::<OSControllerPad>());
-    }
-
     let manager = manager.unwrap();
-    manager.write(pad);
+    manager.read(pad);
 }

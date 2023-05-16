@@ -11,6 +11,7 @@ extern "C" {
 
 void* ControllerManagerCreate(void);
 s32 ControllerManagerInit(void* manager, u8* gamepad_bits);
+void ControllerManagerProcessEvents(void* manager);
 void ControllerGetReadData(void* manager, OSContPad* pad);
 
 #ifdef __cplusplus
