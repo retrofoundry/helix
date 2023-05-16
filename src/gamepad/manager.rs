@@ -84,7 +84,10 @@ extern "C" fn ControllerManagerInit(
 }
 
 #[no_mangle]
-extern "C" fn ControllerGetReadData(manager: Option<&mut GamepadManager>, pad: *mut OSControllerPad) {
+extern "C" fn ControllerGetReadData(
+    manager: Option<&mut GamepadManager>,
+    pad: *mut OSControllerPad,
+) {
     unsafe {
         ptr::write_bytes(pad, 0, size_of::<OSControllerPad>());
     }
