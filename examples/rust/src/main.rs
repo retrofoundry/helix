@@ -1,6 +1,14 @@
-use helix::gui::Gui;
+use helix::{gui::Gui, gamepad::manager::ControllerManager};
 
 fn main() {
+    helix::init();
+
+    let mut controller_manager = ControllerManager::new();
+
+    let mut value: u8 = 0;
+    let controller_bits: *mut u8 = &mut value as *mut u8;
+    controller_manager.init(controller_bits);
+
     let mut gui = Gui::new("Helix Example", |ui| {
         ui.menu("File", || {
             ui.menu_item_config("Quit")
