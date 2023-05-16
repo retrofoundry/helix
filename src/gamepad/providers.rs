@@ -1,25 +1,25 @@
-use crate::gamepad::types::OSContPad;
+use crate::gamepad::types::OSControllerPad;
 use ::gilrs::GamepadId;
 
 pub mod gilrs;
 
-pub enum ControllerService {
+pub enum GamepadService {
     GilRs(GamepadId),
     Keyboard(),
 }
 
-pub trait ControllerProvider {
-    fn scan(&self) -> Vec<Controller>;
-    fn read(&self, controllers: &Controller, pad: *mut OSContPad);
+pub trait GamepadProvider {
+    fn scan(&self) -> Vec<Gamepad>;
+    fn read(&self, controllers: &Gamepad, pad: *mut OSControllerPad);
 }
 
-pub struct Controller {
+pub struct Gamepad {
     pub _slot: u8,
-    pub service: ControllerService,
+    pub service: GamepadService,
 }
 
-impl Controller {
-    pub fn new(service: ControllerService) -> Self {
+impl Gamepad {
+    pub fn new(service: GamepadService) -> Self {
         Self { _slot: 0, service }
     }
 }

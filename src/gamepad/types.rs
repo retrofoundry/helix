@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-pub type ControllerBits = *mut u8;
+pub type GamepadBits = *mut u8;
 
 pub enum N64Button {
     A = 0x8000,
@@ -22,7 +22,7 @@ pub enum N64Button {
 // MARK: - [Libultra] - C API
 
 #[repr(C)]
-pub struct OSContPad {
+pub struct OSControllerPad {
     pub button: u16,
     pub stick_x: i8, /* -80 <= stick_x <= 80 */
     pub stick_y: i8, /* -80 <= stick_x <= 80 */

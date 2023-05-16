@@ -1,9 +1,9 @@
-use helix::{gui::Gui, gamepad::manager::ControllerManager};
+use helix::{gui::Gui, gamepad::manager::GamepadManager};
 
 fn main() {
     helix::init();
 
-    let mut controller_manager = ControllerManager::new();
+    let mut controller_manager = GamepadManager::new();
 
     let mut value: u8 = 0;
     let controller_bits: *mut u8 = &mut value as *mut u8;

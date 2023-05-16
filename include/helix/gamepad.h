@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
 void* ControllerManagerCreate(void);
-s32 ControllerManagerInit(void* manager, u8* controller_bits);
+s32 ControllerManagerInit(void* manager, u8* gamepad_bits);
 void ControllerGetReadData(void* manager, OSContPad* pad);
 
 #ifdef __cplusplus

@@ -1,14 +1,14 @@
-use crate::gamepad::providers::{Controller, ControllerProvider, ControllerService};
-use crate::gamepad::types::{N64Button, OSContPad};
+use crate::gamepad::providers::{Gamepad, GamepadProvider, GamepadService};
+use crate::gamepad::types::{N64Button, OSControllerPad};
 use gilrs::{Axis, Button, Gilrs};
 use log::{debug, info, trace};
 use std::sync::{Arc, Mutex};
 
-pub struct GirlsControllerProvider {
+pub struct GirlsGamepadProvider {
     pub api: Gilrs,
 }
 
-impl GirlsControllerProvider {
+impl GirlsGamepadProvider {
     pub fn new() -> Self {
         let api = Gilrs::new().unwrap();
         trace!("Connected gamepads: {}", api.gamepads().count());
@@ -16,21 +16,21 @@ impl GirlsControllerProvider {
     }
 }
 
-impl ControllerProvider for GirlsControllerProvider {
-    fn scan(&self) -> Vec<Controller> {
+impl GamepadProvider for GirlsGamepadProvider {
+    fn scan(&self) -> Vec<Gamepad> {
         trace!("Scanning for gamepads...");
-        let mut devices: Vec<Controller> = Vec::new();
+        let mut devices: Vec<Gamepad> = Vec::new();
 
         for (id, gamepad) in self.api.gamepads() {
             debug!("Found gamepad: {}", gamepad.name());
-            devices.push(Controller::new(ControllerService::GilRs(id)));
+            devices.push(Gamepad::new(GamepadService::GilRs(id)));
         }
 
         devices
     }
 
-    fn read(&self, controller: &Controller, pad: *mut OSContPad) {
-        if let ControllerService::GilRs(gamepad_id) = controller.service {
+    fn read(&self, controller: &Gamepad, pad: *mut OSControllerPad) {
+        if let GamepadService::GilRs(gamepad_id) = controller.service {
             let gamepad = self.api.gamepad(gamepad_id);
             // TODO: should we unlock the api right away?
 
