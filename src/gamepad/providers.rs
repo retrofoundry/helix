@@ -1,5 +1,5 @@
-use ::gilrs::GamepadId;
 use crate::gamepad::types::OSContPad;
+use ::gilrs::GamepadId;
 
 pub mod gilrs;
 
@@ -20,9 +20,6 @@ pub struct Controller {
 
 impl Controller {
     pub fn new(service: ControllerService) -> Self {
-        Self {
-            _slot: 0,
-            service,
-        }
+        Self { _slot: 0, service }
     }
 }

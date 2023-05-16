@@ -1,10 +1,10 @@
-use super::types::{ControllerBits, OSContPad};
 use super::providers::gilrs::GirlsControllerProvider;
+use super::types::{ControllerBits, OSContPad};
+use crate::gamepad::providers::{Controller, ControllerProvider, ControllerService};
 use std::mem::size_of;
 use std::os::raw::c_void;
 use std::ptr;
 use std::ptr::null_mut;
-use crate::gamepad::providers::{Controller, ControllerProvider, ControllerService};
 
 pub struct ControllerManager {
     controllers: Vec<Controller>,
@@ -22,11 +22,15 @@ impl ControllerManager {
     }
 
     pub fn init(&mut self, controller_bits: ControllerBits) {
-        unsafe { *controller_bits = 0;}
+        unsafe {
+            *controller_bits = 0;
+        }
 
         self.scan_for_controllers();
 
-        unsafe { *controller_bits = 1; }
+        unsafe {
+            *controller_bits = 1;
+        }
         self.controller_bits = controller_bits;
     }
 
@@ -51,7 +55,7 @@ impl ControllerManager {
                     for provider in &self.providers {
                         provider.read(controller, pad);
                     }
-                },
+                }
                 ControllerService::Keyboard() => {
                     todo!("Implement keyboard gamepad");
                 }
@@ -69,7 +73,10 @@ pub extern "C" fn ControllerManagerCreate() -> Box<ControllerManager> {
 }
 
 #[no_mangle]
-extern "C" fn ControllerManagerInit(manager: Option<&mut ControllerManager>, controller_bits: ControllerBits) -> i32 {
+extern "C" fn ControllerManagerInit(
+    manager: Option<&mut ControllerManager>,
+    controller_bits: ControllerBits,
+) -> i32 {
     let manager = manager.unwrap();
     manager.init(controller_bits);
 
@@ -78,7 +85,9 @@ extern "C" fn ControllerManagerInit(manager: Option<&mut ControllerManager>, con
 
 #[no_mangle]
 extern "C" fn ControllerGetReadData(manager: Option<&mut ControllerManager>, pad: *mut OSContPad) {
-    unsafe { ptr::write_bytes(pad, 0, size_of::<OSContPad>()); }
+    unsafe {
+        ptr::write_bytes(pad, 0, size_of::<OSContPad>());
+    }
 
     let manager = manager.unwrap();
     manager.write(pad);

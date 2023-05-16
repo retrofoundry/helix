@@ -1,8 +1,8 @@
-use gilrs::{Axis, Button, Gilrs};
-use std::sync::{Arc, Mutex};
-use log::{debug, info, trace};
 use crate::gamepad::providers::{Controller, ControllerProvider, ControllerService};
 use crate::gamepad::types::{N64Button, OSContPad};
+use gilrs::{Axis, Button, Gilrs};
+use log::{debug, info, trace};
+use std::sync::{Arc, Mutex};
 
 pub struct GirlsControllerProvider {
     pub api: Gilrs,
@@ -15,7 +15,6 @@ impl GirlsControllerProvider {
         Self { api }
     }
 }
-
 
 impl ControllerProvider for GirlsControllerProvider {
     fn scan(&self) -> Vec<Controller> {
@@ -35,7 +34,9 @@ impl ControllerProvider for GirlsControllerProvider {
             let gamepad = self.api.gamepad(gamepad_id);
             // TODO: should we unlock the api right away?
 
-            if !gamepad.is_connected() { return; }
+            if !gamepad.is_connected() {
+                return;
+            }
 
             // if (gp->wButtons & XINPUT_GAMEPAD_START) pad->button |= START_BUTTON;
             // if (gp->wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER) pad->button |= Z_TRIG;
@@ -101,10 +102,7 @@ impl ControllerProvider for GirlsControllerProvider {
                 trace!("Left Y: {}", left_x);
                 trace!("Right X: {}", right_x);
                 trace!("Right Y: {}", right_y);
-
             }
-
-
         }
 
         panic!("The given gamepad does not belong to this service");
