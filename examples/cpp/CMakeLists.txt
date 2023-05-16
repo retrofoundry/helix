@@ -60,7 +60,7 @@ elseif(WIN32)
 else()
     find_package(SDL2 REQUIRED)
     target_link_libraries(helix INTERFACE SDL2::SDL2)
-    target_link_libraries(helix INTERFACE asound speechd)
+    target_link_libraries(helix INTERFACE asound speechd udev)
 endif()
 
 
