@@ -1,17 +1,18 @@
-mod imgui_sdl_support;
-
 use anyhow::Result;
 use imgui::{Context, FontSource, Ui};
 use imgui_wgpu::{Renderer, RendererConfig};
 use log::trace;
 use pollster::block_on;
-use sdl2::{
-    event::{Event, WindowEvent},
-    video::Window,
-    EventPump,
-};
 use std::str;
 use std::{ffi::CStr, time::Instant};
+use imgui_winit_support::winit::{
+    dpi::PhysicalSize,
+    event::{Event, WindowEvent},
+    event_loop::EventLoop,
+    window::{Window, WindowBuilder},
+};
+use winit::event_loop::ControlFlow;
+use winit::platform::run_return::EventLoopExtRunReturn;
 
 use crate::fast3d::{graphics::GraphicsContext, rcp::RCP};
 
@@ -30,8 +31,8 @@ pub struct Gui {
 
     // render
     renderer: Renderer,
-    platform: SdlPlatform,
-    event_pump: EventPump,
+    platform: imgui_winit_support::WinitPlatform,
+    event_loop: EventLoop<()>,
 
     // imgui
     imgui: Context,
@@ -75,11 +76,6 @@ impl Gui {
             .metal_view()
             .build()?;
 
-        // Get the sdl event pump
-        let event_pump = sdl
-            .event_pump()
-            .map_err(|e| anyhow::anyhow!("Failed to get sdl event pump: {}", e))?;
-
         // Create the wgpu instance
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
@@ -88,6 +84,8 @@ impl Gui {
 
         // Create the wgpu surface
         let surface = unsafe { instance.create_surface(&window)? };
+
+        let hidpi_factor = window.scale_factor();
 
         // Request the adapter
         let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
@@ -101,15 +99,13 @@ impl Gui {
         let (device, queue) =
             block_on(adapter.request_device(&wgpu::DeviceDescriptor::default(), None))?;
 
-        // Get surface format
-        let surface_format = surface.get_capabilities(&adapter).formats[0];
         // Configure the surface
         let surface_desc = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT, // | wgpu::TextureUsages::COPY_DST,
-            format: surface_format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: wgpu::TextureFormat::Bgra8UnormSrgb,
             width,
             height,
-            present_mode: wgpu::PresentMode::Fifo, // wgpu::PresentMode::AutoVsync,
+            present_mode: wgpu::PresentMode::Fifo,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             view_formats: vec![wgpu::TextureFormat::Bgra8Unorm],
         };
@@ -117,19 +113,22 @@ impl Gui {
         surface.configure(&device, &surface_desc);
 
         // Setup ImGui
-        let mut imgui = imgui::Context::create();
+        let mut imgui = Context::create();
 
         // Create the egui + sdl2 platform
-        let platform = SdlPlatform::init(&mut imgui);
+        let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
+        platform.attach_window(
+            imgui.io_mut(),
+            &window,
+            imgui_winit_support::HiDpiMode::Default,
+        );
 
         // Setup Dear ImGui style
         imgui.set_ini_filename(None);
 
-        // TODO: Get this via SDL
-        let hidpi_factor: f32 = 2.0; //window.scale_factor();
-
-        let font_size = 13.0 * hidpi_factor;
-        imgui.io_mut().font_global_scale = 1.0 / hidpi_factor;
+        // Setup fonts
+        let font_size = (13.0 * hidpi_factor) as f32;
+        imgui.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
 
         imgui.fonts().add_font(&[FontSource::DefaultFontData {
             config: Some(imgui::FontConfig {
@@ -161,7 +160,7 @@ impl Gui {
             queue,
             renderer,
             platform,
-            event_pump,
+            event_loop: EventLoop::new(),
             imgui,
             ui_state: UIState { last_frame_time },
             draw_menu_callback: Box::new(draw_menu),
@@ -190,33 +189,65 @@ impl Gui {
     }
 
     fn handle_events(&mut self) {
-        for event in self.event_pump.poll_iter() {
-            // Handle sdl events
+        self.event_loop.run_return(|event, _, control_flow| {
+            *control_flow = ControlFlow::Poll;
+
             match event {
-                Event::Window {
-                    window_id,
-                    win_event,
+                Event::WindowEvent {
+                    event: WindowEvent::CloseRequested,
                     ..
-                } if window_id == self.window.id() => match win_event {
-                    WindowEvent::Close => {
-                        std::process::exit(0);
-                    }
-                    WindowEvent::Resized(_w, _h) => {
-                        self.recreate_swapchain().unwrap();
-                        break;
-                    }
-                    WindowEvent::SizeChanged(_w, _h) => {
-                        self.recreate_swapchain().unwrap();
-                        break;
-                    }
-                    _ => {}
-                },
-                _ => {}
+                } => {
+                    *control_flow = ControlFlow::Exit;
+                }
+                Event::WindowEvent {
+                    event: WindowEvent::Resized(_),
+                    ..
+                } => {
+                    self.recreate_swapchain().unwrap();
+                }
+                Event::WindowEvent {
+                    event: WindowEvent::SizeChanged(_),
+                    ..
+                } => {
+                    self.recreate_swapchain().unwrap();
+                }
+                Event::MainEventsCleared => {
+                    self.window.request_redraw();
+                }
+                Event::RedrawRequested(_) => {}
+                _ => (),
             }
 
-            // Let the ImGui platform handle the event
-            self.platform.handle_event(&mut self.imgui, &event);
-        }
+            self.platform.handle_event(self.imgui.io_mut(), &self.window, &event);
+        });
+
+        // for event in self.event_pump.poll_iter() {
+        //     // Handle sdl events
+        //     match event {
+        //         Event::Window {
+        //             window_id,
+        //             win_event,
+        //             ..
+        //         } if window_id == self.window.id() => match win_event {
+        //             WindowEvent::Close => {
+        //                 std::process::exit(0);
+        //             }
+        //             WindowEvent::Resized(_w, _h) => {
+        //                 self.recreate_swapchain().unwrap();
+        //                 break;
+        //             }
+        //             WindowEvent::SizeChanged(_w, _h) => {
+        //                 self.recreate_swapchain().unwrap();
+        //                 break;
+        //             }
+        //             _ => {}
+        //         },
+        //         _ => {}
+        //     }
+        //
+        //     // Let the ImGui platform handle the event
+        //     self.platform.handle_event(&mut self.imgui, &event);
+        // }
     }
 
     pub fn start_frame(&mut self) {
@@ -232,7 +263,7 @@ impl Gui {
 
         // Get the ImGui context and begin drawing the frame
         self.platform
-            .prepare_frame(&mut self.imgui, &self.window, &self.event_pump);
+            .prepare_frame(self.imgui.io_mut(), &self.window)?;
     }
 
     fn render(&mut self) -> Result<()> {

@@ -32,10 +32,11 @@ gilrs = { version = "0.10.2", features = ["serde", "serde-serialize"] }
 glam = { git = "https://github.com/bitshifter/glam-rs.git", branch = "neon", features = ["approx"] }
 imgui = { version = "0.10.0", features = ["docking"] }
 imgui-wgpu = "0.22.0"
+imgui-winit-support = "0.10.0"
 libc = "0.2.139"
 log = "0.4.17"
 pollster = "0.3.0"
-sdl2 = { git = "https://github.com/rust-sdl2/rust-sdl2", features = ["raw-window-handle"] }
 tokio = { version = "1.26.0", features = ["full"], optional = true }
 tts = { version = "0.25.0", optional = true }
 wgpu = "0.15.1"
+winit = { version = "0.27.2", features = ["x11", "wayland", "wayland-dlopen", "wayland-csd-adwaita"] }
