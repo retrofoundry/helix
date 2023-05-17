@@ -41,6 +41,7 @@ jobs:
         sudo apt-get install libasound2-dev
         sudo apt-get install libspeechd-dev
         sudo apt-get install libsdl2-dev
+        sudo apt-get install libx11-dev
     - name: Install latest SDL
       run: |
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
