@@ -1,5 +1,6 @@
 use super::providers::gilrs::GirlsGamepadProvider;
 use super::types::{GamepadBits, OSControllerPad};
+use crate::gamepad::providers::keyboard::KeyboardGamepadProvider;
 use crate::gamepad::providers::{Gamepad, GamepadProvider, GamepadService};
 use std::mem::size_of;
 use std::os::raw::c_void;
@@ -17,7 +18,10 @@ impl GamepadManager {
         Self {
             gamepads: Vec::new(),
             gamepad_bits: null_mut(),
-            providers: vec![Box::new(GirlsGamepadProvider::new())],
+            providers: vec![
+                Box::new(GirlsGamepadProvider::new()),
+                Box::new(KeyboardGamepadProvider::new()),
+            ],
         }
     }
 
@@ -51,15 +55,8 @@ impl GamepadManager {
         }
 
         for controller in &self.gamepads {
-            match controller.service {
-                GamepadService::GilRs(_) => {
-                    for provider in &self.providers {
-                        provider.read(controller, pad);
-                    }
-                }
-                GamepadService::Keyboard() => {
-                    todo!("Implement keyboard gamepad");
-                }
+            for provider in &self.providers {
+                provider.read(controller, pad);
             }
         }
     }
@@ -67,13 +64,11 @@ impl GamepadManager {
     fn scan_for_controllers(&mut self) {
         self.gamepads.clear();
 
-        for provider in self.providers.iter() {
+        for provider in &self.providers {
             for device in provider.scan() {
                 self.gamepads.push(device);
             }
         }
-
-        // TODO: Register a keyboard device?
     }
 }
 

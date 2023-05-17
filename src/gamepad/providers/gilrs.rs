@@ -70,6 +70,18 @@ impl GamepadProvider for GirlsGamepadProvider {
                 if gamepad.is_pressed(Button::East) {
                     (*pad).button |= N64Button::CDown as u16;
                 }
+                if gamepad.is_pressed(Button::DPadUp) {
+                    (*pad).button |= N64Button::DUp as u16;
+                }
+                if gamepad.is_pressed(Button::DPadDown) {
+                    (*pad).button |= N64Button::DDown as u16;
+                }
+                if gamepad.is_pressed(Button::DPadLeft) {
+                    (*pad).button |= N64Button::DLeft as u16;
+                }
+                if gamepad.is_pressed(Button::DPadRight) {
+                    (*pad).button |= N64Button::DRight as u16;
+                }
 
                 let left_x = gamepad.value(Axis::LeftStickX);
                 let left_y = gamepad.value(Axis::LeftStickY);
@@ -89,8 +101,6 @@ impl GamepadProvider for GirlsGamepadProvider {
                 trace!("Left X: {}", (*pad).stick_x);
                 trace!("Left Y: {}", (*pad).stick_y);
             }
-        } else {
-            panic!("The given gamepad does not belong to this service");
         }
     }
 }

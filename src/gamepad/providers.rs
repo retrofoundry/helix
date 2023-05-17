@@ -2,6 +2,7 @@ use crate::gamepad::types::OSControllerPad;
 use ::gilrs::GamepadId;
 
 pub mod gilrs;
+pub mod keyboard;
 
 pub enum GamepadService {
     GilRs(GamepadId),
