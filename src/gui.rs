@@ -1,16 +1,16 @@
 use anyhow::Result;
 use imgui::{Context, FontSource, Ui};
 use imgui_wgpu::{Renderer, RendererConfig};
-use log::trace;
-use pollster::block_on;
-use std::str;
-use std::{ffi::CStr, time::Instant};
 use imgui_winit_support::winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
     event_loop::EventLoop,
     window::{Window, WindowBuilder},
 };
+use log::trace;
+use pollster::block_on;
+use std::str;
+use std::{ffi::CStr, time::Instant};
 use winit::event_loop::ControlFlow;
 use winit::platform::run_return::EventLoopExtRunReturn;
 
@@ -178,36 +178,39 @@ impl Gui {
     }
 
     fn handle_events(&mut self, event_loop_wrapper: &mut EventLoopWrapper) {
-        event_loop_wrapper.event_loop.run_return(|event, _, control_flow| {
-            *control_flow = ControlFlow::Poll;
+        event_loop_wrapper
+            .event_loop
+            .run_return(|event, _, control_flow| {
+                *control_flow = ControlFlow::Poll;
 
-            match event {
-                Event::WindowEvent {
-                    event: WindowEvent::Resized(_),
-                    ..
-                } => {
-                    self.recreate_swapchain().unwrap();
+                match event {
+                    Event::WindowEvent {
+                        event: WindowEvent::Resized(_),
+                        ..
+                    } => {
+                        self.recreate_swapchain().unwrap();
+                    }
+                    Event::WindowEvent {
+                        event: WindowEvent::ScaleFactorChanged { .. },
+                        ..
+                    } => {
+                        self.recreate_swapchain().unwrap();
+                    }
+                    Event::WindowEvent {
+                        event: WindowEvent::CloseRequested,
+                        ..
+                    } => {
+                        // control_flow.set_exit();
+                        std::process::exit(0);
+                    }
+                    Event::MainEventsCleared => control_flow.set_exit(),
+                    Event::RedrawRequested(_window_id) => {}
+                    _ => (),
                 }
-                Event::WindowEvent {
-                    event: WindowEvent::ScaleFactorChanged { .. },
-                    ..
-                } => {
-                    self.recreate_swapchain().unwrap();
-                }
-                Event::WindowEvent {
-                    event: WindowEvent::CloseRequested,
-                    ..
-                } => {
-                    // control_flow.set_exit();
-                    std::process::exit(0);
-                }
-                Event::MainEventsCleared => control_flow.set_exit(),
-                Event::RedrawRequested(_window_id) => {},
-                _ => (),
-            }
 
-            self.platform.handle_event(self.imgui.io_mut(), &self.window, &event);
-        });
+                self.platform
+                    .handle_event(self.imgui.io_mut(), &self.window, &event);
+            });
     }
 
     pub fn start_frame(&mut self, event_loop_wrapper: &mut EventLoopWrapper) {
@@ -318,7 +321,11 @@ pub extern "C" fn GUICreateEventLoop() -> Box<EventLoopWrapper> {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn GUICreate(title_raw: *const i8, event_loop: Option<&mut EventLoopWrapper>, draw_menu: Option<OnDraw>) -> Box<Gui> {
+pub unsafe extern "C" fn GUICreate(
+    title_raw: *const i8,
+    event_loop: Option<&mut EventLoopWrapper>,
+    draw_menu: Option<OnDraw>,
+) -> Box<Gui> {
     let title_str: &CStr = unsafe { CStr::from_ptr(title_raw) };
     let title: &str = str::from_utf8(title_str.to_bytes()).unwrap();
 
