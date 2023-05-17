@@ -23,7 +23,7 @@ pub fn map_stick_value_to_n64(x: f32, y: f32, max_range: f32) -> Option<(i8, i8)
 
     // Step 2: Limit values to points within an octagon
     let (limited_x, limited_y) = limit_to_octagon(adjusted_x, adjusted_y);
-    return Some((limited_x as i8, limited_y as i8));
+    Some((limited_x as i8, limited_y as i8))
 }
 
 #[cfg(test)]

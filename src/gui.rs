@@ -128,8 +128,8 @@ impl Gui {
         // TODO: Get this via SDL
         let hidpi_factor: f32 = 2.0; //window.scale_factor();
 
-        let font_size = (13.0 * hidpi_factor) as f32;
-        imgui.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
+        let font_size = 13.0 * hidpi_factor;
+        imgui.io_mut().font_global_scale = 1.0 / hidpi_factor;
 
         imgui.fonts().add_font(&[FontSource::DefaultFontData {
             config: Some(imgui::FontConfig {

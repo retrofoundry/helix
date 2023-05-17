@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 pub type GamepadBits = *mut u8;
 
 pub enum N64Button {

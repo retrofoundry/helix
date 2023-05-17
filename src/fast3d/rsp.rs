@@ -45,7 +45,7 @@ impl StagingVertex {
 pub enum RSPGeometry {
     G_ZBUFFER = 1 << 0,
     G_SHADE = 1 << 2,
-    G_TEXTURE_ENABLE = 0 << 0,
+    G_TEXTURE_ENABLE = 0,
     G_SHADING_SMOOTH = 1 << 21,
     G_CULL_FRONT = 1 << 9,
     G_CULL_BACK = 1 << 10,

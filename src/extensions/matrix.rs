@@ -16,7 +16,7 @@ impl MatrixFrom for Mat4 {
 
                 let a = (int_part as u32 & 0xFFFF0000) as i32;
                 let b = (frac_part >> 16) as i32;
-                let c = (int_part << 16) as i32;
+                let c = int_part << 16;
                 let d = frac_part as i32 & 0xFFFF;
 
                 f_mtx.col_mut(j)[i] = (a | b) as f32 / 65536.0;

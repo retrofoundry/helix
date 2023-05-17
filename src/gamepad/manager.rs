@@ -1,10 +1,8 @@
 use super::providers::gilrs::GirlsGamepadProvider;
 use super::types::{GamepadBits, OSControllerPad};
 use crate::gamepad::providers::keyboard::KeyboardGamepadProvider;
-use crate::gamepad::providers::{Gamepad, GamepadProvider, GamepadService};
-use std::mem::size_of;
-use std::os::raw::c_void;
-use std::ptr;
+use crate::gamepad::providers::{Gamepad, GamepadProvider};
+
 use std::ptr::null_mut;
 
 pub struct GamepadManager {
@@ -70,7 +68,7 @@ impl GamepadManager {
         }
 
         unsafe {
-            *self.gamepad_bits = if self.gamepads.len() > 0 { 1 } else { 0 };
+            *self.gamepad_bits = if !self.gamepads.is_empty() { 1 } else { 0 };
         }
     }
 }

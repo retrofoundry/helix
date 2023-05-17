@@ -321,21 +321,21 @@ impl RDP {
         if let Some(value) = self.texture_manager.lookup(
             gfx_context,
             tmem_index,
-            self.texture_image_state.address as usize,
+            self.texture_image_state.address,
             fmt,
             siz,
         ) {
-            self.rendering_state.textures[tmem_index as usize] = *value;
+            self.rendering_state.textures[tmem_index] = *value;
             true
         } else {
             let value = self.texture_manager.insert(
                 gfx_context,
                 tmem_index,
-                self.texture_image_state.address as usize,
+                self.texture_image_state.address,
                 fmt,
                 siz,
             );
-            self.rendering_state.textures[tmem_index as usize] = *value;
+            self.rendering_state.textures[tmem_index] = *value;
             false
         }
     }
@@ -617,14 +617,12 @@ impl RDP {
                 gfx_context.api.set_depth_compare(depth_compare as u8);
                 self.rendering_state.depth_compare = depth_compare;
             }
-        } else {
-            if self.rendering_state.depth_compare != CompareFunction::Always {
-                self.flush(gfx_context);
-                gfx_context
-                    .api
-                    .set_depth_compare(CompareFunction::Always as u8);
-                self.rendering_state.depth_compare = CompareFunction::Always;
-            }
+        } else if self.rendering_state.depth_compare != CompareFunction::Always {
+            self.flush(gfx_context);
+            gfx_context
+                .api
+                .set_depth_compare(CompareFunction::Always as u8);
+            self.rendering_state.depth_compare = CompareFunction::Always;
         }
 
         // handle depth write
@@ -672,10 +670,10 @@ impl RDP {
                 operation: BlendOperation::Add,
             };
 
-            return BlendState {
+            BlendState {
                 color: blend_component,
                 alpha: blend_component,
-            };
+            }
         } else {
             // without FORCE_BL, blending only happens for AA of internal edges
             // since we are ignoring n64 coverage values and AA, this means "never"
@@ -686,10 +684,10 @@ impl RDP {
                 operation: BlendOperation::Add,
             };
 
-            return BlendState {
+            BlendState {
                 color: blend_component,
                 alpha: blend_component,
-            };
+            }
         }
     }
 

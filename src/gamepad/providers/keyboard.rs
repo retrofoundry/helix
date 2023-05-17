@@ -2,7 +2,6 @@ use crate::gamepad::providers::{Gamepad, GamepadProvider, GamepadService};
 use crate::gamepad::types::{N64Button, OSControllerPad};
 use crate::gamepad::utils::MAX_N64_AXIS_RANGE;
 use device_query::{DeviceQuery, DeviceState, Keycode};
-use log::trace;
 
 pub struct KeyboardGamepadProvider {
     pub api: Option<DeviceState>,
