@@ -62,8 +62,10 @@ elseif(WIN32)
     target_link_libraries(helix INTERFACE D3DCompiler)
 else()
     find_package(SDL2 REQUIRED)
+    find_package(X11)
     target_link_libraries(helix INTERFACE SDL2::SDL2)
     target_link_libraries(helix INTERFACE asound speechd udev)
+    target_link_libraries(helix INTERFACE X11)
 endif()
 
 
