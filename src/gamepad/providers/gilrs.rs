@@ -2,7 +2,7 @@ use crate::gamepad::providers::{Gamepad, GamepadProvider, GamepadService};
 use crate::gamepad::types::{N64Button, OSControllerPad};
 use crate::gamepad::utils::map_stick_value_to_n64;
 use gilrs::{Axis, Button, Gilrs};
-use log::{debug, info, trace};
+use log::{debug, trace};
 use std::sync::{Arc, Mutex};
 
 pub struct GirlsGamepadProvider {
@@ -36,7 +36,6 @@ impl GamepadProvider for GirlsGamepadProvider {
     fn read(&self, controller: &Gamepad, pad: *mut OSControllerPad) {
         if let GamepadService::GilRs(gamepad_id) = controller.service {
             let gamepad = self.api.gamepad(gamepad_id);
-            // TODO: should we unlock the api right away?
 
             if !gamepad.is_connected() {
                 debug!("Gamepad is not connected");
@@ -68,11 +67,18 @@ impl GamepadProvider for GirlsGamepadProvider {
                 if gamepad.is_pressed(Button::West) {
                     (*pad).button |= N64Button::B as u16;
                 }
+                if gamepad.is_pressed(Button::East) {
+                    (*pad).button |= N64Button::CDown as u16;
+                }
 
                 let left_x = gamepad.value(Axis::LeftStickX);
                 let left_y = gamepad.value(Axis::LeftStickY);
-                let right_x = gamepad.value(Axis::RightStickX);
+                let _right_x = gamepad.value(Axis::RightStickX);
                 let right_y = gamepad.value(Axis::RightStickY);
+
+                if right_y > 0.3 {
+                    (*pad).button |= N64Button::CUp as u16;
+                }
 
                 if let Some((adjusted_x, adjusted_y)) = map_stick_value_to_n64(left_x, left_y, 1.0)
                 {
