@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 include(cmake/prelude.cmake)
+include(FindFontconfig)
 
 project(
     cpp
@@ -55,9 +56,14 @@ elseif(WIN32)
     target_link_libraries(helix INTERFACE ntdll)
     target_link_libraries(helix INTERFACE D3DCompiler)
 else()
-    find_package(X11)
-    target_link_libraries(helix INTERFACE asound speechd udev)
-    target_link_libraries(helix INTERFACE X11)
+    find_package(X11 REQUIRED)
+    find_package(ALSA REQUIRED)
+    find_package(Freetype REQUIRED)
+    find_package(Fontconfig REQUIRED)
+    target_link_libraries(helix INTERFACE ${ALSA_LIBRARIES} speechd udev)
+    target_link_libraries(helix INTERFACE ${X11_LIBRARIES})
+    target_link_libraries(helix INTERFACE ${FREETYPE_LIBRARIES})
+    target_link_libraries(helix INTERFACE Fontconfig::Fontconfig)
 endif()
 
 
