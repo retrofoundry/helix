@@ -200,7 +200,6 @@ impl Gui {
                         event: WindowEvent::CloseRequested,
                         ..
                     } => {
-                        // control_flow.set_exit();
                         std::process::exit(0);
                     }
                     Event::MainEventsCleared => control_flow.set_exit(),
