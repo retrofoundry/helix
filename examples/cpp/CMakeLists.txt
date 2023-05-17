@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 include(cmake/prelude.cmake)
+include(FindFontconfig)
 
 project(
     cpp
@@ -45,27 +46,28 @@ target_link_libraries(cpp_exe PRIVATE helix)
 target_include_directories(cpp_exe PRIVATE ../../include)
 
 if(APPLE)
-    find_package(SDL2 REQUIRED)
-    target_link_libraries(helix INTERFACE SDL2::SDL2)
     target_link_libraries(helix INTERFACE "-framework Foundation")
     target_link_libraries(helix INTERFACE "-framework CoreFoundation -framework AVFoundation -framework CoreAudio -framework AudioToolbox")
     target_link_libraries(helix INTERFACE "-framework Metal -framework QuartzCore")
     target_link_libraries(helix INTERFACE "-framework IOKit")
     target_link_libraries(helix INTERFACE "-framework ApplicationServices")
+    target_link_libraries(helix INTERFACE "-framework AppKit")
 elseif(WIN32)
-    find_package(SDL2 CONFIG REQUIRED)
     target_link_libraries(helix INTERFACE ntdll)
-    target_link_libraries(helix INTERFACE
-        $<TARGET_NAME_IF_EXISTS:SDL2::SDL2main>
-        $<IF:$<TARGET_EXISTS:SDL2::SDL2>,SDL2::SDL2,SDL2::SDL2-static>
-    )
     target_link_libraries(helix INTERFACE D3DCompiler)
+    target_link_libraries(helix INTERFACE imm32)
+    target_link_libraries(helix INTERFACE winmm)
+    target_link_libraries(helix INTERFACE uxtheme)
+    target_link_libraries(helix INTERFACE dwmapi)
 else()
-    find_package(SDL2 REQUIRED)
-    find_package(X11)
-    target_link_libraries(helix INTERFACE SDL2::SDL2)
-    target_link_libraries(helix INTERFACE asound speechd udev)
-    target_link_libraries(helix INTERFACE X11)
+    find_package(X11 REQUIRED)
+    find_package(ALSA REQUIRED)
+    find_package(Freetype REQUIRED)
+    find_package(Fontconfig REQUIRED)
+    target_link_libraries(helix INTERFACE ${ALSA_LIBRARIES} speechd udev)
+    target_link_libraries(helix INTERFACE ${X11_LIBRARIES})
+    target_link_libraries(helix INTERFACE ${FREETYPE_LIBRARIES})
+    target_link_libraries(helix INTERFACE Fontconfig::Fontconfig)
 endif()
 
 

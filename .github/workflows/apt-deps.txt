@@ -1,0 +1,1 @@
+ninja-build libasound2-dev libspeechd-dev libx11-dev libfreetype-dev libexpat1-dev libfreetype6-dev libfontconfig1-dev libudev-dev
