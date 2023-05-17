@@ -204,7 +204,6 @@ impl Gui {
                         std::process::exit(0);
                     }
                     Event::MainEventsCleared => control_flow.set_exit(),
-                    Event::RedrawRequested(_window_id) => {}
                     _ => (),
                 }
 
