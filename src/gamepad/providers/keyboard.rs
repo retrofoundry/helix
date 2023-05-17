@@ -25,9 +25,6 @@ impl GamepadProvider for KeyboardGamepadProvider {
 
     fn read(&self, controllers: &Gamepad, pad: *mut OSControllerPad) {
         if let GamepadService::Keyboard() = controllers.service {
-            // let keys: Vec<Keycode> = device_state.get_keys();
-            // println!("Is A pressed? {}", keys.contains(Keycode::A));
-
             let keys = self.api.get_keys();
 
             unsafe {
