@@ -32,6 +32,8 @@ corrosion_import_crate(MANIFEST_PATH ../../Cargo.toml FEATURES speech network)
 
 # ---- Declare executable ----
 
+add_compile_definitions(_LANGUAGE_C_PLUS_PLUS=1)
+
 add_executable(cpp_exe source/main.cpp)
 add_executable(cpp::exe ALIAS cpp_exe)
 
@@ -48,6 +50,8 @@ if(APPLE)
     target_link_libraries(helix INTERFACE "-framework Foundation")
     target_link_libraries(helix INTERFACE "-framework CoreFoundation -framework AVFoundation -framework CoreAudio -framework AudioToolbox")
     target_link_libraries(helix INTERFACE "-framework Metal -framework QuartzCore")
+    target_link_libraries(helix INTERFACE "-framework IOKit")
+    target_link_libraries(helix INTERFACE "-framework ApplicationServices")
 elseif(WIN32)
     find_package(SDL2 CONFIG REQUIRED)
     target_link_libraries(helix INTERFACE ntdll)
@@ -58,8 +62,10 @@ elseif(WIN32)
     target_link_libraries(helix INTERFACE D3DCompiler)
 else()
     find_package(SDL2 REQUIRED)
+    find_package(X11)
     target_link_libraries(helix INTERFACE SDL2::SDL2)
-    target_link_libraries(helix INTERFACE asound speechd)
+    target_link_libraries(helix INTERFACE asound speechd udev)
+    target_link_libraries(helix INTERFACE X11)
 endif()
 
 
