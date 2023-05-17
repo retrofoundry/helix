@@ -30,22 +30,21 @@ impl GamepadManager {
             *gamepad_bits = 0;
         }
 
-        self.scan_for_controllers();
-
-        unsafe {
-            *gamepad_bits = 1;
-        }
         self.gamepad_bits = gamepad_bits;
+        self.scan_for_controllers();
     }
 
     pub fn process_events(&mut self) {
+        // TODO: Perhaps update controllers at a slower rate than the game loop?
+        self.scan_for_controllers();
+
         for provider in self.providers.iter_mut() {
             provider.process_events();
         }
     }
 
     pub fn read(&mut self, pad: *mut OSControllerPad) {
-        // TODO: Handle current slot (*)
+        // TODO: Handle current slot?
 
         unsafe {
             (*pad).button = 0;
@@ -68,6 +67,10 @@ impl GamepadManager {
             for device in provider.scan() {
                 self.gamepads.push(device);
             }
+        }
+
+        unsafe {
+            *self.gamepad_bits = if self.gamepads.len() > 0 { 1 } else { 0 };
         }
     }
 }

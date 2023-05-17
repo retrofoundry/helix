@@ -18,7 +18,6 @@ impl GirlsGamepadProvider {
 
 impl GamepadProvider for GirlsGamepadProvider {
     fn scan(&self) -> Vec<Gamepad> {
-        trace!("Scanning for gamepads...");
         let mut devices: Vec<Gamepad> = Vec::new();
 
         for (id, gamepad) in self.api.gamepads() {
@@ -97,9 +96,6 @@ impl GamepadProvider for GirlsGamepadProvider {
                     (*pad).stick_x = adjusted_x;
                     (*pad).stick_y = adjusted_y;
                 }
-
-                trace!("Left X: {}", (*pad).stick_x);
-                trace!("Left Y: {}", (*pad).stick_y);
             }
         }
     }
