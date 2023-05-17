@@ -9,7 +9,9 @@ fn main() {
     let controller_bits: *mut u8 = &mut value as *mut u8;
     gamepad_manager.init(controller_bits);
 
-    let mut gui = Gui::new("Helix Example", |ui| {
+    let mut event_loop_wrapper = Gui::create_event_loop();
+
+    let mut gui = Gui::new("Helix Example", &event_loop_wrapper, |ui| {
         ui.menu("File", || {
             ui.menu_item_config("Quit")
                 .shortcut("Ctrl+Q")
@@ -29,8 +31,8 @@ fn main() {
     });
 
     loop {
-        gui.start_frame();
-        gui.draw_lists_dummy();
+        gui.start_frame(&mut event_loop_wrapper);
+        // gui.draw_lists_dummy();
         gui.end_frame();
     }
 }

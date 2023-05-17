@@ -28,7 +28,9 @@ auto main() -> int
   uint8_t controller_bits = 0;
   GamepadManagerInit(gamepad_manager, &controller_bits);
 
-  auto gui = GUICreate("Helix Example", &draw_menu_bar);
+  auto event_loop = GUICreateEventLoop();
+
+  auto gui = GUICreate("Helix Example", event_loop, &draw_menu_bar);
 
   auto event_loop_thread = std::thread([] {
     while (true) {
@@ -38,7 +40,7 @@ auto main() -> int
   });
   
   while (true) {
-    GUIStartFrame(gui);
+    GUIStartFrame(gui, event_loop);
     GUIDrawListsDummy(gui);
     GUIEndFrame(gui);
   }
