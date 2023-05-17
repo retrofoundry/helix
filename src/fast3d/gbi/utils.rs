@@ -15,25 +15,25 @@ pub fn get_cmd(val: usize, start_bit: u32, num_bits: u32) -> usize {
 }
 
 pub fn get_segmented_address(w1: usize) -> usize {
-    return w1;
+    w1
 }
 
 pub fn other_mode_l_uses_texture_edge(other_mode_l: u32) -> bool {
-    return other_mode_l >> (OtherModeLayoutL::CVG_X_ALPHA as u32) & 0x01 == 0x01;
+    other_mode_l >> (OtherModeLayoutL::CVG_X_ALPHA as u32) & 0x01 == 0x01
 }
 
 pub fn other_mode_l_uses_alpha(other_mode_l: u32) -> bool {
-    return other_mode_l & ((BlendParamB::G_BL_A_MEM as u32) << (OtherModeLayoutL::B_1 as u32))
-        == 0;
+    other_mode_l & ((BlendParamB::G_BL_A_MEM as u32) << (OtherModeLayoutL::B_1 as u32))
+        == 0
 }
 
 pub fn other_mode_l_uses_fog(other_mode_l: u32) -> bool {
-    return (other_mode_l >> OtherModeLayoutL::P_1 as u32)
-        == BlendParamPMColor::G_BL_CLR_FOG as u32;
+    (other_mode_l >> OtherModeLayoutL::P_1 as u32)
+        == BlendParamPMColor::G_BL_CLR_FOG as u32
 }
 
 pub fn other_mode_l_uses_noise(other_mode_l: u32) -> bool {
-    return other_mode_l & AlphaCompare::G_AC_DITHER as u32 == AlphaCompare::G_AC_DITHER as u32;
+    other_mode_l & AlphaCompare::G_AC_DITHER as u32 == AlphaCompare::G_AC_DITHER as u32
 }
 
 pub fn get_cycle_type_from_other_mode_h(mode_h: u32) -> OtherModeHCycleType {

@@ -115,7 +115,7 @@ impl F3DEX2 {
     pub const G_MV_POINT: u8 = 12;
     pub const G_MV_MATRIX: u8 = 14;
     pub const G_MVO_LOOKATX: u8 = 0; // (0 * 24);
-    pub const G_MVO_LOOKATY: u8 = (1 * 24);
+    pub const G_MVO_LOOKATY: u8 = 24;
     pub const G_MVO_L0: u8 = (2 * 24);
     pub const G_MVO_L1: u8 = (3 * 24);
     pub const G_MVO_L2: u8 = (4 * 24);
@@ -179,7 +179,7 @@ impl F3DEX2 {
         let w0 = unsafe { (*(*command)).words.w0 };
         let w1 = unsafe { (*(*command)).words.w1 };
 
-        let params = get_cmd(w0, 0, 8) as u8 ^ G_MTX::PUSH as u8;
+        let params = get_cmd(w0, 0, 8) as u8 ^ G_MTX::PUSH;
 
         let matrix: Mat4;
 
@@ -193,8 +193,8 @@ impl F3DEX2 {
             matrix = Mat4::from_fixed_point(slice);
         }
 
-        if params & G_MTX::PROJECTION as u8 != 0 {
-            if (params & G_MTX::LOAD as u8) != 0 {
+        if params & G_MTX::PROJECTION != 0 {
+            if (params & G_MTX::LOAD) != 0 {
                 // Load the input matrix into the projection matrix
                 // rsp.projection_matrix.copy_from_slice(&matrix);
                 rsp.projection_matrix = matrix;
@@ -204,7 +204,7 @@ impl F3DEX2 {
             }
         } else {
             // Modelview matrix
-            if params & G_MTX::PUSH as u8 != 0 && rsp.matrix_stack_pointer < MATRIX_STACK_SIZE {
+            if params & G_MTX::PUSH != 0 && rsp.matrix_stack_pointer < MATRIX_STACK_SIZE {
                 // Push a copy of the current matrix onto the stack
                 rsp.matrix_stack_pointer += 1;
 
@@ -214,7 +214,7 @@ impl F3DEX2 {
                 right[0] = left[src_index];
             }
 
-            if params & G_MTX::LOAD as u8 != 0 {
+            if params & G_MTX::LOAD != 0 {
                 // Load the input matrix into the current matrix
                 rsp.matrix_stack[rsp.matrix_stack_pointer - 1] = matrix;
             } else {
@@ -277,12 +277,12 @@ impl F3DEX2 {
         let data = get_segmented_address(w1);
 
         match index {
-            index if index == F3DEX2::G_MV_VIEWPORT as u8 => {
+            index if index == F3DEX2::G_MV_VIEWPORT => {
                 let viewport_ptr = data as *const Viewport;
                 let viewport = unsafe { &*viewport_ptr };
                 rdp.calculate_and_set_viewport(*viewport);
             }
-            index if index == F3DEX2::G_MV_LIGHT as u8 => {
+            index if index == F3DEX2::G_MV_LIGHT => {
                 let light_index = (offset as i8 / 24) - 2;
                 if light_index >= 0 && (light_index as usize) < MAX_LIGHTS {
                     let light_ptr = data as *const Light;
@@ -310,8 +310,8 @@ impl F3DEX2 {
         let _offset: u16 = get_cmd(w0, 0, 16) as u16;
 
         match index {
-            index if index == G_MW::NUMLIGHT as u8 => rsp.set_num_lights(w1 as u8 / 24 + 1),
-            index if index == G_MW::FOG as u8 => {
+            index if index == G_MW::NUMLIGHT => rsp.set_num_lights(w1 as u8 / 24 + 1),
+            index if index == G_MW::FOG => {
                 rsp.fog_multiplier = (w1 >> 16) as i16;
                 rsp.fog_offset = w1 as i16;
             }
@@ -388,17 +388,15 @@ impl F3DEX2 {
 
             x = rdp.adjust_x_for_viewport(x);
 
-            let mut U = ((vertex.texture_coords[0] as i32) * (rdp.texture_state.scale_s as i32)
-                >> 16) as i16;
-            let mut V = ((vertex.texture_coords[1] as i32) * (rdp.texture_state.scale_t as i32)
-                >> 16) as i16;
+            let mut U = (((vertex.texture_coords[0] as i32) * (rdp.texture_state.scale_s as i32)) >> 16) as i16;
+            let mut V = (((vertex.texture_coords[1] as i32) * (rdp.texture_state.scale_t as i32)) >> 16) as i16;
 
             if rsp.geometry_mode & RSPGeometry::G_LIGHTING as u32 > 0 {
                 if !rsp.lights_valid {
                     for i in 0..rsp.num_lights {
                         calculate_normal_dir(
                             &rsp.lights[i as usize],
-                            &rsp.matrix_stack[rsp.matrix_stack_pointer as usize - 1],
+                            &rsp.matrix_stack[rsp.matrix_stack_pointer - 1],
                             &mut rsp.lights_coeffs[i as usize],
                         );
                     }
@@ -408,13 +406,13 @@ impl F3DEX2 {
 
                     calculate_normal_dir(
                         &LOOKAT_X,
-                        &rsp.matrix_stack[rsp.matrix_stack_pointer as usize - 1],
+                        &rsp.matrix_stack[rsp.matrix_stack_pointer - 1],
                         &mut rsp.lookat_coeffs[0],
                     );
 
                     calculate_normal_dir(
                         &LOOKAT_Y,
-                        &rsp.matrix_stack[rsp.matrix_stack_pointer as usize - 1],
+                        &rsp.matrix_stack[rsp.matrix_stack_pointer - 1],
                         &mut rsp.lookat_coeffs[1],
                     );
 
@@ -672,12 +670,10 @@ impl F3DEX2 {
                         rdp.add_to_buf_vbo(color.r as f32 / 255.0);
                         rdp.add_to_buf_vbo(color.g as f32 / 255.0);
                         rdp.add_to_buf_vbo(color.b as f32 / 255.0);
+                    } else if use_fog && color == vertex_array[i].color {
+                        rdp.add_to_buf_vbo(1.0);
                     } else {
-                        if use_fog && color == vertex_array[i].color {
-                            rdp.add_to_buf_vbo(1.0);
-                        } else {
-                            rdp.add_to_buf_vbo(color.a as f32 / 255.0);
-                        }
+                        rdp.add_to_buf_vbo(color.a as f32 / 255.0);
                     }
                 }
             }
@@ -739,14 +735,14 @@ impl F3DEX2 {
         if get_cmd(w0, 16, 1) == 0 {
             // Push return address
             let new_addr = get_segmented_address(w1);
-            return GBIResult::Recurse(new_addr);
+            GBIResult::Recurse(new_addr)
         } else {
             let new_addr = get_segmented_address(w1);
             let cmd = new_addr as *mut Gfx;
             unsafe {
                 *command = cmd.sub(1);
             }
-            return GBIResult::Continue;
+            GBIResult::Continue
         }
     }
 
@@ -783,9 +779,9 @@ impl F3DEX2 {
     }
 
     pub fn gdp_other_mode(rdp: &mut RDP, shift: usize, mask: usize, mode: u64) -> GBIResult {
-        let mask = (((1 as u64) << (mask as u64)) - 1) << shift as u64;
+        let mask = ((1_u64 << (mask as u64)) - 1) << shift as u64;
         let mut om = rdp.other_mode_l as u64 | ((rdp.other_mode_h as u64) << 32);
-        om = (om & !mask) | mode as u64;
+        om = (om & !mask) | mode;
 
         rdp.other_mode_l = om as u32;
         rdp.other_mode_h = (om >> 32) as u32;
@@ -1168,7 +1164,7 @@ impl F3DEX2 {
         lrxf = rdp.adjust_x_for_viewport(lrxf);
 
         {
-            let ul = &mut rsp.vertex_table[MAX_VERTICES + 0];
+            let ul = &mut rsp.vertex_table[MAX_VERTICES];
             ul.position.x = ulxf;
             ul.position.y = ulyf;
             ul.position.z = -1.0;
@@ -1217,7 +1213,7 @@ impl F3DEX2 {
             rdp,
             rsp,
             gfx_context,
-            MAX_VERTICES + 0,
+            MAX_VERTICES,
             MAX_VERTICES + 1,
             MAX_VERTICES + 3,
         );
@@ -1286,7 +1282,7 @@ impl F3DEX2 {
         let lrs: u32 = ((uls << 7) as u32 + (dsdx as u32) * (width as u32)) >> 7;
         let lrt: u32 = ((ult << 7) as u32 + (dtdy as u32) * (height as u32)) >> 7;
 
-        let ul = &mut rsp.vertex_table[MAX_VERTICES + 0];
+        let ul = &mut rsp.vertex_table[MAX_VERTICES];
         ul.uv[0] = uls as f32;
         ul.uv[1] = ult as f32;
 
@@ -1423,12 +1419,8 @@ impl F3DEX2 {
 
 #[cfg(test)]
 mod tests {
-    use super::F3DEX2;
-    use crate::fast3d::{
-        graphics::{DummyGraphicsDevice, GraphicsContext},
-        rdp::RDP,
-        rsp::RSP,
-    };
+    
+    
 
     #[test]
     fn test_moveword() {
