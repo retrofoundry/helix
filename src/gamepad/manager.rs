@@ -3,8 +3,6 @@ use super::types::{GamepadBits, OSControllerPad};
 use crate::gamepad::providers::keyboard::KeyboardGamepadProvider;
 use crate::gamepad::providers::{Gamepad, GamepadProvider};
 
-
-
 use std::ptr::null_mut;
 
 pub struct GamepadManager {

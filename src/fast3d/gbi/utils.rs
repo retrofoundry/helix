@@ -23,13 +23,11 @@ pub fn other_mode_l_uses_texture_edge(other_mode_l: u32) -> bool {
 }
 
 pub fn other_mode_l_uses_alpha(other_mode_l: u32) -> bool {
-    other_mode_l & ((BlendParamB::G_BL_A_MEM as u32) << (OtherModeLayoutL::B_1 as u32))
-        == 0
+    other_mode_l & ((BlendParamB::G_BL_A_MEM as u32) << (OtherModeLayoutL::B_1 as u32)) == 0
 }
 
 pub fn other_mode_l_uses_fog(other_mode_l: u32) -> bool {
-    (other_mode_l >> OtherModeLayoutL::P_1 as u32)
-        == BlendParamPMColor::G_BL_CLR_FOG as u32
+    (other_mode_l >> OtherModeLayoutL::P_1 as u32) == BlendParamPMColor::G_BL_CLR_FOG as u32
 }
 
 pub fn other_mode_l_uses_noise(other_mode_l: u32) -> bool {

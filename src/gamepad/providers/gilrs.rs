@@ -2,8 +2,7 @@ use crate::gamepad::providers::{Gamepad, GamepadProvider, GamepadService};
 use crate::gamepad::types::{N64Button, OSControllerPad};
 use crate::gamepad::utils::map_stick_value_to_n64;
 use gilrs::{Axis, Button, Gilrs};
-use log::{debug};
-
+use log::debug;
 
 pub struct GirlsGamepadProvider {
     pub api: Gilrs,

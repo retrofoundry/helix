@@ -388,8 +388,10 @@ impl F3DEX2 {
 
             x = rdp.adjust_x_for_viewport(x);
 
-            let mut U = (((vertex.texture_coords[0] as i32) * (rdp.texture_state.scale_s as i32)) >> 16) as i16;
-            let mut V = (((vertex.texture_coords[1] as i32) * (rdp.texture_state.scale_t as i32)) >> 16) as i16;
+            let mut U = (((vertex.texture_coords[0] as i32) * (rdp.texture_state.scale_s as i32))
+                >> 16) as i16;
+            let mut V = (((vertex.texture_coords[1] as i32) * (rdp.texture_state.scale_t as i32))
+                >> 16) as i16;
 
             if rsp.geometry_mode & RSPGeometry::G_LIGHTING as u32 > 0 {
                 if !rsp.lights_valid {
@@ -1419,8 +1421,6 @@ impl F3DEX2 {
 
 #[cfg(test)]
 mod tests {
-    
-    
 
     #[test]
     fn test_moveword() {
