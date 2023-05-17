@@ -30,9 +30,8 @@ jobs:
       run: sudo apt update
     - name: Install dependencies
       run: |
-        sudo apt-get install libasound2-dev
-        sudo apt-get install libspeechd-dev
-        sudo apt-get install libx11-dev
+        sudo apt-get update
+        sudo apt-get install -y $(cat .github/workflows/apt-deps.txt)
     - name: Test
       run: cargo test --all-features
   windows-check:

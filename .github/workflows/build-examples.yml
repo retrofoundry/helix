@@ -37,10 +37,8 @@ jobs:
       run: sudo apt update
     - name: Install deps
       run: |
-        sudo apt-get install ninja-build
-        sudo apt-get install libasound2-dev
-        sudo apt-get install libspeechd-dev
-        sudo apt-get install libx11-dev
+        sudo apt-get update
+        sudo apt-get install -y $(cat .github/workflows/apt-deps.txt)
     - name: Build
       working-directory: examples/cpp
       run: |
@@ -54,9 +52,8 @@ jobs:
       run: sudo apt update
     - name: Install deps
       run: |
-        sudo apt-get install ninja-build
-        sudo apt-get install libasound2-dev
-        sudo apt-get install libspeechd-dev
+        sudo apt-get update
+        sudo apt-get install -y $(cat .github/workflows/apt-deps.txt)
     - name: Build
       working-directory: examples/rust
       run: |
