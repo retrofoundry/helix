@@ -76,6 +76,12 @@ impl GamepadProvider for KeyboardGamepadProvider {
                 if keys.contains(&Keycode::H) {
                     (*pad).button |= N64Button::DRight as u16;
                 }
+                if keys.contains(&Keycode::R) {
+                    (*pad).button |= N64Button::L as u16;
+                }
+                if keys.contains(&Keycode::Y) {
+                    (*pad).button |= N64Button::R as u16;
+                }
             }
         }
     }
