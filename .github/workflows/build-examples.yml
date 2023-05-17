@@ -13,7 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Install deps
-      run: brew install ninja SDL2
+      run: brew install ninja
     - name: Build
       working-directory: examples/cpp
       run: |
@@ -24,7 +24,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Install deps
-      run: brew install ninja SDL2
+      run: brew install ninja
     - name: Build
       working-directory: examples/rust
       run: |
@@ -40,18 +40,7 @@ jobs:
         sudo apt-get install ninja-build
         sudo apt-get install libasound2-dev
         sudo apt-get install libspeechd-dev
-        sudo apt-get install libsdl2-dev
         sudo apt-get install libx11-dev
-    - name: Install latest SDL
-      run: |
-        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
-        wget https://www.libsdl.org/release/SDL2-2.26.1.tar.gz
-        tar -xzf SDL2-2.26.1.tar.gz
-        cd SDL2-2.26.1
-        ./configure
-        make -j 10
-        sudo make install
-        sudo cp -av /usr/local/lib/libSDL* /lib/x86_64-linux-gnu/
     - name: Build
       working-directory: examples/cpp
       run: |
@@ -68,17 +57,6 @@ jobs:
         sudo apt-get install ninja-build
         sudo apt-get install libasound2-dev
         sudo apt-get install libspeechd-dev
-        sudo apt-get install libsdl2-dev
-    - name: Install latest SDL
-      run: |
-        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
-        wget https://www.libsdl.org/release/SDL2-2.26.1.tar.gz
-        tar -xzf SDL2-2.26.1.tar.gz
-        cd SDL2-2.26.1
-        ./configure
-        make -j 10
-        sudo make install
-        sudo cp -av /usr/local/lib/libSDL* /lib/x86_64-linux-gnu/
     - name: Build
       working-directory: examples/rust
       run: |
@@ -87,12 +65,6 @@ jobs:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Install deps
-      run: |
-        choco install ninja
-        vcpkg install sdl2-ttf sdl2 --triplet x64-windows-static
-
-        "C:\vcpkg\installed\x64-windows-static\bin" >> $env:GITHUB_PATH
     - name: Build
       working-directory: examples/cpp
       run: |
@@ -102,15 +74,6 @@ jobs:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Install deps
-      run: |
-        choco install ninja
-        vcpkg install sdl2-ttf sdl2 --triplet x64-windows
-    - name: Export VCPKG environment
-      run: |
-        "C:\vcpkg\installed\x64-windows\bin" >> $env:GITHUB_PATH
-        echo "INCLUDE=C:\vcpkg\installed\x64-windows\include" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        echo "LIB=C:\vcpkg\installed\x64-windows\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
     - name: Build
       working-directory: examples/rust
       run: |
