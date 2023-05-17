@@ -31,8 +31,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_calculate_diagonal_limit() {
-        let diagonal_limit = calculate_diagonal_limit(63.0);
-        assert_eq!(diagonal_limit, 47.0);
+    fn test_normalize_stick_value() {
+        assert_eq!(normalize_stick_value(0.0, 1.0), 0.0);
+        assert_eq!(normalize_stick_value(0.5, 1.0), 40.0);
+        assert_eq!(normalize_stick_value(1.0, 1.0), 80.0);
+        assert_eq!(normalize_stick_value(-0.5, 1.0), -40.0);
+        assert_eq!(normalize_stick_value(-1.0, 1.0), -80.0);
     }
 }
