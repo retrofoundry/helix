@@ -9,10 +9,10 @@
 extern "C" {
 #endif
 
-void* ControllerManagerCreate(void);
-s32 ControllerManagerInit(void* manager, u8* gamepad_bits);
-void ControllerManagerProcessEvents(void* manager);
-void ControllerGetReadData(void* manager, OSContPad* pad);
+void* GamepadManagerCreate(void);
+s32 GamepadManagerInit(void* manager, u8* gamepad_bits);
+void GamepadManagerProcessEvents(void* manager);
+void GamepadManagerGetReadData(void* manager, OSContPad* pad);
 
 #ifdef __cplusplus
 }

@@ -3,11 +3,11 @@ use helix::{gui::Gui, gamepad::manager::GamepadManager};
 fn main() {
     helix::init();
 
-    let mut controller_manager = GamepadManager::new();
+    let mut gamepad_manager = GamepadManager::new();
 
     let mut value: u8 = 0;
     let controller_bits: *mut u8 = &mut value as *mut u8;
-    controller_manager.init(controller_bits);
+    gamepad_manager.init(controller_bits);
 
     let mut gui = Gui::new("Helix Example", |ui| {
         ui.menu("File", || {

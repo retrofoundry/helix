@@ -75,13 +75,13 @@ impl GamepadManager {
 // MARK: - C API
 
 #[no_mangle]
-pub extern "C" fn ControllerManagerCreate() -> Box<GamepadManager> {
+pub extern "C" fn GamepadManagerCreate() -> Box<GamepadManager> {
     let hub = GamepadManager::new();
     Box::new(hub)
 }
 
 #[no_mangle]
-extern "C" fn ControllerManagerInit(
+extern "C" fn GamepadManagerInit(
     manager: Option<&mut GamepadManager>,
     gamepad_bits: GamepadBits,
 ) -> i32 {
@@ -92,13 +92,13 @@ extern "C" fn ControllerManagerInit(
 }
 
 #[no_mangle]
-extern "C" fn ControllerManagerProcessEvents(manager: Option<&mut GamepadManager>) {
+extern "C" fn GamepadManagerProcessEvents(manager: Option<&mut GamepadManager>) {
     let manager = manager.unwrap();
     manager.process_events();
 }
 
 #[no_mangle]
-extern "C" fn ControllerGetReadData(
+extern "C" fn GamepadManagerGetReadData(
     manager: Option<&mut GamepadManager>,
     pad: *mut OSControllerPad,
 ) {

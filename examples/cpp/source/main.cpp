@@ -2,10 +2,10 @@
 #include <string>
 #include <thread>
 
+#include <helix/helix.h>
 #include <helix/gui.h>
+#include <helix/gamepad.h>
 #include <imgui/imgui.h>
-
-static bool show_app_metrics = true;
 
 void draw_menu_bar() {
   if (ImGui::BeginMenu("File")) {
@@ -22,6 +22,12 @@ void draw_menu_bar() {
 
 auto main() -> int
 {
+  HelixInit();
+
+  auto gamepad_manager = GamepadManagerCreate();
+  uint8_t controller_bits = 0;
+  GamepadManagerInit(gamepad_manager, &controller_bits);
+
   auto gui = GUICreate("Helix Example", &draw_menu_bar);
 
   auto event_loop_thread = std::thread([] {

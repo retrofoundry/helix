@@ -1,21 +1,21 @@
 #include <libultra/os_cont.h>
 #include <helix/gamepad.h>
 
-void *_controller_manager;
+void *_gamepad_manager;
 
 s32 osContInit(OSMesgQueue *mq, u8 *controller_bits, OSContStatus *status) {
-    if (_controller_manager == NULL) {
-        _controller_manager = ControllerManagerCreate();
+    if (_gamepad_manager == NULL) {
+        _gamepad_manager = GamepadManagerCreate();
     }
 
-    return ControllerManagerInit(_controller_manager, controller_bits);
+    return GamepadManagerInit(_gamepad_manager, controller_bits);
 }
 
 s32 osContStartReadData(OSMesgQueue *mesg) {
-    ControllerManagerProcessEvents(_controller_manager);
+    GamepadManagerProcessEvents(_gamepad_manager);
     return 0;
 }
 
 void osContGetReadData(OSContPad *pad) {
-    return ControllerGetReadData(_controller_manager, pad);
+    return GamepadManagerGetReadData(_gamepad_manager, pad);
 }
