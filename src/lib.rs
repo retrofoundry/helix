@@ -1,7 +1,7 @@
 pub use arie;
 use env_logger::Builder;
 mod extensions;
-mod fast3d;
+pub mod fast3d;
 pub mod gamepad;
 pub mod gui;
 #[cfg(feature = "network")]

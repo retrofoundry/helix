@@ -58,8 +58,8 @@ void RCPReset(void* rcp);
 void RCPRunDL(void* rcp, void* gfx_context, uintptr_t command);
 
 // Gfx Getters and Setters
-void* GfxCreateContext(struct CGraphicsDevice *rapi);
-struct CGraphicsDevice* GfxGetDevice(void* gfx_context);
+void* GfxCreateExternContext(struct CGraphicsDevice *rapi);
+struct CGraphicsDevice* GfxGetExternDevice(void* gfx_context);
 
 // F3DEX2 Commands
 void F3DEX2_GSPMatrix(void* rcp, void* gfx_context, uintptr_t command);

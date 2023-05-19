@@ -1,13 +1,17 @@
-use helix::{gui::Gui, gamepad::manager::GamepadManager};
+use helix::{gui::Gui, gamepad::manager::GamepadManager, fast3d::graphics::{dummy_device::DummyGraphicsDevice, GraphicsContext}};
 
 fn main() {
     helix::init();
+
+    // Gamepad initialization
 
     let mut gamepad_manager = GamepadManager::new();
 
     let mut value: u8 = 0;
     let controller_bits: *mut u8 = &mut value as *mut u8;
     gamepad_manager.init(controller_bits);
+
+    // Gui initialization
 
     let mut event_loop_wrapper = Gui::create_event_loop();
 

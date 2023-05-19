@@ -25,6 +25,8 @@ network = ["dep:tokio"]
 anyhow = "1.0.70"
 approx = "0.5.1"
 arie = "0.1.0"
+bytemuck = { version = "1.13.1", features = ["derive"] }
+cgmath = "0.18.0"
 device_query = {  git = "https://github.com/dcvz/device_query.git", branch = "feature/macos-init-throw" }
 env_logger = "0.10.0"
 farbe = "0.2.0"

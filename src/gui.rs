@@ -1,6 +1,6 @@
 use anyhow::Result;
-use imgui::{Context, FontSource, Ui};
-use imgui_wgpu::{Renderer, RendererConfig};
+use imgui::{Context, FontSource, Ui, MouseCursor, TextureId, Image};
+use imgui_wgpu::{Renderer, RendererConfig, TextureConfig, Texture};
 use imgui_winit_support::winit::{
     event::{Event, WindowEvent},
     event_loop::EventLoop,
@@ -14,7 +14,7 @@ use winit::dpi::LogicalSize;
 use winit::event_loop::ControlFlow;
 use winit::platform::run_return::EventLoopExtRunReturn;
 
-use crate::fast3d::{graphics::GraphicsContext, rcp::RCP};
+use crate::fast3d::{graphics::{GraphicsContext, dummy_device::DummyGraphicsDevice}, rcp::RCP};
 
 pub struct Gui {
     // window
@@ -34,6 +34,10 @@ pub struct Gui {
     // imgui
     imgui: Context,
 
+    // content
+    graphics_context: GraphicsContext,
+    content_texture_id: TextureId,
+
     // ui state
     ui_state: UIState,
 
@@ -46,6 +50,8 @@ pub struct Gui {
 
 pub struct UIState {
     last_frame_time: Instant,
+    last_frame_size: [f32; 2],
+    last_cursor: Option<MouseCursor>,
 }
 
 pub struct EventLoopWrapper {
@@ -58,6 +64,7 @@ impl Gui {
         D: Fn(&Ui) + 'static,
     {
         let (width, height) = (800, 600);
+        let mut last_frame_size = [width as f32, height as f32];
 
         // Create the window
         let window = WindowBuilder::new()
@@ -136,10 +143,32 @@ impl Gui {
         };
 
         // Create the egui render pass
-        let renderer = Renderer::new(&mut imgui, &device, &queue, renderer_config);
+        let mut renderer = Renderer::new(&mut imgui, &device, &queue, renderer_config);
 
         // Initial UI state
         let last_frame_time = Instant::now();
+
+        let mut last_cursor = None;
+
+        // Setup graphics context
+        let mut dummy_device = DummyGraphicsDevice::init(&surface_desc, &device, &queue);
+        let graphics_context = GraphicsContext::new(Box::new(dummy_device));
+
+        // Stores a texture for displaying with imgui::Image(),
+        // also as a texture view for rendering into it
+
+        let texture_config = TextureConfig {
+            size: wgpu::Extent3d {
+                width: width,
+                height: height,
+                ..Default::default()
+            },
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            ..Default::default()
+        };
+
+        let texture = Texture::new(&device, &renderer, texture_config);
+        let content_texture_id = renderer.textures.insert(texture);
 
         Ok(Self {
             width,
@@ -151,7 +180,9 @@ impl Gui {
             renderer,
             platform,
             imgui,
-            ui_state: UIState { last_frame_time },
+            graphics_context,
+            content_texture_id,
+            ui_state: UIState { last_frame_time, last_cursor, last_frame_size },
             draw_menu_callback: Box::new(draw_menu),
             rcp: RCP::new(),
         })
@@ -228,22 +259,67 @@ impl Gui {
     }
 
     fn render(&mut self) -> Result<()> {
+        // Get the output frame
+        let frame = self.surface.get_current_texture()?;
+
+        let view = frame
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
         // Begin drawing UI
         let ui = self.imgui.frame();
         ui.main_menu_bar(|| {
             (self.draw_menu_callback)(ui);
         });
 
-        // TODO: Draw game image here
-        // let available_size = ui.content_region_avail();
-        // Image::new(texture_id, available_size).build(ui);
+        // Draw the content
+
+        let dummy_device = self.graphics_context
+            .api
+            .as_any_mut()
+            .downcast_mut::<DummyGraphicsDevice>()
+            .unwrap();
+
+        // Render example normally at background
+        dummy_device.update(ui.io().delta_time);
+        dummy_device.setup_camera(&self.queue, ui.io().display_size);
+        dummy_device.render(&view, &self.device, &self.queue);
+
+        let available_size = ui.content_region_avail();
+        Image::new(self.content_texture_id, available_size).build(ui);
+
+        // Resize render target
+        if available_size != self.ui_state.last_frame_size && available_size[0] >= 1.0 && available_size[1] >= 1.0 {
+            trace!("Resizing render target: {}x{}", available_size[0], available_size[1]);
+            self.ui_state.last_frame_size = available_size;
+            let scale = &ui.io().display_framebuffer_scale;
+            let texture_config = TextureConfig {
+                size: wgpu::Extent3d {
+                    width: (available_size[0] * scale[0]) as u32,
+                    height: (available_size[1] * scale[1]) as u32,
+                    ..Default::default()
+                },
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
+                ..Default::default()
+            };
+            self.renderer.textures.replace(
+                self.content_texture_id,
+                Texture::new(&self.device, &self.renderer, texture_config),
+            );
+        }
+
+        // Only render example to example_texture if thw window is not collapsed
+        dummy_device.setup_camera(&self.queue, available_size);
+        dummy_device.render(
+            self.renderer.textures.get(self.content_texture_id).unwrap().view(),
+            &self.device,
+            &self.queue,
+        );
 
         // Demo window for now
         let mut opened = true;
         ui.show_metrics_window(&mut opened);
-
-        // Get the output frame
-        let frame = self.surface.get_current_texture()?;
 
         let mut encoder: wgpu::CommandEncoder =
             self.device
@@ -251,9 +327,10 @@ impl Gui {
                     label: Some("Main Command Encoder"),
                 });
 
-        let view = frame
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+        if self.ui_state.last_cursor != ui.mouse_cursor() {
+            self.ui_state.last_cursor = ui.mouse_cursor();
+            self.platform.prepare_render(ui, &self.window);
+        }
 
         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
