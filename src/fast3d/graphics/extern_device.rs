@@ -1,6 +1,6 @@
+use crate::fast3d::graphics::{CullMode, GraphicsAPI, GraphicsContext, ShaderProgram};
 use std::any::Any;
 use wgpu::BlendState;
-use crate::fast3d::graphics::{CullMode, GraphicsAPI, GraphicsContext, ShaderProgram};
 
 #[repr(C)]
 pub struct CGraphicsDevice {
@@ -155,7 +155,9 @@ pub extern "C" fn GfxCreateExternContext(device: *mut CGraphicsDevice) -> Box<Gr
 }
 
 #[no_mangle]
-pub extern "C" fn GfxGetExternDevice(gfx_context: Option<&mut GraphicsContext>) -> *mut CGraphicsDevice {
+pub extern "C" fn GfxGetExternDevice(
+    gfx_context: Option<&mut GraphicsContext>,
+) -> *mut CGraphicsDevice {
     let context = gfx_context.unwrap();
     context
         .api

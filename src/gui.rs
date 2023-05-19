@@ -1,6 +1,6 @@
 use anyhow::Result;
-use imgui::{Context, FontSource, Ui, MouseCursor, TextureId, Image};
-use imgui_wgpu::{Renderer, RendererConfig, TextureConfig, Texture};
+use imgui::{Context, FontSource, Image, MouseCursor, TextureId, Ui};
+use imgui_wgpu::{Renderer, RendererConfig, Texture, TextureConfig};
 use imgui_winit_support::winit::{
     event::{Event, WindowEvent},
     event_loop::EventLoop,
@@ -14,7 +14,10 @@ use winit::dpi::LogicalSize;
 use winit::event_loop::ControlFlow;
 use winit::platform::run_return::EventLoopExtRunReturn;
 
-use crate::fast3d::{graphics::{GraphicsContext, dummy_device::DummyGraphicsDevice}, rcp::RCP};
+use crate::fast3d::{
+    graphics::{dummy_device::DummyGraphicsDevice, GraphicsContext},
+    rcp::RCP,
+};
 
 pub struct Gui {
     // window
@@ -182,7 +185,11 @@ impl Gui {
             imgui,
             graphics_context,
             content_texture_id,
-            ui_state: UIState { last_frame_time, last_cursor, last_frame_size },
+            ui_state: UIState {
+                last_frame_time,
+                last_cursor,
+                last_frame_size,
+            },
             draw_menu_callback: Box::new(draw_menu),
             rcp: RCP::new(),
         })
@@ -274,7 +281,8 @@ impl Gui {
 
         // Draw the content
 
-        let dummy_device = self.graphics_context
+        let dummy_device = self
+            .graphics_context
             .api
             .as_any_mut()
             .downcast_mut::<DummyGraphicsDevice>()
@@ -284,38 +292,6 @@ impl Gui {
         dummy_device.update(ui.io().delta_time);
         dummy_device.setup_camera(&self.queue, ui.io().display_size);
         dummy_device.render(&view, &self.device, &self.queue);
-
-        let available_size = ui.content_region_avail();
-        Image::new(self.content_texture_id, available_size).build(ui);
-
-        // Resize render target
-        if available_size != self.ui_state.last_frame_size && available_size[0] >= 1.0 && available_size[1] >= 1.0 {
-            trace!("Resizing render target: {}x{}", available_size[0], available_size[1]);
-            self.ui_state.last_frame_size = available_size;
-            let scale = &ui.io().display_framebuffer_scale;
-            let texture_config = TextureConfig {
-                size: wgpu::Extent3d {
-                    width: (available_size[0] * scale[0]) as u32,
-                    height: (available_size[1] * scale[1]) as u32,
-                    ..Default::default()
-                },
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                    | wgpu::TextureUsages::TEXTURE_BINDING,
-                ..Default::default()
-            };
-            self.renderer.textures.replace(
-                self.content_texture_id,
-                Texture::new(&self.device, &self.renderer, texture_config),
-            );
-        }
-
-        // Only render example to example_texture if thw window is not collapsed
-        dummy_device.setup_camera(&self.queue, available_size);
-        dummy_device.render(
-            self.renderer.textures.get(self.content_texture_id).unwrap().view(),
-            &self.device,
-            &self.queue,
-        );
 
         // Demo window for now
         let mut opened = true;
@@ -338,12 +314,7 @@ impl Gui {
                 view: &view,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: 0.1,
-                        g: 0.2,
-                        b: 0.3,
-                        a: 1.0,
-                    }),
+                    load: wgpu::LoadOp::Load,
                     store: true,
                 },
             })],
