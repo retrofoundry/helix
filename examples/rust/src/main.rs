@@ -32,7 +32,7 @@ fn main() {
 
     loop {
         gui.start_frame(&mut event_loop_wrapper);
-        // gui.draw_lists_dummy();
+        gui.draw_lists_dummy();
         gui.end_frame();
     }
 }
