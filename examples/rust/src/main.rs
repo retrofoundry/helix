@@ -23,13 +23,6 @@ fn main() {
         });
     }).unwrap();
 
-    std::thread::spawn(move || {
-        loop {
-            println!("Hello, world!");
-            std::thread::sleep(std::time::Duration::from_millis(1000));
-        }
-    });
-
     loop {
         gui.start_frame(&mut event_loop_wrapper);
         gui.draw_lists_dummy();

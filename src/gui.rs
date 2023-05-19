@@ -2,7 +2,6 @@ use anyhow::Result;
 use imgui::{Context, FontSource, Ui};
 use imgui_wgpu::{Renderer, RendererConfig};
 use imgui_winit_support::winit::{
-    dpi::PhysicalSize,
     event::{Event, WindowEvent},
     event_loop::EventLoop,
     window::{Window, WindowBuilder},
@@ -11,6 +10,7 @@ use log::trace;
 use pollster::block_on;
 use std::str;
 use std::{ffi::CStr, time::Instant};
+use winit::dpi::LogicalSize;
 use winit::event_loop::ControlFlow;
 use winit::platform::run_return::EventLoopExtRunReturn;
 
@@ -62,7 +62,7 @@ impl Gui {
         // Create the window
         let window = WindowBuilder::new()
             .with_title(title)
-            .with_inner_size(PhysicalSize::new(width, height))
+            .with_inner_size(LogicalSize::new(width, height))
             .with_resizable(true)
             .build(&event_loop_wrapper.event_loop)?;
 
@@ -105,7 +105,7 @@ impl Gui {
         // Setup ImGui
         let mut imgui = Context::create();
 
-        // Create the egui + sdl2 platform
+        // Create the egui + winit platform
         let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
         platform.attach_window(
             imgui.io_mut(),
