@@ -603,7 +603,6 @@ impl F3DEX2 {
 
         let num_inputs = unsafe { (*prg).num_inputs };
         let use_texture = rdp.combine.uses_texture0() || rdp.uses_texture1();
-        // let use_texture = unsafe { (*prg).used_textures[0] || (*prg).used_textures[1] };
         rdp.flush_textures(gfx_context);
 
         let current_tile = rdp.tile_descriptors[rdp.texture_state.tile as usize];
@@ -646,34 +645,51 @@ impl F3DEX2 {
 
             for j in 0..num_inputs {
                 let mut color: Color;
-                for k in 0..1 + if use_alpha { 1 } else { 0 } {
-                    match shader_input_mapping[k][j as usize] {
-                        x if x == CCMUX::PRIMITIVE as u8 => {
-                            color = rdp.prim_color;
-                        }
-                        x if x == CCMUX::SHADE as u8 => {
-                            color = vertex_array[i].color;
-                        }
-                        x if x == CCMUX::ENVIRONMENT as u8 => {
-                            color = rdp.env_color;
-                        }
-                        x if x == CCMUX::LOD_FRACTION as u8 => {
-                            let mut distance_frac = (vertex1.position.w - 3000.0) / 3000.0;
-                            if distance_frac < 0.0 {
-                                distance_frac = 0.0
+                for k in 0..(1 + if use_alpha { 1 } else { 0 }) {
+                    if k == 0 {
+                        match shader_input_mapping[k][j as usize] {
+                            x if x == CCMUX::PRIMITIVE as u8 => {
+                                color = rdp.prim_color;
                             }
-                            if distance_frac > 1.0 {
-                                distance_frac = 1.0
+                            x if x == CCMUX::SHADE as u8 => {
+                                color = vertex_array[i].color;
                             }
-                            color = Color::RGBA(
-                                (distance_frac * 255.0) as u8,
-                                (distance_frac * 255.0) as u8,
-                                (distance_frac * 255.0) as u8,
-                                (distance_frac * 255.0) as u8,
-                            );
+                            x if x == CCMUX::ENVIRONMENT as u8 => {
+                                color = rdp.env_color;
+                            }
+                            x if x == CCMUX::LOD_FRACTION as u8 => {
+                                let mut distance_frac = (vertex1.position.w - 3000.0) / 3000.0;
+                                if distance_frac < 0.0 {
+                                    distance_frac = 0.0
+                                }
+                                if distance_frac > 1.0 {
+                                    distance_frac = 1.0
+                                }
+                                color = Color::RGBA(
+                                    (distance_frac * 255.0) as u8,
+                                    (distance_frac * 255.0) as u8,
+                                    (distance_frac * 255.0) as u8,
+                                    (distance_frac * 255.0) as u8,
+                                );
+                            }
+                            _ => {
+                                color = Color::TRANSPARENT;
+                            }
                         }
-                        _ => {
-                            color = Color::TRANSPARENT;
+                    } else {
+                        match shader_input_mapping[k][j as usize] {
+                            x if x == ACMUX::PRIMITIVE as u8 => {
+                                color = rdp.prim_color;
+                            }
+                            x if x == ACMUX::SHADE as u8 => {
+                                color = vertex_array[i].color;
+                            }
+                            x if x == ACMUX::ENVIRONMENT as u8 => {
+                                color = rdp.env_color;
+                            }
+                            _ => {
+                                color = Color::TRANSPARENT;
+                            }
                         }
                     }
 
