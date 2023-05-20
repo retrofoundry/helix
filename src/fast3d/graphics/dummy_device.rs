@@ -395,7 +395,7 @@ impl GraphicsAPI for DummyGraphicsDevice {
     fn set_polygon_offset(&self, _enable: bool) {}
     fn set_viewport(&self, _x: i32, _y: i32, _width: i32, _height: i32) {}
     fn set_scissor(&self, _x: i32, _y: i32, _width: i32, _height: i32) {}
-    fn set_blend_state(&self, _blend_state: BlendState) {}
+    fn set_blend_state(&self, _enabld: bool, _blend_state: BlendState) {}
     fn set_cull_mode(&self, _cull_mode: CullMode) {}
     fn draw_triangles(&self, _vertices: *const f32, _count: usize, _stride: usize) {}
     fn init(&self) {}

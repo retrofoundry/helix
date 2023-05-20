@@ -20,7 +20,7 @@ pub struct CGraphicsDevice {
     pub set_polygon_offset: extern "C" fn(bool),
     pub set_viewport: extern "C" fn(i32, i32, i32, i32),
     pub set_scissor: extern "C" fn(i32, i32, i32, i32),
-    pub set_blend_state: extern "C" fn(BlendState),
+    pub set_blend_state: extern "C" fn(bool, BlendState),
     pub set_cull_mode: extern "C" fn(CullMode),
     pub draw_triangles: extern "C" fn(*const f32, usize, usize),
     pub init: extern "C" fn(),
@@ -113,8 +113,8 @@ impl GraphicsAPI for ExternGraphicsDevice {
         unsafe { ((*self.inner).set_scissor)(x, y, width, height) }
     }
 
-    fn set_blend_state(&self, blend_state: BlendState) {
-        unsafe { ((*self.inner).set_blend_state)(blend_state) }
+    fn set_blend_state(&self, enabled: bool, blend_state: BlendState) {
+        unsafe { ((*self.inner).set_blend_state)(enabled, blend_state) }
     }
 
     fn set_cull_mode(&self, cull_mode: CullMode) {

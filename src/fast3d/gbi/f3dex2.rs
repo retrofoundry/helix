@@ -2,6 +2,7 @@ use std::slice;
 
 use glam::Mat4;
 use log::trace;
+use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState};
 
 use super::defines::{Gfx, Light, Viewport, Vtx, G_FILLRECT, G_MTX, G_TEXRECT, G_TEXRECTFLIP};
 use super::utils::{
@@ -590,6 +591,14 @@ impl F3DEX2 {
             gfx_context.api.unload_shader(rs_prg);
             gfx_context.api.load_shader(prg);
             rdp.rendering_state.shader_program = prg;
+        }
+
+        if use_alpha != rdp.rendering_state.blend_enabled {
+            let blend_state = BlendState::ALPHA_BLENDING;
+
+            rdp.flush(gfx_context);
+            gfx_context.api.set_blend_state(use_alpha, blend_state);
+            rdp.rendering_state.blend_enabled = use_alpha;
         }
 
         let num_inputs = unsafe { (*prg).num_inputs };

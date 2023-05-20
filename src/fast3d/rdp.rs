@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use log::trace;
 use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState, CompareFunction};
 
-use crate::fast3d::gbi::utils::translate_blend_param_b;
+use crate::fast3d::gbi::utils::{
+    other_mode_l_uses_alpha, other_mode_l_uses_texture_edge, translate_blend_param_b,
+};
 
 use super::{
     gbi::{
@@ -88,6 +90,7 @@ pub struct RenderingState {
     pub depth_test: bool,
     pub depth_write: bool,
     pub polygon_offset: bool,
+    pub blend_enabled: bool,
     pub blend_state: BlendState,
     pub viewport: Rect,
     pub scissor: Rect,
@@ -102,6 +105,7 @@ impl RenderingState {
         depth_test: false,
         depth_write: false,
         polygon_offset: false,
+        blend_enabled: false,
         blend_state: BlendState::REPLACE,
         viewport: Rect::ZERO,
         scissor: Rect::ZERO,
@@ -595,11 +599,7 @@ impl RDP {
 
     // MARK: - Blend
 
-    fn translate_blend_mode(
-        &mut self,
-        gfx_context: &GraphicsContext,
-        render_mode: u32,
-    ) -> BlendState {
+    fn translate_blend_mode(&mut self, gfx_context: &GraphicsContext, render_mode: u32) {
         let zmode: u32 = self.other_mode_l >> (OtherModeLayoutL::ZMODE as u32) & 0x03;
 
         // handle depth compare
@@ -641,53 +641,24 @@ impl RDP {
             self.rendering_state.polygon_offset = polygon_offset;
         }
 
-        let src_color = render_mode >> OtherModeLayoutL::P_2 as u32 & 0x03;
-        let src_factor = render_mode >> OtherModeLayoutL::A_2 as u32 & 0x03;
-        let dst_color = render_mode >> OtherModeLayoutL::M_2 as u32 & 0x03;
-        let dst_factor = render_mode >> OtherModeLayoutL::B_2 as u32 & 0x03;
+        // TODO: Properly read this from render_mode
+        // let src_color = render_mode >> OtherModeLayoutL::P_2 as u32 & 0x03;
+        // let src_factor = render_mode >> OtherModeLayoutL::A_2 as u32 & 0x03;
+        // let dst_color = render_mode >> OtherModeLayoutL::M_2 as u32 & 0x03;
+        // let dst_factor = render_mode >> OtherModeLayoutL::B_2 as u32 & 0x03;
+        //
+        // let do_blend = render_mode & (1 << OtherModeLayoutL::FORCE_BL as u32) != 0
+        //     && dst_color == BlendParamPMColor::G_BL_CLR_MEM as u32;
 
-        let do_blend = render_mode & (1 << OtherModeLayoutL::FORCE_BL as u32) != 0
-            && dst_color == BlendParamPMColor::G_BL_CLR_MEM as u32;
+        let mut use_alpha = other_mode_l_uses_alpha(self.other_mode_l)
+            || other_mode_l_uses_texture_edge(self.other_mode_l);
 
-        if do_blend {
-            assert!(src_color == BlendParamPMColor::G_BL_CLR_IN as u32);
+        if use_alpha != self.rendering_state.blend_enabled {
+            let blend_state = BlendState::ALPHA_BLENDING;
 
-            let blend_src_factor: BlendFactor;
-            if src_factor == BlendParamA::G_BL_0 as u32 {
-                blend_src_factor = BlendFactor::Zero;
-            } else if (render_mode & (1 << OtherModeLayoutL::ALPHA_CVG_SEL as u32)) != 0
-                && (render_mode & (1 << OtherModeLayoutL::CVG_X_ALPHA as u32)) == 0
-            {
-                // this is technically "coverage", admitting blending on edges
-                blend_src_factor = BlendFactor::One;
-            } else {
-                blend_src_factor = BlendFactor::SrcAlpha;
-            }
-
-            let blend_component = BlendComponent {
-                src_factor: blend_src_factor,
-                dst_factor: translate_blend_param_b(dst_factor, blend_src_factor),
-                operation: BlendOperation::Add,
-            };
-
-            BlendState {
-                color: blend_component,
-                alpha: blend_component,
-            }
-        } else {
-            // without FORCE_BL, blending only happens for AA of internal edges
-            // since we are ignoring n64 coverage values and AA, this means "never"
-            // if dstColor isn't the framebuffer, we'll take care of the "blending" in the shader
-            let blend_component = BlendComponent {
-                src_factor: BlendFactor::One,
-                dst_factor: BlendFactor::Zero,
-                operation: BlendOperation::Add,
-            };
-
-            BlendState {
-                color: blend_component,
-                alpha: blend_component,
-            }
+            self.flush(gfx_context);
+            gfx_context.api.set_blend_state(use_alpha, blend_state);
+            self.rendering_state.blend_enabled = use_alpha;
         }
     }
 
@@ -706,14 +677,7 @@ impl RDP {
             self.rendering_state.cull_mode = cull_mode;
         }
 
-        let blend_state = self.translate_blend_mode(gfx_context, self.other_mode_l);
-
-        // TODO: split checks into updating blend state separately: enable, blendeq and blendfunc
-        if blend_state != self.rendering_state.blend_state {
-            self.flush(gfx_context);
-            gfx_context.api.set_blend_state(blend_state);
-            self.rendering_state.blend_state = blend_state;
-        }
+        self.translate_blend_mode(gfx_context, self.other_mode_l);
 
         if self.viewport_or_scissor_changed {
             let viewport = self.viewport;

@@ -41,7 +41,7 @@ pub trait GraphicsAPI {
     fn set_polygon_offset(&self, enable: bool);
     fn set_viewport(&self, x: i32, y: i32, width: i32, height: i32);
     fn set_scissor(&self, x: i32, y: i32, width: i32, height: i32);
-    fn set_blend_state(&self, blend_state: BlendState);
+    fn set_blend_state(&self, enabled: bool, blend_state: BlendState);
     fn set_cull_mode(&self, cull_mode: CullMode);
     fn draw_triangles(&self, vertices: *const f32, count: usize, stride: usize);
     fn init(&self);
