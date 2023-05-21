@@ -580,6 +580,7 @@ impl F3DEX2 {
         }
 
         // TODO: Stop using ID's for the color combiner, use the object instead
+        rdp.lookup_or_create_program(gfx_context);
         rdp.lookup_or_create_color_combiner(gfx_context, cc_id);
         let color_combiner = rdp.color_combiner_manager.combiners.get(&cc_id).unwrap();
         let shader_input_mapping = color_combiner.shader_input_mapping;
@@ -676,6 +677,10 @@ impl F3DEX2 {
                                 color = Color::TRANSPARENT;
                             }
                         }
+
+                        rdp.add_to_buf_vbo(color.r as f32 / 255.0);
+                        rdp.add_to_buf_vbo(color.g as f32 / 255.0);
+                        rdp.add_to_buf_vbo(color.b as f32 / 255.0);
                     } else {
                         match shader_input_mapping[k][j as usize] {
                             x if x == ACMUX::PRIMITIVE as u8 => {
@@ -691,16 +696,12 @@ impl F3DEX2 {
                                 color = Color::TRANSPARENT;
                             }
                         }
-                    }
 
-                    if k == 0 {
-                        rdp.add_to_buf_vbo(color.r as f32 / 255.0);
-                        rdp.add_to_buf_vbo(color.g as f32 / 255.0);
-                        rdp.add_to_buf_vbo(color.b as f32 / 255.0);
-                    } else if use_fog && color == vertex_array[i].color {
-                        rdp.add_to_buf_vbo(1.0);
-                    } else {
-                        rdp.add_to_buf_vbo(color.a as f32 / 255.0);
+                        if use_fog && color == vertex_array[i].color {
+                            rdp.add_to_buf_vbo(1.0);
+                        } else {
+                            rdp.add_to_buf_vbo(color.a as f32 / 255.0);
+                        }
                     }
                 }
             }

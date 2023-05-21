@@ -382,7 +382,6 @@ impl GraphicsAPI for DummyGraphicsDevice {
     fn lookup_shader(&self, _id: u32) -> *mut ShaderProgram {
         std::ptr::null_mut()
     }
-    fn shader_get_info(&self, _shader: *mut ShaderProgram, _info: *mut u8, _info_size: [bool; 2]) {}
     fn new_texture(&self) -> u32 {
         0
     }

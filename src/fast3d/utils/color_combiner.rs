@@ -1,7 +1,23 @@
 use crate::fast3d::{gbi::utils::get_cmd, graphics::ShaderProgram, rcp::RCP};
 use std::collections::HashMap;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Debug)]
+pub struct ShaderInputMapping {
+    pub num_inputs: u8,
+    pub mirror_mapping: [[SHADER; 4]; 2],
+    pub input_mapping: [[u8; 4]; 2],
+}
+
+impl ShaderInputMapping {
+    pub const ZERO: Self = Self {
+        num_inputs: 0,
+        mirror_mapping: [[SHADER::ZERO; 4]; 2],
+        input_mapping: [[0; 4]; 2],
+    };
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ColorCombinePass {
     pub a: CCMUX,
     pub b: CCMUX,
@@ -44,15 +60,16 @@ impl ColorCombinePass {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct AlhpaCombinePass {
-    a: ACMUX,
-    b: ACMUX,
-    c: ACMUX,
-    d: ACMUX,
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct AlphaCombinePass {
+    pub a: ACMUX,
+    pub b: ACMUX,
+    pub c: ACMUX,
+    pub d: ACMUX,
 }
 
-impl AlhpaCombinePass {
+impl AlphaCombinePass {
     // grab property by index
     pub fn get(&self, index: usize) -> ACMUX {
         match index {
@@ -79,12 +96,13 @@ impl AlhpaCombinePass {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CombineParams {
     pub c0: ColorCombinePass,
-    pub a0: AlhpaCombinePass,
+    pub a0: AlphaCombinePass,
     c1: ColorCombinePass,
-    a1: AlhpaCombinePass,
+    a1: AlphaCombinePass,
 }
 
 impl CombineParams {
@@ -95,7 +113,7 @@ impl CombineParams {
             c: CCMUX::PRIMITIVE,
             d: CCMUX::COMBINED,
         },
-        a0: AlhpaCombinePass {
+        a0: AlphaCombinePass {
             a: ACMUX::COMBINED__LOD_FRAC,
             b: ACMUX::TEXEL0,
             c: ACMUX::PRIMITIVE,
@@ -107,7 +125,7 @@ impl CombineParams {
             c: CCMUX::PRIMITIVE,
             d: CCMUX::COMBINED,
         },
-        a1: AlhpaCombinePass {
+        a1: AlphaCombinePass {
             a: ACMUX::COMBINED__LOD_FRAC,
             b: ACMUX::TEXEL0,
             c: ACMUX::PRIMITIVE,
@@ -143,7 +161,7 @@ impl CombineParams {
                 c: CCMUX::from(c0),
                 d: CCMUX::from(d0),
             },
-            a0: AlhpaCombinePass {
+            a0: AlphaCombinePass {
                 a: ACMUX::from(aa0),
                 b: ACMUX::from(ab0),
                 c: ACMUX::from(ac0),
@@ -155,7 +173,7 @@ impl CombineParams {
                 c: CCMUX::from(c1),
                 d: CCMUX::from(d1),
             },
-            a1: AlhpaCombinePass {
+            a1: AlphaCombinePass {
                 a: ACMUX::from(aa1),
                 b: ACMUX::from(ab1),
                 c: ACMUX::from(ac1),
@@ -164,16 +182,38 @@ impl CombineParams {
         }
     }
 
-    pub fn to_u32(&self) -> u32 {
-        let c0 = self.c0;
-        let a0 = self.a0;
+    pub fn get_cc(&self, index: usize) -> ColorCombinePass {
+        match index {
+            0 => self.c0,
+            1 => self.c1,
+            _ => panic!("Invalid index"),
+        }
+    }
 
-        let cout =
-            (c0.a as u32) | ((c0.b as u32) << 3) | ((c0.c as u32) << 6) | ((c0.d as u32) << 9);
-        let aout =
-            (a0.a as u32) | ((a0.b as u32) << 3) | ((a0.c as u32) << 6) | ((a0.d as u32) << 9);
+    pub fn get_ac(&self, index: usize) -> AlphaCombinePass {
+        match index {
+            0 => self.a0,
+            1 => self.a1,
+            _ => panic!("Invalid index"),
+        }
+    }
 
-        cout | (aout << 12)
+    pub fn cc_ac_same(&self, index: usize) -> bool {
+        match index {
+            0 => {
+                self.c0.a as u8 == self.a0.a as u8
+                    && self.c0.b as u8 == self.a0.b as u8
+                    && self.c0.c as u8 == self.a0.c as u8
+                    && self.c0.d as u8 == self.a0.d as u8
+            }
+            1 => {
+                self.c1.a as u8 == self.a1.a as u8
+                    && self.c1.b as u8 == self.a1.b as u8
+                    && self.c1.c as u8 == self.a1.c as u8
+                    && self.c1.d as u8 == self.a1.d as u8
+            }
+            _ => panic!("Invalid index"),
+        }
     }
 
     pub fn uses_texture0(&self) -> bool {
@@ -189,9 +229,97 @@ impl CombineParams {
             || self.a0.uses_texture1()
             || self.a1.uses_texture1()
     }
+
+    pub fn shader_input_mapping(&self) -> ShaderInputMapping {
+        let mut num_inputs = 0;
+        let mut mirror_mapping = [[SHADER::ZERO; 4]; 2];
+        let mut input_mapping = [[0u8; 4]; 2];
+
+        for i in 0..2 {
+            let mut input_number = [0u8; 8];
+            let mut next_input_number = SHADER::ONE as u8;
+
+            match i % 2 {
+                0 => {
+                    let index = i / 2;
+                    for j in 0..4 {
+                        match self.get_cc(index).get(j) {
+                            CCMUX::TEXEL0 => mirror_mapping[index][j] = SHADER::TEXEL0,
+                            CCMUX::TEXEL1 => mirror_mapping[index][j] = SHADER::TEXEL1,
+                            CCMUX::TEXEL0_ALPHA => mirror_mapping[index][j] = SHADER::TEXEL0A,
+                            CCMUX::PRIMITIVE
+                            | CCMUX::SHADE
+                            | CCMUX::ENVIRONMENT
+                            | CCMUX::LOD_FRACTION => {
+                                let property = self.get_cc(index).get(j) as u8;
+
+                                if input_number[property as usize] == 0 {
+                                    input_mapping[index][(next_input_number - 1) as usize] =
+                                        property;
+                                    input_number[property as usize] = next_input_number as u8;
+                                    mirror_mapping[index][j] = SHADER::from(next_input_number);
+                                    next_input_number += 1;
+
+                                    if next_input_number > num_inputs {
+                                        num_inputs = next_input_number;
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                1 => {
+                    let index = (i - 1) / 2;
+                    for j in 0..4 {
+                        match self.get_ac(index).get(j) {
+                            ACMUX::TEXEL0 => mirror_mapping[index][j] = SHADER::TEXEL0,
+                            ACMUX::TEXEL1 => mirror_mapping[index][j] = SHADER::TEXEL1,
+                            ACMUX::PRIMITIVE | ACMUX::SHADE | ACMUX::ENVIRONMENT => {
+                                let property = self.get_ac(index).get(j) as u8;
+
+                                if input_number[property as usize] == 0 {
+                                    input_mapping[index][(next_input_number - 1) as usize] =
+                                        property;
+                                    input_number[property as usize] = next_input_number;
+                                    mirror_mapping[index][j] = SHADER::from(next_input_number);
+                                    next_input_number += 1;
+
+                                    if next_input_number > num_inputs {
+                                        num_inputs = next_input_number;
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+
+        ShaderInputMapping {
+            num_inputs,
+            mirror_mapping,
+            input_mapping,
+        }
+    }
+
+    pub fn to_u32(&self) -> u32 {
+        let c0 = self.c0;
+        let a0 = self.a0;
+
+        let cout =
+            (c0.a as u32) | ((c0.b as u32) << 3) | ((c0.c as u32) << 6) | ((c0.d as u32) << 9);
+        let aout =
+            (a0.a as u32) | ((a0.b as u32) << 3) | ((a0.c as u32) << 6) | ((a0.d as u32) << 9);
+
+        cout | (aout << 12)
+    }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd)]
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Hash)]
 pub enum CCMUX {
     COMBINED = 0,
     TEXEL0 = 1,
@@ -238,7 +366,8 @@ impl CCMUX {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd)]
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Hash)]
 pub enum ACMUX {
     COMBINED__LOD_FRAC = 0, // ADD?
     TEXEL0 = 1,
@@ -271,15 +400,32 @@ pub const SHADER_OPT_FOG: u32 = 1 << 25;
 pub const SHADER_OPT_TEXTURE_EDGE: u32 = 1 << 26;
 pub const SHADER_OPT_NOISE: u32 = 1 << 27;
 
+#[derive(Copy, Clone, Debug)]
 pub enum SHADER {
     ZERO,
-    INPUT_1,
-    INPUT_2,
-    INPUT_3,
-    INPUT_4,
+    ONE,
+    TWO,
+    THREE,
+    FOUR,
     TEXEL0,
     TEXEL0A,
     TEXEL1,
+}
+
+impl SHADER {
+    pub fn from(val: u8) -> Self {
+        match val {
+            0 => SHADER::ZERO,
+            1 => SHADER::ONE,
+            2 => SHADER::TWO,
+            3 => SHADER::THREE,
+            4 => SHADER::FOUR,
+            5 => SHADER::TEXEL0,
+            6 => SHADER::TEXEL0A,
+            7 => SHADER::TEXEL1,
+            _ => panic!("Invalid SHADER value: {}", val),
+        }
+    }
 }
 
 pub struct ColorCombinerManager {

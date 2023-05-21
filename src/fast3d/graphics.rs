@@ -3,6 +3,7 @@ use wgpu::BlendState;
 
 pub mod dummy_device;
 mod extern_device;
+pub mod opengl_program;
 
 #[repr(C)]
 pub struct ShaderProgram {
@@ -30,7 +31,6 @@ pub trait GraphicsAPI {
     fn load_shader(&self, shader: *mut ShaderProgram);
     fn create_and_load_new_shader(&self, id: u32) -> *mut ShaderProgram;
     fn lookup_shader(&self, id: u32) -> *mut ShaderProgram;
-    fn shader_get_info(&self, shader: *mut ShaderProgram, info: *mut u8, info_size: [bool; 2]);
     fn new_texture(&self) -> u32;
     fn select_texture(&self, unit: i32, id: u32);
     fn upload_texture(&self, data: *const u8, width: i32, height: i32);

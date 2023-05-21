@@ -23,7 +23,6 @@ struct CGraphicsDevice {
     void (*load_shader)(struct ShaderProgram *new_prg);
     struct ShaderProgram *(*create_and_load_new_shader)(uint32_t shader_id);
     struct ShaderProgram *(*lookup_shader)(uint32_t shader_id);
-    void (*shader_get_info)(struct ShaderProgram *prg, uint8_t *num_inputs, bool used_textures[2]);
     uint32_t (*new_texture)(void);
     void (*select_texture)(int tile, uint32_t texture_id);
     void (*upload_texture)(const uint8_t *rgba32_buf, int width, int height);
@@ -47,6 +46,53 @@ struct CGraphicsDevice {
 struct OutputDimensions {
     uint32_t width, height;
     float aspect_ratio;
+};
+
+typedef enum CCMUX {
+    CCMUX_COMBINED = 0,
+    CCMUX_TEXEL0 = 1,
+    CCMUX_TEXEL1 = 2,
+    CCMUX_PRIMITIVE = 3,
+    CCMUX_SHADE = 4,
+    CCMUX_ENVIRONMENT = 5,
+    CCMUX_CENTER__SCALE__ONE = 6,
+    // param C only
+    CCMUX_COMBINED_ALPHA__NOISE__K4 = 7, // COMBINE_A only for C (ADD_ZERO?)
+    CCMUX_TEXEL0_ALPHA = 8,
+    CCMUX_TEXEL1_ALPHA = 9,
+    CCMUX_PRIMITIVE_ALPHA = 10,
+    CCMUX_SHADE_ALPHA = 11,
+    CCMUX_ENV_ALPHA = 12,
+    CCMUX_LOD_FRACTION = 13,
+    CCMUX_PRIM_LOD_FRACTION = 14,
+    CCMUX_K5 = 15, // MUL_ZERO?
+    CCMUX_ZERO = 31,
+} CCMUX;
+
+typedef enum ACMUX {
+    ACMUX_COMBINED__LOD_FRAC = 0, // ADD?
+    ACMUX_TEXEL0 = 1,
+    ACMUX_TEXEL1 = 2,
+    ACMUX_PRIMITIVE = 3,
+    ACMUX_SHADE = 4,
+    ACMUX_ENVIRONMENT = 5,
+    ACMUX_PRIM_LOD_FRAC__ONE = 6,
+    ACMUX_ZERO = 7,
+} ACMUX;
+
+struct ColorCombinePass {
+    CCMUX a, b, c, d;
+};
+
+struct AlphaCombinePass {
+    ACMUX a, b, c, d;
+};
+
+struct CombineParams {
+    struct ColorCombinePass c0;
+    struct AlphaCombinePass a0;
+    struct ColorCombinePass c1;
+    struct AlphaCombinePass a1;
 };
 
 #ifdef __cplusplus

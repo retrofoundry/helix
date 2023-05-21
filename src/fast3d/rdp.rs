@@ -1,4 +1,6 @@
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 
 use log::trace;
 use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState, CompareFunction};
@@ -32,6 +34,7 @@ use super::{
     },
 };
 
+use crate::fast3d::graphics::opengl_program::OpenGLProgram;
 use farbe::image::n64::ImageSize as FarbeImageSize;
 
 pub const SCREEN_WIDTH: f32 = 320.0;
@@ -95,6 +98,7 @@ pub struct RenderingState {
     pub viewport: Rect,
     pub scissor: Rect,
     pub shader_program: *mut ShaderProgram,
+    pub shader_program_hash: u64,
     pub textures: [Texture; 2],
     pub cull_mode: CullMode,
 }
@@ -110,6 +114,7 @@ impl RenderingState {
         viewport: Rect::ZERO,
         scissor: Rect::ZERO,
         shader_program: std::ptr::null_mut(),
+        shader_program_hash: 0,
         textures: [Texture::EMPTY; 2],
         cull_mode: CullMode::None,
     };
@@ -223,6 +228,7 @@ pub struct RDP {
     pub textures_changed: [bool; 2],
 
     pub color_combiner_manager: ColorCombinerManager,
+    pub shader_cache: HashMap<u64, OpenGLProgram>,
 
     pub viewport: Rect,
     pub scissor: Rect,
@@ -261,6 +267,7 @@ impl RDP {
             textures_changed: [false; 2],
 
             color_combiner_manager: ColorCombinerManager::new(),
+            shader_cache: HashMap::new(),
 
             viewport: Rect::ZERO,
             scissor: Rect::ZERO,
@@ -491,6 +498,29 @@ impl RDP {
 
     // MARK: - Shader Programs
 
+    pub fn lookup_or_create_program(&mut self, gfx_context: &GraphicsContext) {
+        let mut hasher = DefaultHasher::new();
+        self.other_mode_h.hash(&mut hasher);
+        self.other_mode_l.hash(&mut hasher);
+        self.combine.hash(&mut hasher);
+        let hash = hasher.finish();
+
+        if let Some(program) = self.shader_cache.get(&hash) {
+            // load it into the Gfx device
+            self.rendering_state.shader_program_hash = hash;
+            return;
+        }
+
+        let mut program = OpenGLProgram::new(self.other_mode_h, self.other_mode_l, self.combine);
+        program.init();
+        program.preprocess();
+
+        // gfx_context.api.x_load_shader(program.preprocessed_vertex, program.preprocessed_fragment);
+
+        // trace!("Program: {:?}", program);
+        self.shader_cache.insert(hash, program);
+    }
+
     pub fn lookup_or_create_shader_program(
         &mut self,
         gfx_context: &GraphicsContext,
@@ -538,7 +568,7 @@ impl RDP {
         // parse the color combine pass
         {
             let mut input_number = [0u8; 8];
-            let mut next_input_number = SHADER::INPUT_1 as u8;
+            let mut next_input_number = SHADER::ONE as u8;
 
             for i in 0..4 {
                 let mut val = 0;
@@ -566,7 +596,7 @@ impl RDP {
         // parse the alpha combine pass
         {
             let mut input_number = [0u8; 8];
-            let mut next_input_number = SHADER::INPUT_1 as u8;
+            let mut next_input_number = SHADER::ONE as u8;
 
             for i in 0..4 {
                 let mut val = 0;
