@@ -20,8 +20,6 @@ pub struct CGraphicsDevice {
         u8,
     ) -> *mut ShaderProgram,
     pub load_shader: extern "C" fn(*mut ShaderProgram),
-    pub create_and_load_new_shader: extern "C" fn(u32) -> *mut ShaderProgram,
-    pub lookup_shader: extern "C" fn(u32) -> *mut ShaderProgram,
     pub new_texture: extern "C" fn() -> u32,
     pub select_texture: extern "C" fn(i32, u32),
     pub upload_texture: extern "C" fn(*const u8, i32, i32),
@@ -102,14 +100,6 @@ impl GraphicsAPI for ExternGraphicsDevice {
 
     fn load_shader(&self, shader: *mut ShaderProgram) {
         unsafe { ((*self.inner).load_shader)(shader) }
-    }
-
-    fn create_and_load_new_shader(&self, id: u32) -> *mut ShaderProgram {
-        unsafe { ((*self.inner).create_and_load_new_shader)(id) }
-    }
-
-    fn lookup_shader(&self, id: u32) -> *mut ShaderProgram {
-        unsafe { ((*self.inner).lookup_shader)(id) }
     }
 
     fn new_texture(&self) -> u32 {

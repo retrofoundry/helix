@@ -25,9 +25,7 @@ pub enum CullMode {
 pub trait GraphicsAPI {
     fn as_any_ref(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
-
     fn z_is_from_0_to_1(&self) -> bool;
-
     fn unload_shader(&self, shader: *mut ShaderProgram);
     fn new_shader(
         &self,
@@ -43,11 +41,7 @@ pub trait GraphicsAPI {
         uses_noise: bool,
         num_inputs: u8,
     ) -> *mut ShaderProgram;
-
     fn load_shader(&self, shader: *mut ShaderProgram);
-    fn create_and_load_new_shader(&self, id: u32) -> *mut ShaderProgram;
-    fn lookup_shader(&self, id: u32) -> *mut ShaderProgram;
-
     fn new_texture(&self) -> u32;
     fn select_texture(&self, unit: i32, id: u32);
     fn upload_texture(&self, data: *const u8, width: i32, height: i32);

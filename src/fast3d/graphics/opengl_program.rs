@@ -88,13 +88,7 @@ impl OpenGLProgram {
             self.preprocess_shader("frag", &format!("{}{}", self.both, self.fragment));
     }
 
-    pub fn preprocess_shader(&mut self, shader_type: &str, shader: &str) -> String {
-        let mut shader = shader.to_string();
-
-        // let definesString: string = '';
-        // if (defines !== null)
-            // definesString = [... defines.entries()].map(([k, v]) => defineStr(k, v)).join('\n');
-
+    pub fn preprocess_shader(&mut self, _shader_type: &str, shader: &str) -> String {
         let defines_string = self
             .defines
             .iter()
@@ -108,8 +102,7 @@ impl OpenGLProgram {
         {}
         {}
         "#,
-            defines_string,
-            shader
+            defines_string, shader
         )
     }
 
@@ -149,7 +142,8 @@ impl OpenGLProgram {
         );
         self.set_define_bool(
             "USE_ALPHA".to_string(),
-            other_mode_l_uses_alpha(self.other_mode_l) || other_mode_l_uses_texture_edge(self.other_mode_l),
+            other_mode_l_uses_alpha(self.other_mode_l)
+                || other_mode_l_uses_texture_edge(self.other_mode_l),
         );
         self.set_define_bool(
             "USE_NOISE".to_string(),
@@ -330,8 +324,10 @@ impl OpenGLProgram {
             self.shader_input_mapping.mirror_mapping[1][3] == SHADER::ZERO,
         ];
         let do_mix: [bool; 2] = [
-            self.shader_input_mapping.mirror_mapping[0][1] == self.shader_input_mapping.mirror_mapping[0][3],
-            self.shader_input_mapping.mirror_mapping[1][1] == self.shader_input_mapping.mirror_mapping[1][3],
+            self.shader_input_mapping.mirror_mapping[0][1]
+                == self.shader_input_mapping.mirror_mapping[0][3],
+            self.shader_input_mapping.mirror_mapping[1][1]
+                == self.shader_input_mapping.mirror_mapping[1][3],
         ];
 
         trace!("defines: {:?}", self.defines);
@@ -400,8 +396,12 @@ impl OpenGLProgram {
         let shader_map = self.shader_input_mapping.mirror_mapping[if only_alpha { 1 } else { 0 }];
 
         if do_single {
-            out.push_str(
-               &self.shader_input(shader_map[3], with_alpha, only_alpha, use_alpha, false,
+            out.push_str(&self.shader_input(
+                shader_map[3],
+                with_alpha,
+                only_alpha,
+                use_alpha,
+                false,
             ));
         } else if do_multiply {
             out.push_str(&format!(
@@ -511,6 +511,7 @@ impl OpenGLProgram {
                 SHADER::TEXEL0A => "texVal0.a",
                 SHADER::TEXEL1 => "texVal1.a",
             }
-        }.to_string();
+        }
+        .to_string();
     }
 }

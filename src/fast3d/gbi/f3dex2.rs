@@ -579,25 +579,16 @@ impl F3DEX2 {
             cc_id &= !0xfff000;
         }
 
-        // TODO: Stop using ID's for the color combiner, use the object instead
         let shader_hash = rdp.lookup_or_create_program(gfx_context).clone();
-        //        rdp.lookup_or_create_color_combiner(gfx_context, cc_id);
-        //        let color_combiner = rdp.color_combiner_manager.combiners.get(&cc_id).unwrap();
-        //        let shader_input_mapping = color_combiner.shader_input_mapping;
+        let new_program = rdp.shader_cache.get(&shader_hash).unwrap().compiled_program;
 
-        //        let prg = color_combiner.prg;
-        //        let rs_prg = rdp.rendering_state.shader_program;
-        let new_program = rdp
-            .shader_cache
-            .get(&shader_hash)
-            .unwrap()
-            .compiled_program;
         if shader_hash != rdp.rendering_state.shader_program_hash {
             rdp.flush(gfx_context);
 
             if let Some(old_program) = rdp
-            .shader_cache
-            .get(&rdp.rendering_state.shader_program_hash) {
+                .shader_cache
+                .get(&rdp.rendering_state.shader_program_hash)
+            {
                 gfx_context.api.unload_shader(old_program.compiled_program);
             }
 

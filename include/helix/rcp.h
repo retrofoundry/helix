@@ -22,8 +22,6 @@ struct CGraphicsDevice {
     void (*unload_shader)(struct ShaderProgram *old_prg);
     void (*new_shader)(char *vertex, size_t vertex_len, char *fragment, size_t fragment_len, size_t num_floats, bool uses_tex, bool uses_tex1, bool uses_fog, bool uses_alpha, bool uses_noise, uint8_t num_inputs);
     void (*load_shader)(struct ShaderProgram *new_prg);
-    struct ShaderProgram *(*create_and_load_new_shader)(uint32_t shader_id);
-    struct ShaderProgram *(*lookup_shader)(uint32_t shader_id);
     uint32_t (*new_texture)(void);
     void (*select_texture)(int tile, uint32_t texture_id);
     void (*upload_texture)(const uint8_t *rgba32_buf, int width, int height);
@@ -145,7 +143,6 @@ void F3DEX2E_GDPFillRectangle(void* rcp, void* gfx_context, uintptr_t command);
 
 // RDP Getters and Setters
 void RDPSetOutputDimensions(void* rcp, struct OutputDimensions dimensions);
-void RDPLookupOrCreateShaderProgram(void* rcp, void* gfx_context, uint32_t shader_id);
 void RDPFlush(void* rcp, void* gfx_context);
 
 #ifdef __cplusplus

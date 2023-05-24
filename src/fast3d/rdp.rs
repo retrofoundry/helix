@@ -544,112 +544,6 @@ impl RDP {
         hash
     }
 
-    pub fn lookup_or_create_shader_program(
-        &mut self,
-        gfx_context: &GraphicsContext,
-        shader_id: u32,
-    ) -> *mut ShaderProgram {
-        let mut shader_program = gfx_context.api.lookup_shader(shader_id);
-        if shader_program.is_null() {
-            gfx_context
-                .api
-                .unload_shader(self.rendering_state.shader_program);
-            shader_program = gfx_context.api.create_and_load_new_shader(shader_id);
-            self.rendering_state.shader_program = shader_program;
-        }
-
-        shader_program
-    }
-
-    // MARK: - Color Combiners
-
-    pub fn create_color_combiner(
-        &mut self,
-        gfx_context: &GraphicsContext,
-        cc_id: u32,
-    ) -> &ColorCombiner {
-        self.flush(gfx_context);
-        self.generate_color_combiner(gfx_context, cc_id);
-
-        let combiner = self.color_combiner_manager.combiners.get(&cc_id).unwrap();
-        self.color_combiner_manager.current_combiner = Some(cc_id);
-
-        combiner
-    }
-
-    pub fn lookup_or_create_color_combiner(&mut self, gfx_context: &GraphicsContext, cc_id: u32) {
-        if let Some(_cc) = self.color_combiner_manager.lookup_color_combiner(cc_id) {
-        } else {
-            self.create_color_combiner(gfx_context, cc_id);
-        }
-    }
-
-    pub fn generate_color_combiner(&mut self, gfx_context: &GraphicsContext, cc_id: u32) {
-        let mut shader_id = (cc_id >> 24) << 24;
-        let mut shader_input_mapping = [[0u8; 4]; 2];
-
-        // parse the color combine pass
-        {
-            let mut input_number = [0u8; 8];
-            let mut next_input_number = SHADER::ONE as u8;
-
-            for i in 0..4 {
-                let mut val = 0;
-                match self.combine.c0.get(i) {
-                    CCMUX::TEXEL0 => val = SHADER::TEXEL0 as u8,
-                    CCMUX::TEXEL1 => val = SHADER::TEXEL1 as u8,
-                    CCMUX::TEXEL0_ALPHA => val = SHADER::TEXEL0A as u8,
-                    CCMUX::PRIMITIVE | CCMUX::SHADE | CCMUX::ENVIRONMENT | CCMUX::LOD_FRACTION => {
-                        let property = self.combine.c0.get(i) as u8;
-
-                        if input_number[property as usize] == 0 {
-                            shader_input_mapping[0][(next_input_number - 1) as usize] = property;
-                            input_number[property as usize] = next_input_number;
-                            next_input_number += 1;
-                        }
-                        val = input_number[property as usize];
-                    }
-                    _ => {}
-                }
-
-                shader_id |= (val as u32) << (i * 3);
-            }
-        }
-
-        // parse the alpha combine pass
-        {
-            let mut input_number = [0u8; 8];
-            let mut next_input_number = SHADER::ONE as u8;
-
-            for i in 0..4 {
-                let mut val = 0;
-                match self.combine.a0.get(i) {
-                    ACMUX::TEXEL0 => val = SHADER::TEXEL0 as u8,
-                    ACMUX::TEXEL1 => val = SHADER::TEXEL1 as u8,
-                    ACMUX::PRIMITIVE | ACMUX::SHADE | ACMUX::ENVIRONMENT => {
-                        let property = self.combine.a0.get(i) as u8;
-
-                        if input_number[property as usize] == 0 {
-                            shader_input_mapping[1][(next_input_number - 1) as usize] = property;
-                            input_number[property as usize] = next_input_number;
-                            next_input_number += 1;
-                        }
-                        val = input_number[property as usize];
-                    }
-                    _ => {}
-                }
-
-                shader_id |= (val as u32) << (12 + i * 3);
-            }
-        }
-
-        let shader_program = self.lookup_or_create_shader_program(gfx_context, shader_id);
-        let combiner = ColorCombiner::new(shader_id, shader_program, shader_input_mapping);
-        self.color_combiner_manager
-            .combiners
-            .insert(cc_id, combiner);
-    }
-
     // MARK: - Blend
 
     fn translate_blend_mode(&mut self, gfx_context: &GraphicsContext, render_mode: u32) {
@@ -781,18 +675,6 @@ impl RDP {
 pub extern "C" fn RDPSetOutputDimensions(rcp: Option<&mut RCP>, dimensions: OutputDimensions) {
     let rcp = rcp.unwrap();
     rcp.rdp.output_dimensions = dimensions;
-}
-
-#[no_mangle]
-pub extern "C" fn RDPLookupOrCreateShaderProgram(
-    rcp: Option<&mut RCP>,
-    gfx_context: Option<&mut GraphicsContext>,
-    shader_id: u32,
-) {
-    let rcp = rcp.unwrap();
-    let gfx_context = gfx_context.unwrap();
-    rcp.rdp
-        .lookup_or_create_shader_program(gfx_context, shader_id);
 }
 
 #[no_mangle]

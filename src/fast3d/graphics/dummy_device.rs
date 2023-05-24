@@ -392,12 +392,6 @@ impl GraphicsAPI for DummyGraphicsDevice {
         std::ptr::null_mut()
     }
     fn load_shader(&self, _shader: *mut ShaderProgram) {}
-    fn create_and_load_new_shader(&self, _id: u32) -> *mut ShaderProgram {
-        std::ptr::null_mut()
-    }
-    fn lookup_shader(&self, _id: u32) -> *mut ShaderProgram {
-        std::ptr::null_mut()
-    }
     fn new_texture(&self) -> u32 {
         0
     }

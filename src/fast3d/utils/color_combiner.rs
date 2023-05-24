@@ -243,13 +243,13 @@ impl CombineParams {
                 0 => {
                     let index = i / 2;
 
-                    if self.get_cc(index).a == self.get_cc(index).b || self.get_cc(index).c == CCMUX::ZERO
+                    if self.get_cc(index).a == self.get_cc(index).b
+                        || self.get_cc(index).c == CCMUX::ZERO
                     {
                         self.get_cc(i).a = CCMUX::COMBINED;
                         self.get_cc(i).b = CCMUX::COMBINED;
                         self.get_cc(i).c = CCMUX::COMBINED;
                     }
-
 
                     for j in 0..4 {
                         // if (cc_features->c[i][j] >= SHADER_INPUT_1 && cc_features->c[i][j] <= SHADER_INPUT_4) {
@@ -269,13 +269,15 @@ impl CombineParams {
                                 let property = self.get_cc(index).get(j) as u8;
 
                                 if input_number[property as usize] == 0 {
-                                    input_mapping[i][(next_input_number - 1) as usize] =
-                                        property;
+                                    input_mapping[i][(next_input_number - 1) as usize] = property;
                                     input_number[property as usize] = next_input_number as u8;
                                     next_input_number += 1;
-                                    mirror_mapping[i][j] = SHADER::from(input_number[property as usize]);
+                                    mirror_mapping[i][j] =
+                                        SHADER::from(input_number[property as usize]);
 
-                                    if mirror_mapping[i][j] >= SHADER::ONE && mirror_mapping[i][j] <= SHADER::FOUR {
+                                    if mirror_mapping[i][j] >= SHADER::ONE
+                                        && mirror_mapping[i][j] <= SHADER::FOUR
+                                    {
                                         if mirror_mapping[i][j] as u8 > num_inputs {
                                             num_inputs = input_number[property as usize];
                                         }
@@ -289,7 +291,8 @@ impl CombineParams {
                 1 => {
                     let index = (i - 1) / 2;
 
-                    if self.get_ac(index).a == self.get_ac(index).b || self.get_ac(index).c == ACMUX::ZERO
+                    if self.get_ac(index).a == self.get_ac(index).b
+                        || self.get_ac(index).c == ACMUX::ZERO
                     {
                         self.get_ac(i).a = ACMUX::COMBINED__LOD_FRAC;
                         self.get_ac(i).b = ACMUX::COMBINED__LOD_FRAC;
@@ -304,13 +307,15 @@ impl CombineParams {
                                 let property = self.get_ac(index).get(j) as u8;
 
                                 if input_number[property as usize] == 0 {
-                                    input_mapping[i][(next_input_number - 1) as usize] =
-                                        property;
+                                    input_mapping[i][(next_input_number - 1) as usize] = property;
                                     input_number[property as usize] = next_input_number;
                                     next_input_number += 1;
-                                    mirror_mapping[i][j] = SHADER::from(input_number[property as usize]);
+                                    mirror_mapping[i][j] =
+                                        SHADER::from(input_number[property as usize]);
 
-                                    if mirror_mapping[i][j] >= SHADER::ONE && mirror_mapping[i][j] <= SHADER::FOUR {
+                                    if mirror_mapping[i][j] >= SHADER::ONE
+                                        && mirror_mapping[i][j] <= SHADER::FOUR
+                                    {
                                         if mirror_mapping[i][j] as u8 > num_inputs {
                                             num_inputs = input_number[property as usize];
                                         }
