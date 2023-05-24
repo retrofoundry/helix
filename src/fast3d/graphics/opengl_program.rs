@@ -1,15 +1,17 @@
-use log::trace;
-
 use crate::fast3d::gbi::utils::{
     other_mode_l_uses_alpha, other_mode_l_uses_fog, other_mode_l_uses_noise,
     other_mode_l_uses_texture_edge,
 };
-use crate::fast3d::utils::color_combiner::{
-    ColorCombiner, CombineParams, ShaderInputMapping, ACMUX, CCMUX, SHADER,
-};
+use crate::fast3d::utils::color_combiner::{CombineParams, ShaderInputMapping, SHADER};
 use std::collections::HashMap;
 
 use super::ShaderProgram;
+
+#[derive(PartialEq, Eq)]
+pub enum ShaderType {
+    Vertex,
+    Fragment,
+}
 
 #[derive(Debug)]
 pub struct OpenGLProgram {
@@ -83,12 +85,20 @@ impl OpenGLProgram {
         }
 
         self.preprocessed_vertex =
-            self.preprocess_shader("vert", &format!("{}{}", self.both, self.vertex));
-        self.preprocessed_frag =
-            self.preprocess_shader("frag", &format!("{}{}", self.both, self.fragment));
+            self.preprocess_shader(ShaderType::Vertex, &format!("{}{}", self.both, self.vertex));
+        self.preprocessed_frag = self.preprocess_shader(
+            ShaderType::Fragment,
+            &format!("{}{}", self.both, self.fragment),
+        );
     }
 
-    pub fn preprocess_shader(&mut self, _shader_type: &str, shader: &str) -> String {
+    pub fn preprocess_shader(&mut self, shader_type: ShaderType, shader: &str) -> String {
+        let version_string = if cfg!(target_os = "macos") {
+            "#version 410 core"
+        } else {
+            "#version 110"
+        };
+
         let defines_string = self
             .defines
             .iter()
@@ -96,13 +106,26 @@ impl OpenGLProgram {
             .collect::<Vec<String>>()
             .join("");
 
+        #[cfg(target_os = "macos")]
+        let shader = if shader_type == ShaderType::Vertex {
+            shader.replace("attribute", "in").replace("varying", "out")
+        } else {
+            shader
+                .replace("varying", "in")
+                .replace("texture2D", "texture")
+                .replace("gl_FragColor", "outColor")
+        };
+
+        #[cfg(not(target_os = "macos"))]
+        let shader = shader.replace("out vec4 outColor;", "");
+
         format!(
             r#"
-        #version 110
+        {}
         {}
         {}
         "#,
-            defines_string, shader
+            version_string, defines_string, shader
         )
     }
 
@@ -276,6 +299,8 @@ impl OpenGLProgram {
                 }}
             #endif
 
+            out vec4 outColor;
+
             void main() {{
                 #ifdef USE_TEXTURE
                     vec4 texVal0 = texture2D(uTex0, vTexCoord);
@@ -329,11 +354,6 @@ impl OpenGLProgram {
             self.shader_input_mapping.mirror_mapping[1][1]
                 == self.shader_input_mapping.mirror_mapping[1][3],
         ];
-
-        trace!("defines: {:?}", self.defines);
-        trace!("do_single: {:?}", do_single);
-        trace!("do_multiply: {:?}", do_multiply);
-        trace!("do_mix: {:?}", do_mix);
 
         format!(
             r#"
