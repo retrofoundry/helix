@@ -18,7 +18,7 @@ impl GamepadManager {
             gamepad_bits: null_mut(),
             providers: vec![
                 Box::new(GirlsGamepadProvider::new()),
-                Box::new(KeyboardGamepadProvider::new()),
+                // Box::new(KeyboardGamepadProvider::new()),
             ],
         }
     }

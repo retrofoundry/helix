@@ -8,7 +8,7 @@ name = "helix"
 crate-type = ["lib", "staticlib"]
 
 [features]
-default = ["f3dex2"]
+default = ["f3dex2", "dummy_renderer"]
 
 # Graphics Features
 dummy_renderer = ["cgmath", "bytemuck"]

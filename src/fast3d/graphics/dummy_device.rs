@@ -3,7 +3,7 @@ use bytemuck::{Pod, Zeroable};
 use std::any::Any;
 use std::borrow::Cow;
 use std::mem;
-use wgpu::{include_wgsl, util::DeviceExt, BlendState, ShaderModuleDescriptor, ShaderSource};
+use wgpu::{util::DeviceExt, BlendState, ShaderModuleDescriptor, ShaderSource};
 
 const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
     1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 1.0,
@@ -375,6 +375,22 @@ impl GraphicsAPI for DummyGraphicsDevice {
         false
     }
     fn unload_shader(&self, _shader: *mut ShaderProgram) {}
+    fn new_shader(
+        &self,
+        vertex: *const u8,
+        vertex_len: usize,
+        fragment: *const u8,
+        fragment_len: usize,
+        num_floats: usize,
+        uses_tex: bool,
+        uses_tex1: bool,
+        uses_fog: bool,
+        uses_alpha: bool,
+        uses_noise: bool,
+        num_inputs: u8,
+    ) -> *mut ShaderProgram {
+        std::ptr::null_mut()
+    }
     fn load_shader(&self, _shader: *mut ShaderProgram) {}
     fn create_and_load_new_shader(&self, _id: u32) -> *mut ShaderProgram {
         std::ptr::null_mut()

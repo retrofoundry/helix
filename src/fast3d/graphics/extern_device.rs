@@ -6,6 +6,19 @@ use wgpu::BlendState;
 pub struct CGraphicsDevice {
     pub z_is_from_0_to_1: extern "C" fn() -> bool,
     pub unload_shader: extern "C" fn(*mut ShaderProgram),
+    pub new_shader: extern "C" fn(
+        *const u8,
+        usize,
+        *const u8,
+        usize,
+        usize,
+        bool,
+        bool,
+        bool,
+        bool,
+        bool,
+        u8,
+    ) -> *mut ShaderProgram,
     pub load_shader: extern "C" fn(*mut ShaderProgram),
     pub create_and_load_new_shader: extern "C" fn(u32) -> *mut ShaderProgram,
     pub lookup_shader: extern "C" fn(u32) -> *mut ShaderProgram,
@@ -54,6 +67,37 @@ impl GraphicsAPI for ExternGraphicsDevice {
 
     fn unload_shader(&self, shader: *mut ShaderProgram) {
         unsafe { ((*self.inner).unload_shader)(shader) }
+    }
+
+    fn new_shader(
+        &self,
+        vertex: *const u8,
+        vertex_len: usize,
+        fragment: *const u8,
+        fragment_len: usize,
+        num_floats: usize,
+        uses_tex: bool,
+        uses_tex1: bool,
+        uses_fog: bool,
+        uses_alpha: bool,
+        uses_noise: bool,
+        num_inputs: u8,
+    ) -> *mut ShaderProgram {
+        unsafe {
+            ((*self.inner).new_shader)(
+                vertex,
+                vertex_len,
+                fragment,
+                fragment_len,
+                num_floats,
+                uses_tex,
+                uses_tex1,
+                uses_fog,
+                uses_alpha,
+                uses_noise,
+                num_inputs,
+            )
+        }
     }
 
     fn load_shader(&self, shader: *mut ShaderProgram) {

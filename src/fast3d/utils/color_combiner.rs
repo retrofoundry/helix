@@ -242,11 +242,26 @@ impl CombineParams {
             match i % 2 {
                 0 => {
                     let index = i / 2;
+
+                    if self.get_cc(index).a == self.get_cc(index).b || self.get_cc(index).c == CCMUX::ZERO
+                    {
+                        self.get_cc(i).a = CCMUX::COMBINED;
+                        self.get_cc(i).b = CCMUX::COMBINED;
+                        self.get_cc(i).c = CCMUX::COMBINED;
+                    }
+
+
                     for j in 0..4 {
+                        // if (cc_features->c[i][j] >= SHADER_INPUT_1 && cc_features->c[i][j] <= SHADER_INPUT_4) {
+                        //     if (cc_features->c[i][j] > cc_features->num_inputs) {
+                        //         cc_features->num_inputs = cc_features->c[i][j];
+                        //     }
+                        // }
+
                         match self.get_cc(index).get(j) {
-                            CCMUX::TEXEL0 => mirror_mapping[index][j] = SHADER::TEXEL0,
-                            CCMUX::TEXEL1 => mirror_mapping[index][j] = SHADER::TEXEL1,
-                            CCMUX::TEXEL0_ALPHA => mirror_mapping[index][j] = SHADER::TEXEL0A,
+                            CCMUX::TEXEL0 => mirror_mapping[i][j] = SHADER::TEXEL0,
+                            CCMUX::TEXEL1 => mirror_mapping[i][j] = SHADER::TEXEL1,
+                            CCMUX::TEXEL0_ALPHA => mirror_mapping[i][j] = SHADER::TEXEL0A,
                             CCMUX::PRIMITIVE
                             | CCMUX::SHADE
                             | CCMUX::ENVIRONMENT
@@ -254,14 +269,16 @@ impl CombineParams {
                                 let property = self.get_cc(index).get(j) as u8;
 
                                 if input_number[property as usize] == 0 {
-                                    input_mapping[index][(next_input_number - 1) as usize] =
+                                    input_mapping[i][(next_input_number - 1) as usize] =
                                         property;
                                     input_number[property as usize] = next_input_number as u8;
-                                    mirror_mapping[index][j] = SHADER::from(next_input_number);
                                     next_input_number += 1;
+                                    mirror_mapping[i][j] = SHADER::from(input_number[property as usize]);
 
-                                    if next_input_number > num_inputs {
-                                        num_inputs = next_input_number;
+                                    if mirror_mapping[i][j] >= SHADER::ONE && mirror_mapping[i][j] <= SHADER::FOUR {
+                                        if mirror_mapping[i][j] as u8 > num_inputs {
+                                            num_inputs = input_number[property as usize];
+                                        }
                                     }
                                 }
                             }
@@ -271,22 +288,32 @@ impl CombineParams {
                 }
                 1 => {
                     let index = (i - 1) / 2;
+
+                    if self.get_ac(index).a == self.get_ac(index).b || self.get_ac(index).c == ACMUX::ZERO
+                    {
+                        self.get_ac(i).a = ACMUX::COMBINED__LOD_FRAC;
+                        self.get_ac(i).b = ACMUX::COMBINED__LOD_FRAC;
+                        self.get_ac(i).c = ACMUX::COMBINED__LOD_FRAC;
+                    }
+
                     for j in 0..4 {
                         match self.get_ac(index).get(j) {
-                            ACMUX::TEXEL0 => mirror_mapping[index][j] = SHADER::TEXEL0,
-                            ACMUX::TEXEL1 => mirror_mapping[index][j] = SHADER::TEXEL1,
+                            ACMUX::TEXEL0 => mirror_mapping[i][j] = SHADER::TEXEL0,
+                            ACMUX::TEXEL1 => mirror_mapping[i][j] = SHADER::TEXEL1,
                             ACMUX::PRIMITIVE | ACMUX::SHADE | ACMUX::ENVIRONMENT => {
                                 let property = self.get_ac(index).get(j) as u8;
 
                                 if input_number[property as usize] == 0 {
-                                    input_mapping[index][(next_input_number - 1) as usize] =
+                                    input_mapping[i][(next_input_number - 1) as usize] =
                                         property;
                                     input_number[property as usize] = next_input_number;
-                                    mirror_mapping[index][j] = SHADER::from(next_input_number);
                                     next_input_number += 1;
+                                    mirror_mapping[i][j] = SHADER::from(input_number[property as usize]);
 
-                                    if next_input_number > num_inputs {
-                                        num_inputs = next_input_number;
+                                    if mirror_mapping[i][j] >= SHADER::ONE && mirror_mapping[i][j] <= SHADER::FOUR {
+                                        if mirror_mapping[i][j] as u8 > num_inputs {
+                                            num_inputs = input_number[property as usize];
+                                        }
                                     }
                                 }
                             }
@@ -400,7 +427,7 @@ pub const SHADER_OPT_FOG: u32 = 1 << 25;
 pub const SHADER_OPT_TEXTURE_EDGE: u32 = 1 << 26;
 pub const SHADER_OPT_NOISE: u32 = 1 << 27;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd)]
 pub enum SHADER {
     ZERO,
     ONE,

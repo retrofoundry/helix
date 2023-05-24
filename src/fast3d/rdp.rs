@@ -498,27 +498,50 @@ impl RDP {
 
     // MARK: - Shader Programs
 
-    pub fn lookup_or_create_program(&mut self, gfx_context: &GraphicsContext) {
+    pub fn shader_program_hash(&mut self) -> u64 {
         let mut hasher = DefaultHasher::new();
+
         self.other_mode_h.hash(&mut hasher);
         self.other_mode_l.hash(&mut hasher);
         self.combine.hash(&mut hasher);
-        let hash = hasher.finish();
 
-        if let Some(program) = self.shader_cache.get(&hash) {
+        hasher.finish()
+    }
+
+    pub fn lookup_or_create_program(&mut self, gfx_context: &GraphicsContext) -> u64 {
+        let hash = self.shader_program_hash();
+        if let Some(_program) = self.shader_cache.get(&hash) {
             // load it into the Gfx device
-            self.rendering_state.shader_program_hash = hash;
-            return;
+            // self.rendering_state.shader_program_hash = hash;
+            return hash;
         }
+
+        gfx_context
+            .api
+            .unload_shader(self.rendering_state.shader_program);
 
         let mut program = OpenGLProgram::new(self.other_mode_h, self.other_mode_l, self.combine);
         program.init();
         program.preprocess();
 
-        // gfx_context.api.x_load_shader(program.preprocessed_vertex, program.preprocessed_fragment);
+        let compiled_program = gfx_context.api.new_shader(
+            program.preprocessed_vertex.as_ptr(),
+            program.preprocessed_vertex.len(),
+            program.preprocessed_frag.as_ptr(),
+            program.preprocessed_frag.len(),
+            program.num_floats,
+            program.get_define_bool("USE_TEXTURE"),
+            program.get_define_bool("USE_TEXTURE1"),
+            program.get_define_bool("USE_FOG"),
+            program.get_define_bool("USE_ALPHA"),
+            program.get_define_bool("USE_NOISE"),
+            program.shader_input_mapping.num_inputs,
+        );
 
-        // trace!("Program: {:?}", program);
+        program.compiled_program = compiled_program;
         self.shader_cache.insert(hash, program);
+
+        hash
     }
 
     pub fn lookup_or_create_shader_program(

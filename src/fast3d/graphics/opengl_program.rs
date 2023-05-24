@@ -1,3 +1,5 @@
+use log::trace;
+
 use crate::fast3d::gbi::utils::{
     other_mode_l_uses_alpha, other_mode_l_uses_fog, other_mode_l_uses_noise,
     other_mode_l_uses_texture_edge,
@@ -7,11 +9,14 @@ use crate::fast3d::utils::color_combiner::{
 };
 use std::collections::HashMap;
 
+use super::ShaderProgram;
+
 #[derive(Debug)]
 pub struct OpenGLProgram {
     // Compiled program.
     pub preprocessed_vertex: String,
     pub preprocessed_frag: String,
+    pub compiled_program: *mut ShaderProgram,
 
     // inputs
     pub both: String,
@@ -24,8 +29,8 @@ pub struct OpenGLProgram {
     other_mode_l: u32,
     combine: CombineParams,
 
-    shader_input_mapping: ShaderInputMapping,
-    num_floats: u32,
+    pub shader_input_mapping: ShaderInputMapping,
+    pub num_floats: usize,
 }
 
 impl OpenGLProgram {
@@ -86,11 +91,24 @@ impl OpenGLProgram {
     pub fn preprocess_shader(&mut self, shader_type: &str, shader: &str) -> String {
         let mut shader = shader.to_string();
 
+        // let definesString: string = '';
+        // if (defines !== null)
+            // definesString = [... defines.entries()].map(([k, v]) => defineStr(k, v)).join('\n');
+
+        let defines_string = self
+            .defines
+            .iter()
+            .map(|(k, v)| format!("#define {} {}\n", k, v))
+            .collect::<Vec<String>>()
+            .join("");
+
         format!(
             r#"
         #version 110
         {}
+        {}
         "#,
+            defines_string,
             shader
         )
     }
@@ -101,6 +119,7 @@ impl OpenGLProgram {
         Self {
             preprocessed_vertex: "".to_string(),
             preprocessed_frag: "".to_string(),
+            compiled_program: std::ptr::null_mut(),
 
             both: "".to_string(),
             vertex: "".to_string(),
@@ -130,7 +149,7 @@ impl OpenGLProgram {
         );
         self.set_define_bool(
             "USE_ALPHA".to_string(),
-            other_mode_l_uses_alpha(self.other_mode_l),
+            other_mode_l_uses_alpha(self.other_mode_l) || other_mode_l_uses_texture_edge(self.other_mode_l),
         );
         self.set_define_bool(
             "USE_NOISE".to_string(),
@@ -141,7 +160,16 @@ impl OpenGLProgram {
 
         self.shader_input_mapping = self.combine.shader_input_mapping();
 
-        self.num_floats = 10u32;
+        self.num_floats = 4;
+
+        if self.get_define_bool("USE_TEXTURE") {
+            self.num_floats += 2;
+        }
+
+        if self.get_define_bool("USE_FOG") {
+            self.num_floats += 4;
+        }
+
         self.vertex = format!(
             r#"
             attribute vec4 aVtxPos;
@@ -158,7 +186,7 @@ impl OpenGLProgram {
 
             {}
 
-            void(main) {{
+            void main() {{
                 #ifdef USE_TEXTURE
                     vTexCoord = aTexCoord;
                 #endif
@@ -176,7 +204,7 @@ impl OpenGLProgram {
             self.generate_vtx_inputs_body(),
         );
 
-        self.vertex = self.generate_frag().to_string();
+        self.fragment = self.generate_frag().to_string();
     }
 
     fn generate_vtx_inputs_params(&mut self) -> String {
@@ -214,7 +242,7 @@ impl OpenGLProgram {
         let mut inputs = String::new();
         for i in 0..self.shader_input_mapping.num_inputs {
             inputs.push_str(&format!(
-                "varying vec{} vInput{};",
+                "varying vec{} vInput{};\n",
                 if self.get_define_bool("USE_ALPHA") {
                     4
                 } else {
@@ -228,8 +256,8 @@ impl OpenGLProgram {
         format!(
             r#"
             #ifdef USE_TEXTURE
-                varying vec2 vTexCoord
-            #endif;
+                varying vec2 vTexCoord;
+            #endif
 
             #ifdef USE_FOG
                 varying vec4 vFog;
@@ -262,12 +290,7 @@ impl OpenGLProgram {
                     #endif
                 #endif
 
-                #ifdef USE_ALPHA
-                    vec4 texel =
-                #else
-                    vec3 texel =
-                #endif
-                {};
+                {}
 
                 #ifdef TEXTURE_EDGE
                     if (texel.a > 0.3) texel.a = 1.0; else discard;
@@ -299,28 +322,34 @@ impl OpenGLProgram {
 
     fn generate_color_combiner(&mut self) -> String {
         let do_single: [bool; 2] = [
-            self.combine.c0.c == CCMUX::ZERO,
-            self.combine.a0.c == ACMUX::ZERO,
+            self.shader_input_mapping.mirror_mapping[0][2] == SHADER::ZERO,
+            self.shader_input_mapping.mirror_mapping[1][2] == SHADER::ZERO,
         ];
         let do_multiply: [bool; 2] = [
-            self.combine.c0.b == CCMUX::ZERO && self.combine.c0.d == CCMUX::ZERO,
-            self.combine.a0.b == ACMUX::ZERO && self.combine.a0.d == ACMUX::ZERO,
+            self.shader_input_mapping.mirror_mapping[0][3] == SHADER::ZERO,
+            self.shader_input_mapping.mirror_mapping[1][3] == SHADER::ZERO,
         ];
         let do_mix: [bool; 2] = [
-            self.combine.c0.b == self.combine.c0.d,
-            self.combine.a0.b == self.combine.a0.d,
+            self.shader_input_mapping.mirror_mapping[0][1] == self.shader_input_mapping.mirror_mapping[0][3],
+            self.shader_input_mapping.mirror_mapping[1][1] == self.shader_input_mapping.mirror_mapping[1][3],
         ];
+
+        trace!("defines: {:?}", self.defines);
+        trace!("do_single: {:?}", do_single);
+        trace!("do_multiply: {:?}", do_multiply);
+        trace!("do_mix: {:?}", do_mix);
 
         format!(
             r#"
-        #if !defined(COLOR_ALPHA_SAME) && defined(USE_ALPHA)
-            vec4(
-                {}
-                {}
-            )
-        #else
-            {}
-        #endif
+                #ifdef USE_ALPHA
+                    #if !defined(COLOR_ALPHA_SAME) && defined(USE_ALPHA)
+                        vec4 texel = vec4({}, {});
+                    #else
+                        vec4 texel = {};
+                    #endif
+                #else
+                    vec3 texel = {};
+                #endif
         "#,
             self.generate_color_combiner_inputs(
                 do_single[0],
@@ -337,6 +366,14 @@ impl OpenGLProgram {
                 true,
                 true,
                 true,
+            ),
+            self.generate_color_combiner_inputs(
+                do_single[0],
+                do_multiply[0],
+                do_mix[0],
+                self.get_define_bool("USE_ALPHA"),
+                false,
+                self.get_define_bool("USE_ALPHA"),
             ),
             self.generate_color_combiner_inputs(
                 do_single[0],
@@ -363,39 +400,25 @@ impl OpenGLProgram {
         let shader_map = self.shader_input_mapping.mirror_mapping[if only_alpha { 1 } else { 0 }];
 
         if do_single {
-            out.push_str(&self.shader_input(
-                shader_map[3],
-                with_alpha,
-                only_alpha,
-                use_alpha,
-                false,
+            out.push_str(
+               &self.shader_input(shader_map[3], with_alpha, only_alpha, use_alpha, false,
             ));
         } else if do_multiply {
             out.push_str(&format!(
-                r#"
-                {} * {}
-            "#,
+                "{} * {}",
                 self.shader_input(shader_map[0], with_alpha, only_alpha, use_alpha, false),
                 self.shader_input(shader_map[2], with_alpha, only_alpha, use_alpha, true),
             ));
         } else if do_mix {
             out.push_str(&format!(
-                r#"
-                mix(
-                    {},
-                    {},
-                    {}
-                )
-            "#,
+                "mix({}, {}, {})",
                 self.shader_input(shader_map[1], with_alpha, only_alpha, use_alpha, false),
                 self.shader_input(shader_map[0], with_alpha, only_alpha, use_alpha, false),
                 self.shader_input(shader_map[2], with_alpha, only_alpha, use_alpha, true),
             ));
         } else {
             out.push_str(&format!(
-                r#"
-                ({} - {}) * {} + {}
-            "#,
+                "({} - {}) * {} + {}",
                 self.shader_input(shader_map[0], with_alpha, only_alpha, use_alpha, false),
                 self.shader_input(shader_map[1], with_alpha, only_alpha, use_alpha, false),
                 self.shader_input(shader_map[2], with_alpha, only_alpha, use_alpha, true),
@@ -414,7 +437,7 @@ impl OpenGLProgram {
         inputs_have_alpha: bool,
         hint_single_element: bool,
     ) -> String {
-        return if only_alpha {
+        return if !only_alpha {
             match input {
                 SHADER::ZERO => {
                     if with_alpha {
@@ -477,7 +500,6 @@ impl OpenGLProgram {
                     }
                 }
             }
-            .to_string()
         } else {
             match input {
                 SHADER::ZERO => "0.0",
@@ -489,7 +511,6 @@ impl OpenGLProgram {
                 SHADER::TEXEL0A => "texVal0.a",
                 SHADER::TEXEL1 => "texVal1.a",
             }
-            .to_string()
-        };
+        }.to_string();
     }
 }

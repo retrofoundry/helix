@@ -580,18 +580,29 @@ impl F3DEX2 {
         }
 
         // TODO: Stop using ID's for the color combiner, use the object instead
-        rdp.lookup_or_create_program(gfx_context);
-        rdp.lookup_or_create_color_combiner(gfx_context, cc_id);
-        let color_combiner = rdp.color_combiner_manager.combiners.get(&cc_id).unwrap();
-        let shader_input_mapping = color_combiner.shader_input_mapping;
+        let shader_hash = rdp.lookup_or_create_program(gfx_context).clone();
+        //        rdp.lookup_or_create_color_combiner(gfx_context, cc_id);
+        //        let color_combiner = rdp.color_combiner_manager.combiners.get(&cc_id).unwrap();
+        //        let shader_input_mapping = color_combiner.shader_input_mapping;
 
-        let prg = color_combiner.prg;
-        let rs_prg = rdp.rendering_state.shader_program;
-        if prg != rs_prg {
+        //        let prg = color_combiner.prg;
+        //        let rs_prg = rdp.rendering_state.shader_program;
+        let new_program = rdp
+            .shader_cache
+            .get(&shader_hash)
+            .unwrap()
+            .compiled_program;
+        if shader_hash != rdp.rendering_state.shader_program_hash {
             rdp.flush(gfx_context);
-            gfx_context.api.unload_shader(rs_prg);
-            gfx_context.api.load_shader(prg);
-            rdp.rendering_state.shader_program = prg;
+
+            if let Some(old_program) = rdp
+            .shader_cache
+            .get(&rdp.rendering_state.shader_program_hash) {
+                gfx_context.api.unload_shader(old_program.compiled_program);
+            }
+
+            gfx_context.api.load_shader(new_program);
+            rdp.rendering_state.shader_program_hash = shader_hash;
         }
 
         if use_alpha != rdp.rendering_state.blend_enabled {
@@ -602,7 +613,7 @@ impl F3DEX2 {
             rdp.rendering_state.blend_enabled = use_alpha;
         }
 
-        let num_inputs = unsafe { (*prg).num_inputs };
+        //        let num_inputs = unsafe { (*prg).num_inputs };
         let use_texture = rdp.combine.uses_texture0() || rdp.uses_texture1();
         rdp.flush_textures(gfx_context);
 
@@ -644,11 +655,14 @@ impl F3DEX2 {
                 rdp.add_to_buf_vbo(vertex_array[i].color.a as f32 / 255.0);
             }
 
+            let shader_program = rdp.shader_cache.get(&shader_hash).unwrap();
+            let num_inputs = shader_program.shader_input_mapping.num_inputs.clone();
             for j in 0..num_inputs {
                 let mut color: Color;
                 for k in 0..(1 + if use_alpha { 1 } else { 0 }) {
                     if k == 0 {
-                        match shader_input_mapping[k][j as usize] {
+                        let shader_program = rdp.shader_cache.get(&shader_hash).unwrap();
+                        match shader_program.shader_input_mapping.input_mapping[k][j as usize] {
                             x if x == CCMUX::PRIMITIVE as u8 => {
                                 color = rdp.prim_color;
                             }
@@ -682,7 +696,8 @@ impl F3DEX2 {
                         rdp.add_to_buf_vbo(color.g as f32 / 255.0);
                         rdp.add_to_buf_vbo(color.b as f32 / 255.0);
                     } else {
-                        match shader_input_mapping[k][j as usize] {
+                        let shader_program = rdp.shader_cache.get(&shader_hash).unwrap();
+                        match shader_program.shader_input_mapping.input_mapping[k][j as usize] {
                             x if x == ACMUX::PRIMITIVE as u8 => {
                                 color = rdp.prim_color;
                             }
