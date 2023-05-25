@@ -9,6 +9,7 @@ use crate::fast3d::gbi::utils::{
     other_mode_l_uses_alpha, other_mode_l_uses_texture_edge, translate_blend_param_b,
 };
 
+use super::graphics::opengl_program::ContextVersion;
 use super::{
     gbi::{
         defines::Viewport,
@@ -514,7 +515,7 @@ impl RDP {
 
         let mut program = OpenGLProgram::new(self.other_mode_h, self.other_mode_l, self.combine);
         program.init();
-        program.preprocess();
+        program.preprocess(ContextVersion::OpenGL330);
 
         let compiled_program = gfx_context.api.new_shader(
             program.preprocessed_vertex.as_ptr(),

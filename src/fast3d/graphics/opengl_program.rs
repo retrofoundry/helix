@@ -14,6 +14,12 @@ pub enum ShaderType {
     Fragment,
 }
 
+#[derive(PartialEq, Eq)]
+pub enum ContextVersion {
+    OpenGL110,
+    OpenGL330,
+}
+
 #[derive(Debug)]
 pub struct OpenGLProgram {
     // Compiled program.
@@ -80,24 +86,32 @@ impl OpenGLProgram {
 
     // MARK: - Preprocessing
 
-    pub fn preprocess(&mut self) {
+    pub fn preprocess(&mut self, context_version: ContextVersion) {
         if self.preprocessed_vertex.len() > 0 {
             return;
         }
 
-        self.preprocessed_vertex =
-            self.preprocess_shader(ShaderType::Vertex, &format!("{}{}", self.both, self.vertex));
+        self.preprocessed_vertex = self.preprocess_shader(
+            &context_version,
+            ShaderType::Vertex,
+            &format!("{}{}", self.both, self.vertex),
+        );
         self.preprocessed_frag = self.preprocess_shader(
+            &context_version,
             ShaderType::Fragment,
             &format!("{}{}", self.both, self.fragment),
         );
     }
 
-    pub fn preprocess_shader(&mut self, shader_type: ShaderType, shader: &str) -> String {
-        let version_string = if cfg!(target_os = "macos") {
-            "#version 330 core"
-        } else {
-            "#version 110"
+    pub fn preprocess_shader(
+        &mut self,
+        context_version: &ContextVersion,
+        shader_type: ShaderType,
+        shader: &str,
+    ) -> String {
+        let version_string = match context_version {
+            ContextVersion::OpenGL330 => "#version 330 core",
+            ContextVersion::OpenGL110 => "#version 110",
         };
 
         let defines_string = self
@@ -107,18 +121,21 @@ impl OpenGLProgram {
             .collect::<Vec<String>>()
             .join("");
 
-        #[cfg(target_os = "macos")]
-        let shader = if shader_type == ShaderType::Vertex {
-            shader.replace("attribute", "in").replace("varying", "out")
-        } else {
-            shader
-                .replace("varying", "in")
-                .replace("texture2D", "texture")
-                .replace("gl_FragColor", "outColor")
+        let shader = match shader_type {
+            ShaderType::Vertex => match context_version {
+                ContextVersion::OpenGL330 => {
+                    shader.replace("attribute", "in").replace("varying", "out")
+                }
+                ContextVersion::OpenGL110 => shader.to_string(),
+            },
+            ShaderType::Fragment => match context_version {
+                ContextVersion::OpenGL330 => shader
+                    .replace("varying", "in")
+                    .replace("texture2D", "texture")
+                    .replace("gl_FragColor", "outColor"),
+                ContextVersion::OpenGL110 => shader.replace("out vec4 outColor;", ""),
+            },
         };
-
-        #[cfg(not(target_os = "macos"))]
-        let shader = shader.replace("out vec4 outColor;", "");
 
         format!(
             r#"
