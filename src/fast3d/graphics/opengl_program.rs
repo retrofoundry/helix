@@ -2,6 +2,7 @@ use crate::fast3d::gbi::utils::{
     other_mode_l_uses_alpha, other_mode_l_uses_fog, other_mode_l_uses_noise,
     other_mode_l_uses_texture_edge,
 };
+
 use crate::fast3d::utils::color_combiner::{CombineParams, ShaderInputMapping, SHADER};
 use std::collections::HashMap;
 
@@ -165,7 +166,8 @@ impl OpenGLProgram {
         );
         self.set_define_bool(
             "USE_ALPHA".to_string(),
-            other_mode_l_uses_alpha(self.other_mode_l) || other_mode_l_uses_texture_edge(self.other_mode_l),
+            other_mode_l_uses_alpha(self.other_mode_l)
+                || other_mode_l_uses_texture_edge(self.other_mode_l),
         );
         self.set_define_bool(
             "USE_NOISE".to_string(),
@@ -268,7 +270,6 @@ impl OpenGLProgram {
             ));
         }
 
-        // TODO: Could be called uNoise and uNoiseScale (frame_count / window_height)
         format!(
             r#"
             #if defined(USE_TEXTURE0) || defined(USE_TEXTURE1)
@@ -289,8 +290,8 @@ impl OpenGLProgram {
             #endif
 
             #if defined(USE_ALPHA) && defined(USE_NOISE)
-                uniform int frame_count;
-                uniform int window_height;
+                uniform int uNoise;
+                uniform int uNoiseScale;
 
                 float random(in vec3 value) {{
                     float random = dot(sin(value), vec3(12.9898, 78.233, 37.719));
@@ -323,7 +324,7 @@ impl OpenGLProgram {
                 #endif
 
                 #if defined(USE_ALPHA) && defined(USE_NOISE)
-                    texel.a *= floor(random(vec3(floor(gl_FragCoord.xy * (240.0 / float(window_height))), float(frame_count))) + 0.5);
+                    texel.a *= floor(random(vec3(floor(gl_FragCoord.xy * (240.0 / float(uNoiseScale))), float(uNoise))) + 0.5);
                 #endif
 
                 #ifdef USE_ALPHA
@@ -344,8 +345,10 @@ impl OpenGLProgram {
             self.shader_input_mapping.mirror_mapping[1][2] == SHADER::ZERO,
         ];
         let do_multiply: [bool; 2] = [
-            self.shader_input_mapping.mirror_mapping[0][3] == SHADER::ZERO,
-            self.shader_input_mapping.mirror_mapping[1][3] == SHADER::ZERO,
+            self.shader_input_mapping.mirror_mapping[0][1] == SHADER::ZERO
+                && self.shader_input_mapping.mirror_mapping[0][3] == SHADER::ZERO,
+            self.shader_input_mapping.mirror_mapping[1][1] == SHADER::ZERO
+                && self.shader_input_mapping.mirror_mapping[1][3] == SHADER::ZERO,
         ];
         let do_mix: [bool; 2] = [
             self.shader_input_mapping.mirror_mapping[0][1]
@@ -353,6 +356,8 @@ impl OpenGLProgram {
             self.shader_input_mapping.mirror_mapping[1][1]
                 == self.shader_input_mapping.mirror_mapping[1][3],
         ];
+
+        let use_alpha = self.get_define_bool("USE_ALPHA");
 
         format!(
             r#"
@@ -388,9 +393,9 @@ impl OpenGLProgram {
                 do_single[0],
                 do_multiply[0],
                 do_mix[0],
-                self.get_define_bool("USE_ALPHA"),
+                use_alpha,
                 false,
-                self.get_define_bool("USE_ALPHA"),
+                use_alpha,
             ),
         )
         .to_string()

@@ -499,7 +499,7 @@ impl RDP {
     pub fn shader_program_hash(&mut self) -> u64 {
         let mut hasher = DefaultHasher::new();
 
-        self.other_mode_h.hash(&mut hasher);
+        // self.other_mode_h.hash(&mut hasher);
         self.other_mode_l.hash(&mut hasher);
         self.combine.hash(&mut hasher);
 
@@ -509,8 +509,6 @@ impl RDP {
     pub fn lookup_or_create_program(&mut self, gfx_context: &GraphicsContext) -> u64 {
         let hash = self.shader_program_hash();
         if let Some(_program) = self.shader_cache.get(&hash) {
-            // load it into the Gfx device
-            // self.rendering_state.shader_program_hash = hash;
             return hash;
         }
 
@@ -591,7 +589,7 @@ impl RDP {
         // let do_blend = render_mode & (1 << OtherModeLayoutL::FORCE_BL as u32) != 0
         //     && dst_color == BlendParamPMColor::G_BL_CLR_MEM as u32;
 
-        let mut use_alpha = other_mode_l_uses_alpha(self.other_mode_l)
+        let use_alpha = other_mode_l_uses_alpha(self.other_mode_l)
             || other_mode_l_uses_texture_edge(self.other_mode_l);
 
         if use_alpha != self.rendering_state.blend_enabled {

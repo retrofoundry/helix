@@ -2,13 +2,13 @@ use std::slice;
 
 use glam::Mat4;
 use log::trace;
-use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState};
+use wgpu::BlendState;
 
 use super::defines::{Gfx, Light, Viewport, Vtx, G_FILLRECT, G_MTX, G_TEXRECT, G_TEXRECTFLIP};
 use super::utils::{
     get_cmd, get_cycle_type_from_other_mode_h, get_segmented_address,
     get_textfilter_from_other_mode_h, other_mode_l_uses_alpha, other_mode_l_uses_fog,
-    other_mode_l_uses_noise, other_mode_l_uses_texture_edge,
+    other_mode_l_uses_texture_edge,
 };
 use super::{
     super::{
@@ -22,9 +22,7 @@ use crate::extensions::matrix::MatrixFrom;
 use crate::fast3d::gbi::defines::G_TX;
 use crate::fast3d::rdp::MAX_BUFFERED;
 use crate::fast3d::utils::color::Color;
-use crate::fast3d::utils::color_combiner::{
-    ACMUX, CCMUX, SHADER_OPT_ALPHA, SHADER_OPT_FOG, SHADER_OPT_NOISE, SHADER_OPT_TEXTURE_EDGE,
-};
+use crate::fast3d::utils::color_combiner::{ACMUX, CCMUX};
 use crate::{
     extensions::matrix::calculate_normal_dir,
     fast3d::{
@@ -552,7 +550,8 @@ impl F3DEX2 {
         rdp.update_render_state(gfx_context, rsp.geometry_mode);
 
         // TODO: Produce draw calls for RDP to process later?
-        let use_alpha = other_mode_l_uses_alpha(rdp.other_mode_l) || other_mode_l_uses_texture_edge(rdp.other_mode_l);
+        let use_alpha = other_mode_l_uses_alpha(rdp.other_mode_l)
+            || other_mode_l_uses_texture_edge(rdp.other_mode_l);
         let use_fog = other_mode_l_uses_fog(rdp.other_mode_l);
 
         let shader_hash = rdp.lookup_or_create_program(gfx_context).clone();
@@ -580,8 +579,7 @@ impl F3DEX2 {
             rdp.rendering_state.blend_enabled = use_alpha;
         }
 
-        //        let num_inputs = unsafe { (*prg).num_inputs };
-        let use_texture = rdp.combine.uses_texture0() || rdp.uses_texture1();
+        let use_texture = rdp.combine.uses_texture0() || rdp.combine.uses_texture1();
         rdp.flush_textures(gfx_context);
 
         let current_tile = rdp.tile_descriptors[rdp.texture_state.tile as usize];
@@ -1289,8 +1287,8 @@ impl F3DEX2 {
 
         let width = if !flipped { lrx - ulx } else { lry - uly };
         let height = if !flipped { lry - uly } else { lrx - ulx };
-        let lrs: u32 = ((uls << 7) as u32 + (dsdx as u32) * (width as u32)) >> 7;
-        let lrt: u32 = ((ult << 7) as u32 + (dtdy as u32) * (height as u32)) >> 7;
+        let lrs: i32 = ((uls << 7) as i32 + (dsdx as i32) * (width as i32)) >> 7;
+        let lrt: i32 = ((ult << 7) as i32 + (dtdy as i32) * (height as i32)) >> 7;
 
         let ul = &mut rsp.vertex_table[MAX_VERTICES];
         ul.uv[0] = uls as f32;

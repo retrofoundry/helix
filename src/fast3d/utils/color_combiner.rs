@@ -243,7 +243,9 @@ impl CombineParams {
                 0 => {
                     let index = i / 2;
                     for j in 0..4 {
-                        match self.get_cc(index).get(j) {
+                        let cc = self.get_cc(index).get(j);
+                        match cc {
+                            CCMUX::ZERO => mirror_mapping[i][j] = SHADER::ZERO,
                             CCMUX::TEXEL0 => mirror_mapping[i][j] = SHADER::TEXEL0,
                             CCMUX::TEXEL1 => mirror_mapping[i][j] = SHADER::TEXEL1,
                             CCMUX::TEXEL0_ALPHA => mirror_mapping[i][j] = SHADER::TEXEL0A,
@@ -251,14 +253,14 @@ impl CombineParams {
                             | CCMUX::SHADE
                             | CCMUX::ENVIRONMENT
                             | CCMUX::LOD_FRACTION => {
-                                let property = self.get_cc(index).get(j) as u8;
+                                let property = cc as u8;
 
                                 if input_number[property as usize] == 0 {
                                     input_mapping[i][(next_input_number - 1) as usize] = property;
                                     input_number[property as usize] = next_input_number as u8;
-                                    next_input_number += 1;
                                     mirror_mapping[i][j] =
                                         SHADER::from(input_number[property as usize]);
+                                    next_input_number += 1;
 
                                     if mirror_mapping[i][j] >= SHADER::ONE
                                         && mirror_mapping[i][j] <= SHADER::FOUR
@@ -276,18 +278,20 @@ impl CombineParams {
                 1 => {
                     let index = (i - 1) / 2;
                     for j in 0..4 {
-                        match self.get_ac(index).get(j) {
+                        let ac = self.get_ac(index).get(j);
+                        match ac {
+                            ACMUX::ZERO => mirror_mapping[i][j] = SHADER::ZERO,
                             ACMUX::TEXEL0 => mirror_mapping[i][j] = SHADER::TEXEL0,
                             ACMUX::TEXEL1 => mirror_mapping[i][j] = SHADER::TEXEL1,
                             ACMUX::PRIMITIVE | ACMUX::SHADE | ACMUX::ENVIRONMENT => {
-                                let property = self.get_ac(index).get(j) as u8;
+                                let property = ac as u8;
 
                                 if input_number[property as usize] == 0 {
                                     input_mapping[i][(next_input_number - 1) as usize] = property;
                                     input_number[property as usize] = next_input_number;
-                                    next_input_number += 1;
                                     mirror_mapping[i][j] =
                                         SHADER::from(input_number[property as usize]);
+                                    next_input_number += 1;
 
                                     if mirror_mapping[i][j] >= SHADER::ONE
                                         && mirror_mapping[i][j] <= SHADER::FOUR
@@ -390,11 +394,6 @@ impl ACMUX {
         }
     }
 }
-
-pub const SHADER_OPT_ALPHA: u32 = 1 << 24;
-pub const SHADER_OPT_FOG: u32 = 1 << 25;
-pub const SHADER_OPT_TEXTURE_EDGE: u32 = 1 << 26;
-pub const SHADER_OPT_NOISE: u32 = 1 << 27;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd)]
 pub enum SHADER {
