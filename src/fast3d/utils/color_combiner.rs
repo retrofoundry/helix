@@ -242,22 +242,7 @@ impl CombineParams {
             match i % 2 {
                 0 => {
                     let index = i / 2;
-
-                    if self.get_cc(index).a == self.get_cc(index).b
-                        || self.get_cc(index).c == CCMUX::ZERO
-                    {
-                        self.get_cc(i).a = CCMUX::COMBINED;
-                        self.get_cc(i).b = CCMUX::COMBINED;
-                        self.get_cc(i).c = CCMUX::COMBINED;
-                    }
-
                     for j in 0..4 {
-                        // if (cc_features->c[i][j] >= SHADER_INPUT_1 && cc_features->c[i][j] <= SHADER_INPUT_4) {
-                        //     if (cc_features->c[i][j] > cc_features->num_inputs) {
-                        //         cc_features->num_inputs = cc_features->c[i][j];
-                        //     }
-                        // }
-
                         match self.get_cc(index).get(j) {
                             CCMUX::TEXEL0 => mirror_mapping[i][j] = SHADER::TEXEL0,
                             CCMUX::TEXEL1 => mirror_mapping[i][j] = SHADER::TEXEL1,
@@ -290,15 +275,6 @@ impl CombineParams {
                 }
                 1 => {
                     let index = (i - 1) / 2;
-
-                    if self.get_ac(index).a == self.get_ac(index).b
-                        || self.get_ac(index).c == ACMUX::ZERO
-                    {
-                        self.get_ac(i).a = ACMUX::COMBINED__LOD_FRAC;
-                        self.get_ac(i).b = ACMUX::COMBINED__LOD_FRAC;
-                        self.get_ac(i).c = ACMUX::COMBINED__LOD_FRAC;
-                    }
-
                     for j in 0..4 {
                         match self.get_ac(index).get(j) {
                             ACMUX::TEXEL0 => mirror_mapping[i][j] = SHADER::TEXEL0,
@@ -335,18 +311,6 @@ impl CombineParams {
             mirror_mapping,
             input_mapping,
         }
-    }
-
-    pub fn to_u32(&self) -> u32 {
-        let c0 = self.c0;
-        let a0 = self.a0;
-
-        let cout =
-            (c0.a as u32) | ((c0.b as u32) << 3) | ((c0.c as u32) << 6) | ((c0.d as u32) << 9);
-        let aout =
-            (a0.a as u32) | ((a0.b as u32) << 3) | ((a0.c as u32) << 6) | ((a0.d as u32) << 9);
-
-        cout | (aout << 12)
     }
 }
 

@@ -382,7 +382,7 @@ impl GraphicsAPI for DummyGraphicsDevice {
         fragment: *const u8,
         fragment_len: usize,
         num_floats: usize,
-        uses_tex: bool,
+        uses_tex0: bool,
         uses_tex1: bool,
         uses_fog: bool,
         uses_alpha: bool,

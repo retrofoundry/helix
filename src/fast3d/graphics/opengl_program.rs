@@ -94,7 +94,7 @@ impl OpenGLProgram {
 
     pub fn preprocess_shader(&mut self, shader_type: ShaderType, shader: &str) -> String {
         let version_string = if cfg!(target_os = "macos") {
-            "#version 410 core"
+            "#version 330 core"
         } else {
             "#version 110"
         };
@@ -152,7 +152,7 @@ impl OpenGLProgram {
     }
 
     pub fn init(&mut self) {
-        self.set_define_bool("USE_TEXTURE".to_string(), self.combine.uses_texture0());
+        self.set_define_bool("USE_TEXTURE0".to_string(), self.combine.uses_texture0());
         self.set_define_bool("USE_TEXTURE1".to_string(), self.combine.uses_texture1());
         self.set_define_bool(
             "TEXTURE_EDGE".to_string(),
@@ -165,8 +165,7 @@ impl OpenGLProgram {
         );
         self.set_define_bool(
             "USE_ALPHA".to_string(),
-            other_mode_l_uses_alpha(self.other_mode_l)
-                || other_mode_l_uses_texture_edge(self.other_mode_l),
+            other_mode_l_uses_alpha(self.other_mode_l) || other_mode_l_uses_texture_edge(self.other_mode_l),
         );
         self.set_define_bool(
             "USE_NOISE".to_string(),
@@ -179,7 +178,7 @@ impl OpenGLProgram {
 
         self.num_floats = 4;
 
-        if self.get_define_bool("USE_TEXTURE") {
+        if self.get_define_bool("USE_TEXTURE0") || self.get_define_bool("USE_TEXTURE1") {
             self.num_floats += 2;
         }
 
@@ -191,7 +190,7 @@ impl OpenGLProgram {
             r#"
             attribute vec4 aVtxPos;
 
-            #ifdef USE_TEXTURE
+            #if defined(USE_TEXTURE0) || defined(USE_TEXTURE1)
                 attribute vec2 aTexCoord;
                 varying vec2 vTexCoord;
             #endif
@@ -204,7 +203,7 @@ impl OpenGLProgram {
             {}
 
             void main() {{
-                #ifdef USE_TEXTURE
+                #if defined(USE_TEXTURE0) || defined(USE_TEXTURE1)
                     vTexCoord = aTexCoord;
                 #endif
 
@@ -272,7 +271,7 @@ impl OpenGLProgram {
         // TODO: Could be called uNoise and uNoiseScale (frame_count / window_height)
         format!(
             r#"
-            #ifdef USE_TEXTURE
+            #if defined(USE_TEXTURE0) || defined(USE_TEXTURE1)
                 varying vec2 vTexCoord;
             #endif
 
@@ -282,14 +281,14 @@ impl OpenGLProgram {
 
             {}
 
-            #ifdef USE_TEXTURE
+            #ifdef USE_TEXTURE0
                 uniform sampler2D uTex0;
-                #ifdef USE_TEXTURE1
-                    uniform sampler2D uTex1;
-                #endif
+            #endif
+            #ifdef USE_TEXTURE1
+                uniform sampler2D uTex1;
             #endif
 
-            #if defined(USE_ALPHA) || defined(USE_NOISE)
+            #if defined(USE_ALPHA) && defined(USE_NOISE)
                 uniform int frame_count;
                 uniform int window_height;
 
@@ -302,16 +301,16 @@ impl OpenGLProgram {
             out vec4 outColor;
 
             void main() {{
-                #ifdef USE_TEXTURE
+                #ifdef USE_TEXTURE0
                     vec4 texVal0 = texture2D(uTex0, vTexCoord);
-                    #ifdef USE_TEXTURE1
-                        vec4 texVal1 = texture2D(uTex1, vTexCoord);
-                    #endif
+                #endif
+                #ifdef USE_TEXTURE1
+                    vec4 texVal1 = texture2D(uTex1, vTexCoord);
                 #endif
 
                 {}
 
-                #ifdef TEXTURE_EDGE
+                #if defined(TEXTURE_EDGE) && defined(USE_ALPHA)
                     if (texel.a > 0.3) texel.a = 1.0; else discard;
                 #endif
 
@@ -358,13 +357,15 @@ impl OpenGLProgram {
         format!(
             r#"
                 #ifdef USE_ALPHA
-                    #if !defined(COLOR_ALPHA_SAME) && defined(USE_ALPHA)
-                        vec4 texel = vec4({}, {});
-                    #else
-                        vec4 texel = {};
-                    #endif
+                    vec4 texel = 
                 #else
-                    vec3 texel = {};
+                    vec3 texel =
+                #endif
+
+                #if !defined(COLOR_ALPHA_SAME) && defined(USE_ALPHA)
+                    vec4({}, {});
+                #else
+                    {};
                 #endif
         "#,
             self.generate_color_combiner_inputs(
@@ -382,14 +383,6 @@ impl OpenGLProgram {
                 true,
                 true,
                 true,
-            ),
-            self.generate_color_combiner_inputs(
-                do_single[0],
-                do_multiply[0],
-                do_mix[0],
-                self.get_define_bool("USE_ALPHA"),
-                false,
-                self.get_define_bool("USE_ALPHA"),
             ),
             self.generate_color_combiner_inputs(
                 do_single[0],

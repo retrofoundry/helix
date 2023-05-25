@@ -97,7 +97,6 @@ pub struct RenderingState {
     pub blend_state: BlendState,
     pub viewport: Rect,
     pub scissor: Rect,
-    pub shader_program: *mut ShaderProgram,
     pub shader_program_hash: u64,
     pub textures: [Texture; 2],
     pub cull_mode: CullMode,
@@ -113,7 +112,6 @@ impl RenderingState {
         blend_state: BlendState::REPLACE,
         viewport: Rect::ZERO,
         scissor: Rect::ZERO,
-        shader_program: std::ptr::null_mut(),
         shader_program_hash: 0,
         textures: [Texture::EMPTY; 2],
         cull_mode: CullMode::None,
@@ -516,10 +514,6 @@ impl RDP {
             return hash;
         }
 
-        gfx_context
-            .api
-            .unload_shader(self.rendering_state.shader_program);
-
         let mut program = OpenGLProgram::new(self.other_mode_h, self.other_mode_l, self.combine);
         program.init();
         program.preprocess();
@@ -530,7 +524,7 @@ impl RDP {
             program.preprocessed_frag.as_ptr(),
             program.preprocessed_frag.len(),
             program.num_floats,
-            program.get_define_bool("USE_TEXTURE"),
+            program.get_define_bool("USE_TEXTURE0"),
             program.get_define_bool("USE_TEXTURE1"),
             program.get_define_bool("USE_FOG"),
             program.get_define_bool("USE_ALPHA"),

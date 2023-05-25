@@ -552,32 +552,8 @@ impl F3DEX2 {
         rdp.update_render_state(gfx_context, rsp.geometry_mode);
 
         // TODO: Produce draw calls for RDP to process later?
-        let mut cc_id = rdp.combine.to_u32();
-        let mut use_alpha = other_mode_l_uses_alpha(rdp.other_mode_l);
-        let use_texture_edge = other_mode_l_uses_texture_edge(rdp.other_mode_l);
+        let use_alpha = other_mode_l_uses_alpha(rdp.other_mode_l) || other_mode_l_uses_texture_edge(rdp.other_mode_l);
         let use_fog = other_mode_l_uses_fog(rdp.other_mode_l);
-        let use_noise = other_mode_l_uses_noise(rdp.other_mode_l);
-
-        if use_texture_edge {
-            use_alpha = true;
-        }
-
-        if use_alpha {
-            cc_id |= SHADER_OPT_ALPHA;
-        };
-        if use_fog {
-            cc_id |= SHADER_OPT_FOG;
-        };
-        if use_texture_edge {
-            cc_id |= SHADER_OPT_TEXTURE_EDGE;
-        };
-        if use_noise {
-            cc_id |= SHADER_OPT_NOISE;
-        };
-
-        if !use_alpha {
-            cc_id &= !0xfff000;
-        }
 
         let shader_hash = rdp.lookup_or_create_program(gfx_context).clone();
         let new_program = rdp.shader_cache.get(&shader_hash).unwrap().compiled_program;

@@ -8,8 +8,6 @@ pub mod opengl_program;
 #[repr(C)]
 pub struct ShaderProgram {
     pub shader_id: u32,
-    pub num_inputs: u8,
-    pub used_textures: [bool; 2],
     // .. ommiting the rest
 }
 
@@ -34,7 +32,7 @@ pub trait GraphicsAPI {
         fragment: *const u8,
         fragment_len: usize,
         num_floats: usize,
-        uses_tex: bool,
+        uses_tex0: bool,
         uses_tex1: bool,
         uses_fog: bool,
         uses_alpha: bool,

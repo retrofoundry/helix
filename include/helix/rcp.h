@@ -20,7 +20,7 @@ typedef enum CullMode {
 struct CGraphicsDevice {
     bool (*z_is_from_0_to_1)(void);
     void (*unload_shader)(struct ShaderProgram *old_prg);
-    void (*new_shader)(char *vertex, size_t vertex_len, char *fragment, size_t fragment_len, size_t num_floats, bool uses_tex, bool uses_tex1, bool uses_fog, bool uses_alpha, bool uses_noise, uint8_t num_inputs);
+    void (*new_shader)(char *vertex, size_t vertex_len, char *fragment, size_t fragment_len, size_t num_floats, bool uses_tex0, bool uses_tex1, bool uses_fog, bool uses_alpha, bool uses_noise, uint8_t num_inputs);
     void (*load_shader)(struct ShaderProgram *new_prg);
     uint32_t (*new_texture)(void);
     void (*select_texture)(int tile, uint32_t texture_id);
