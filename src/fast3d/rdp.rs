@@ -2,6 +2,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
+use imgui_glow_renderer::glow;
 use log::trace;
 use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState, CompareFunction};
 
@@ -323,12 +324,14 @@ impl RDP {
 
     pub fn lookup_texture(
         &mut self,
+        gl_context: &glow::Context,
         gfx_context: &GraphicsContext,
         tmem_index: usize,
         fmt: ImageFormat,
         siz: ImageSize,
     ) -> bool {
         if let Some(value) = self.texture_manager.lookup(
+            gl_context,
             gfx_context,
             tmem_index,
             self.texture_image_state.address,
@@ -339,6 +342,7 @@ impl RDP {
             true
         } else {
             let value = self.texture_manager.insert(
+                gl_context,
                 gfx_context,
                 tmem_index,
                 self.texture_image_state.address,
@@ -350,14 +354,19 @@ impl RDP {
         }
     }
 
-    pub fn import_tile_texture(&mut self, gfx_context: &GraphicsContext, tmem_index: usize) {
+    pub fn import_tile_texture(
+        &mut self,
+        gl_context: &glow::Context,
+        gfx_context: &GraphicsContext,
+        tmem_index: usize,
+    ) {
         let tile = self.tile_descriptors[self.texture_state.tile as usize];
         let format = tile.format as u32;
         let size = tile.size as u32;
         let width = tile.get_width() as u32;
         let height = tile.get_height() as u32;
 
-        if self.lookup_texture(gfx_context, tmem_index, tile.format, tile.size) {
+        if self.lookup_texture(gl_context, gfx_context, tmem_index, tile.format, tile.size) {
             return;
         }
 
@@ -424,7 +433,7 @@ impl RDP {
         let texture = texture.as_ptr() as *const u8;
         gfx_context
             .api
-            .upload_texture(texture, width as i32, height as i32);
+            .upload_texture(gl_context, texture, width as i32, height as i32);
     }
 
     pub fn uses_texture1(&self) -> bool {
@@ -432,7 +441,7 @@ impl RDP {
             && self.combine.uses_texture1()
     }
 
-    pub fn flush_textures(&mut self, gfx_context: &GraphicsContext) {
+    pub fn flush_textures(&mut self, gl_context: &glow::Context, gfx_context: &GraphicsContext) {
         // if textures are not on, then we have no textures to flush
         // if !self.texture_state.on {
         //     return;
@@ -455,7 +464,7 @@ impl RDP {
                 if i == 0 || self.uses_texture1() {
                     if self.textures_changed[i as usize] {
                         self.flush(gfx_context);
-                        self.import_tile_texture(gfx_context, i as usize);
+                        self.import_tile_texture(gl_context, gfx_context, i as usize);
                         self.textures_changed[i as usize] = false;
                     }
 
@@ -469,6 +478,7 @@ impl RDP {
                         || tile_descriptor.cm_t != texture.cmt
                     {
                         gfx_context.api.set_sampler_parameters(
+                            gl_context,
                             i as i32,
                             linear_filter,
                             tile_descriptor.cm_s as u32,
@@ -507,7 +517,11 @@ impl RDP {
         hasher.finish()
     }
 
-    pub fn lookup_or_create_program(&mut self, gfx_context: &GraphicsContext) -> u64 {
+    pub fn lookup_or_create_program(
+        &mut self,
+        gl_context: &glow::Context,
+        gfx_context: &GraphicsContext,
+    ) -> u64 {
         let hash = self.shader_program_hash();
         if let Some(_program) = self.shader_cache.get(&hash) {
             return hash;
@@ -518,10 +532,9 @@ impl RDP {
         program.preprocess(ContextVersion::OpenGL330);
 
         let compiled_program = gfx_context.api.new_shader(
-            program.preprocessed_vertex.as_ptr(),
-            program.preprocessed_vertex.len(),
-            program.preprocessed_frag.as_ptr(),
-            program.preprocessed_frag.len(),
+            gl_context,
+            program.preprocessed_vertex.clone(),
+            program.preprocessed_frag.clone(),
             program.num_floats,
             program.get_define_bool("USE_TEXTURE0"),
             program.get_define_bool("USE_TEXTURE1"),
@@ -539,7 +552,12 @@ impl RDP {
 
     // MARK: - Blend
 
-    fn translate_blend_mode(&mut self, gfx_context: &GraphicsContext, render_mode: u32) {
+    fn translate_blend_mode(
+        &mut self,
+        gl_context: &glow::Context,
+        gfx_context: &GraphicsContext,
+        render_mode: u32,
+    ) {
         let zmode: u32 = self.other_mode_l >> (OtherModeLayoutL::ZMODE as u32) & 0x03;
 
         // handle depth compare
@@ -554,14 +572,14 @@ impl RDP {
 
             if depth_compare != self.rendering_state.depth_compare {
                 self.flush(gfx_context);
-                gfx_context.api.set_depth_compare(depth_compare as u8);
+                gfx_context.api.set_depth_compare(gl_context, depth_compare);
                 self.rendering_state.depth_compare = depth_compare;
             }
         } else if self.rendering_state.depth_compare != CompareFunction::Always {
             self.flush(gfx_context);
             gfx_context
                 .api
-                .set_depth_compare(CompareFunction::Always as u8);
+                .set_depth_compare(gl_context, CompareFunction::Always);
             self.rendering_state.depth_compare = CompareFunction::Always;
         }
 
@@ -569,7 +587,7 @@ impl RDP {
         let depth_write = render_mode & (1 << OtherModeLayoutL::Z_UPD as u32) != 0;
         if depth_write != self.rendering_state.depth_write {
             self.flush(gfx_context);
-            gfx_context.api.set_depth_write(depth_write);
+            gfx_context.api.set_depth_write(gl_context, depth_write);
             self.rendering_state.depth_write = depth_write;
         }
 
@@ -577,7 +595,7 @@ impl RDP {
         let polygon_offset = zmode == ZMode::ZMODE_DEC as u32;
         if polygon_offset != self.rendering_state.polygon_offset {
             self.flush(gfx_context);
-            gfx_context.api.set_polygon_offset(polygon_offset);
+            gfx_context.api.set_polygon_offset(gl_context, polygon_offset);
             self.rendering_state.polygon_offset = polygon_offset;
         }
 
@@ -602,11 +620,16 @@ impl RDP {
         }
     }
 
-    pub fn update_render_state(&mut self, gfx_context: &GraphicsContext, geometry_mode: u32) {
+    pub fn update_render_state(
+        &mut self,
+        gl_context: &glow::Context,
+        gfx_context: &GraphicsContext,
+        geometry_mode: u32,
+    ) {
         let depth_test = geometry_mode & RSPGeometry::G_ZBUFFER as u32 != 0;
         if depth_test != self.rendering_state.depth_test {
             self.flush(gfx_context);
-            gfx_context.api.set_depth_test(depth_test);
+            gfx_context.api.set_depth_test(gl_context, depth_test);
             self.rendering_state.depth_test = depth_test;
         }
 
@@ -617,13 +640,14 @@ impl RDP {
             self.rendering_state.cull_mode = cull_mode;
         }
 
-        self.translate_blend_mode(gfx_context, self.other_mode_l);
+        self.translate_blend_mode(gl_context, gfx_context, self.other_mode_l);
 
         if self.viewport_or_scissor_changed {
             let viewport = self.viewport;
             if viewport != self.rendering_state.viewport {
                 self.flush(gfx_context);
                 gfx_context.api.set_viewport(
+                    gl_context,
                     viewport.x as i32,
                     viewport.y as i32,
                     viewport.width as i32,

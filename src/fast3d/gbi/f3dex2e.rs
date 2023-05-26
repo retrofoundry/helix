@@ -1,3 +1,5 @@
+use imgui_glow_renderer::glow;
+
 use crate::fast3d::{graphics::GraphicsContext, rcp::RCP, rdp::RDP, rsp::RSP};
 
 use super::{
@@ -22,6 +24,7 @@ impl F3DEX2E {
     pub fn gdp_texture_rectangle(
         rdp: &mut RDP,
         rsp: &mut RSP,
+        gl_context: &glow::Context,
         gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -57,6 +60,7 @@ impl F3DEX2E {
         F3DEX2::gdp_texture_rectangle_raw(
             rdp,
             rsp,
+            gl_context,
             gfx_context,
             ulx as i32,
             uly as i32,
@@ -74,6 +78,7 @@ impl F3DEX2E {
     pub fn gdp_fill_rectangle(
         rdp: &mut RDP,
         rsp: &mut RSP,
+        gl_context: &glow::Context,
         gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -95,6 +100,7 @@ impl F3DEX2E {
         F3DEX2::gdp_fill_rectangle_raw(
             rdp,
             rsp,
+            gl_context,
             gfx_context,
             ulx as i32,
             uly as i32,
@@ -102,32 +108,4 @@ impl F3DEX2E {
             lry as i32,
         )
     }
-}
-
-// MARK: - C Bridge
-
-#[no_mangle]
-pub extern "C" fn F3DEX2E_GDPTextureRectangle(
-    rcp: Option<&mut RCP>,
-    gfx_context: Option<&mut GraphicsContext>,
-    command: usize,
-) {
-    let rcp = rcp.unwrap();
-    let gfx_context = gfx_context.unwrap();
-    let mut command: *mut Gfx = command as *mut Gfx;
-
-    F3DEX2E::gdp_texture_rectangle(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
-}
-
-#[no_mangle]
-pub extern "C" fn F3DEX2E_GDPFillRectangle(
-    rcp: Option<&mut RCP>,
-    gfx_context: Option<&mut GraphicsContext>,
-    command: usize,
-) {
-    let rcp = rcp.unwrap();
-    let gfx_context = gfx_context.unwrap();
-    let mut command: *mut Gfx = command as *mut Gfx;
-
-    F3DEX2E::gdp_fill_rectangle(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }

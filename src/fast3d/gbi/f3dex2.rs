@@ -1,6 +1,7 @@
 use std::slice;
 
 use glam::Mat4;
+use imgui_glow_renderer::glow;
 use log::trace;
 use wgpu::BlendState;
 
@@ -137,7 +138,7 @@ impl GBIDefinition for F3DEX2 {
         gbi.register(F3DEX2::G_GEOMETRYMODE as usize, F3DEX2::gsp_geometry_mode);
         gbi.register(F3DEX2::G_TRI1 as usize, F3DEX2::gsp_tri1);
         gbi.register(F3DEX2::G_TRI2 as usize, F3DEX2::gsp_tri2);
-        gbi.register(F3DEX2::G_ENDDL as usize, |_, _, _, _| GBIResult::Return);
+        gbi.register(F3DEX2::G_ENDDL as usize, |_, _, _, _, _| GBIResult::Return);
 
         gbi.register(
             F3DEX2::G_SETOTHERMODE_L as usize,
@@ -172,6 +173,7 @@ impl F3DEX2 {
     pub fn gsp_matrix(
         _rdp: &mut RDP,
         rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -235,6 +237,7 @@ impl F3DEX2 {
     pub fn gsp_pop_matrix(
         _rdp: &mut RDP,
         rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -265,6 +268,7 @@ impl F3DEX2 {
     pub fn gsp_movemem(
         rdp: &mut RDP,
         rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -299,6 +303,7 @@ impl F3DEX2 {
     pub fn gsp_moveword(
         _rdp: &mut RDP,
         rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -324,6 +329,7 @@ impl F3DEX2 {
     pub fn gsp_texture(
         rdp: &mut RDP,
         _rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -349,6 +355,7 @@ impl F3DEX2 {
     pub fn gsp_vertex(
         rdp: &mut RDP,
         rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -514,6 +521,7 @@ impl F3DEX2 {
     pub fn gsp_geometry_mode(
         _rdp: &mut RDP,
         rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -532,6 +540,7 @@ impl F3DEX2 {
     pub fn gsp_tri1_raw(
         rdp: &mut RDP,
         rsp: &mut RSP,
+        gl_context: &glow::Context,
         gfx_context: &GraphicsContext,
         vertex_id1: usize,
         vertex_id2: usize,
@@ -547,14 +556,16 @@ impl F3DEX2 {
             return GBIResult::Continue;
         }
 
-        rdp.update_render_state(gfx_context, rsp.geometry_mode);
+        rdp.update_render_state(gl_context, gfx_context, rsp.geometry_mode);
 
         // TODO: Produce draw calls for RDP to process later?
         let use_alpha = other_mode_l_uses_alpha(rdp.other_mode_l)
             || other_mode_l_uses_texture_edge(rdp.other_mode_l);
         let use_fog = other_mode_l_uses_fog(rdp.other_mode_l);
 
-        let shader_hash = rdp.lookup_or_create_program(gfx_context).clone();
+        let shader_hash = rdp
+            .lookup_or_create_program(gl_context, gfx_context)
+            .clone();
         let new_program = rdp.shader_cache.get(&shader_hash).unwrap().compiled_program;
 
         if shader_hash != rdp.rendering_state.shader_program_hash {
@@ -564,10 +575,12 @@ impl F3DEX2 {
                 .shader_cache
                 .get(&rdp.rendering_state.shader_program_hash)
             {
-                gfx_context.api.unload_shader(old_program.compiled_program);
+                gfx_context
+                    .api
+                    .unload_shader(gl_context, old_program.compiled_program);
             }
 
-            gfx_context.api.load_shader(new_program);
+            gfx_context.api.load_shader(gl_context, new_program);
             rdp.rendering_state.shader_program_hash = shader_hash;
         }
 
@@ -580,7 +593,7 @@ impl F3DEX2 {
         }
 
         let use_texture = rdp.combine.uses_texture0() || rdp.combine.uses_texture1();
-        rdp.flush_textures(gfx_context);
+        rdp.flush_textures(gl_context, gfx_context);
 
         let current_tile = rdp.tile_descriptors[rdp.texture_state.tile as usize];
         let tex_width = current_tile.get_width();
@@ -698,6 +711,7 @@ impl F3DEX2 {
     pub fn gsp_tri1(
         rdp: &mut RDP,
         rsp: &mut RSP,
+        gl_context: &glow::Context,
         gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -707,12 +721,21 @@ impl F3DEX2 {
         let vertex_id2 = get_cmd(w0, 8, 8) / 2;
         let vertex_id3 = get_cmd(w0, 0, 8) / 2;
 
-        F3DEX2::gsp_tri1_raw(rdp, rsp, gfx_context, vertex_id1, vertex_id2, vertex_id3)
+        F3DEX2::gsp_tri1_raw(
+            rdp,
+            rsp,
+            gl_context,
+            gfx_context,
+            vertex_id1,
+            vertex_id2,
+            vertex_id3,
+        )
     }
 
     pub fn gsp_tri2(
         rdp: &mut RDP,
         rsp: &mut RSP,
+        gl_context: &glow::Context,
         gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -723,17 +746,34 @@ impl F3DEX2 {
         let vertex_id2 = get_cmd(w0, 8, 8) / 2;
         let vertex_id3 = get_cmd(w0, 0, 8) / 2;
 
-        F3DEX2::gsp_tri1_raw(rdp, rsp, gfx_context, vertex_id1, vertex_id2, vertex_id3);
+        F3DEX2::gsp_tri1_raw(
+            rdp,
+            rsp,
+            gl_context,
+            gfx_context,
+            vertex_id1,
+            vertex_id2,
+            vertex_id3,
+        );
 
         let vertex_id1 = get_cmd(w1, 16, 8) / 2;
         let vertex_id2 = get_cmd(w1, 8, 8) / 2;
         let vertex_id3 = get_cmd(w1, 0, 8) / 2;
-        F3DEX2::gsp_tri1_raw(rdp, rsp, gfx_context, vertex_id1, vertex_id2, vertex_id3)
+        F3DEX2::gsp_tri1_raw(
+            rdp,
+            rsp,
+            gl_context,
+            gfx_context,
+            vertex_id1,
+            vertex_id2,
+            vertex_id3,
+        )
     }
 
     pub fn sub_dl(
         _rdp: &mut RDP,
         _rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -757,6 +797,7 @@ impl F3DEX2 {
     pub fn gdp_set_other_mode_l(
         rdp: &mut RDP,
         _rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -773,6 +814,7 @@ impl F3DEX2 {
     pub fn gdp_set_other_mode_h(
         rdp: &mut RDP,
         _rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -801,6 +843,7 @@ impl F3DEX2 {
     pub fn gdp_set_scissor(
         rdp: &mut RDP,
         _rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -830,6 +873,7 @@ impl F3DEX2 {
     pub fn gdp_set_combine(
         rdp: &mut RDP,
         _rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -844,6 +888,7 @@ impl F3DEX2 {
     pub fn gdp_set_tile(
         rdp: &mut RDP,
         _rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -885,6 +930,7 @@ impl F3DEX2 {
     pub fn gdp_set_tile_size(
         rdp: &mut RDP,
         _rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -912,6 +958,7 @@ impl F3DEX2 {
     pub fn gdp_set_texture_image(
         rdp: &mut RDP,
         _rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -936,6 +983,7 @@ impl F3DEX2 {
     pub fn gdp_load_tlut(
         rdp: &mut RDP,
         _rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -966,6 +1014,7 @@ impl F3DEX2 {
     pub fn gdp_load_block(
         rdp: &mut RDP,
         _rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -998,6 +1047,7 @@ impl F3DEX2 {
     pub fn gdp_load_tile(
         rdp: &mut RDP,
         _rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -1037,6 +1087,7 @@ impl F3DEX2 {
     pub fn gdp_set_env_color(
         rdp: &mut RDP,
         _rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -1054,6 +1105,7 @@ impl F3DEX2 {
     pub fn gdp_set_prim_color(
         rdp: &mut RDP,
         _rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -1071,6 +1123,7 @@ impl F3DEX2 {
     pub fn gdp_set_blend_color(
         rdp: &mut RDP,
         _rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -1088,6 +1141,7 @@ impl F3DEX2 {
     pub fn gdp_set_fog_color(
         rdp: &mut RDP,
         _rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -1105,6 +1159,7 @@ impl F3DEX2 {
     pub fn gdp_set_fill_color(
         rdp: &mut RDP,
         _rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -1118,6 +1173,7 @@ impl F3DEX2 {
     pub fn gdp_set_depth_image(
         rdp: &mut RDP,
         _rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -1130,6 +1186,7 @@ impl F3DEX2 {
     pub fn gdp_set_color_image(
         rdp: &mut RDP,
         _rsp: &mut RSP,
+        gl_context: &glow::Context,
         _gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -1147,6 +1204,7 @@ impl F3DEX2 {
     pub fn draw_rectangle(
         rdp: &mut RDP,
         rsp: &mut RSP,
+        gl_context: &glow::Context,
         gfx_context: &GraphicsContext,
         ulx: i32,
         uly: i32,
@@ -1220,6 +1278,7 @@ impl F3DEX2 {
         F3DEX2::gsp_tri1_raw(
             rdp,
             rsp,
+            gl_context,
             gfx_context,
             MAX_VERTICES,
             MAX_VERTICES + 1,
@@ -1228,6 +1287,7 @@ impl F3DEX2 {
         F3DEX2::gsp_tri1_raw(
             rdp,
             rsp,
+            gl_context,
             gfx_context,
             MAX_VERTICES + 1,
             MAX_VERTICES + 2,
@@ -1246,6 +1306,7 @@ impl F3DEX2 {
     pub fn gdp_texture_rectangle_raw(
         rdp: &mut RDP,
         rsp: &mut RSP,
+        gl_context: &glow::Context,
         gfx_context: &GraphicsContext,
         ulx: i32,
         uly: i32,
@@ -1306,7 +1367,7 @@ impl F3DEX2 {
         ur.uv[0] = if !flipped { lrs as f32 } else { uls as f32 };
         ur.uv[1] = if !flipped { ult as f32 } else { lrt as f32 };
 
-        F3DEX2::draw_rectangle(rdp, rsp, gfx_context, ulx, uly, lrx, lry);
+        F3DEX2::draw_rectangle(rdp, rsp, gl_context, gfx_context, ulx, uly, lrx, lry);
         rdp.combine = saved_combine_mode;
 
         GBIResult::Continue
@@ -1315,6 +1376,7 @@ impl F3DEX2 {
     pub fn gdp_texture_rectangle(
         rdp: &mut RDP,
         rsp: &mut RSP,
+        gl_context: &glow::Context,
         gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -1348,6 +1410,7 @@ impl F3DEX2 {
         F3DEX2::gdp_texture_rectangle_raw(
             rdp,
             rsp,
+            gl_context,
             gfx_context,
             ulx as i32,
             uly as i32,
@@ -1365,6 +1428,7 @@ impl F3DEX2 {
     pub fn gdp_fill_rectangle_raw(
         rdp: &mut RDP,
         rsp: &mut RSP,
+        gl_context: &glow::Context,
         gfx_context: &GraphicsContext,
         ulx: i32,
         uly: i32,
@@ -1393,7 +1457,7 @@ impl F3DEX2 {
         let saved_combine_mode = rdp.combine;
         let rhs = (CCMUX::SHADE as usize & 0b111) << 15 | (ACMUX::SHADE as usize & 0b111) << 9;
         rdp.combine = CombineParams::decode(0, rhs);
-        F3DEX2::draw_rectangle(rdp, rsp, gfx_context, ulx, uly, lrx, lry);
+        F3DEX2::draw_rectangle(rdp, rsp, gl_context, gfx_context, ulx, uly, lrx, lry);
         rdp.combine = saved_combine_mode;
 
         GBIResult::Continue
@@ -1402,6 +1466,7 @@ impl F3DEX2 {
     pub fn gdp_fill_rectangle(
         rdp: &mut RDP,
         rsp: &mut RSP,
+        gl_context: &glow::Context,
         gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -1416,6 +1481,7 @@ impl F3DEX2 {
         F3DEX2::gdp_fill_rectangle_raw(
             rdp,
             rsp,
+            gl_context,
             gfx_context,
             ulx as i32,
             uly as i32,

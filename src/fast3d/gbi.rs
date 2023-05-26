@@ -1,3 +1,5 @@
+use imgui_glow_renderer::glow;
+
 use self::defines::{Gfx, G_RDPFULLSYNC, G_RDPLOADSYNC, G_RDPPIPESYNC, G_RDPTILESYNC};
 
 use super::{graphics::GraphicsContext, rdp::RDP, rsp::RSP};
@@ -6,7 +8,6 @@ use std::collections::HashMap;
 pub mod defines;
 mod f3d;
 mod f3dex2;
-mod f3dex2_c;
 mod f3dex2e;
 mod f3dzex2;
 pub mod utils;
@@ -21,6 +22,7 @@ pub enum GBIResult {
 pub type GBICommand = fn(
     dp: &mut RDP,
     rsp: &mut RSP,
+    gl_context: &glow::Context,
     gfx_context: &GraphicsContext,
     command: &mut *mut Gfx,
 ) -> GBIResult;
@@ -41,10 +43,10 @@ impl GBI {
     }
 
     pub fn setup(&mut self) {
-        self.register(G_RDPLOADSYNC as usize, |_, _, _, _| GBIResult::Continue);
-        self.register(G_RDPPIPESYNC as usize, |_, _, _, _| GBIResult::Continue);
-        self.register(G_RDPTILESYNC as usize, |_, _, _, _| GBIResult::Continue);
-        self.register(G_RDPFULLSYNC as usize, |_, _, _, _| GBIResult::Continue);
+        self.register(G_RDPLOADSYNC as usize, |_, _, _, _, _| GBIResult::Continue);
+        self.register(G_RDPPIPESYNC as usize, |_, _, _, _, _| GBIResult::Continue);
+        self.register(G_RDPTILESYNC as usize, |_, _, _, _, _| GBIResult::Continue);
+        self.register(G_RDPFULLSYNC as usize, |_, _, _, _, _| GBIResult::Continue);
 
         if cfg!(feature = "f3dzex2") {
             f3dzex2::F3DZEX2::setup(self);
@@ -63,6 +65,7 @@ impl GBI {
         &self,
         rdp: &mut RDP,
         rsp: &mut RSP,
+        gl_context: &glow::Context,
         gfx_context: &GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
@@ -72,7 +75,7 @@ impl GBI {
         let cmd = self.gbi_opcode_table.get(&opcode);
 
         match cmd {
-            Some(cmd) => cmd(rdp, rsp, gfx_context, command),
+            Some(cmd) => cmd(rdp, rsp, gl_context, gfx_context, command),
             None => GBIResult::Unknown(opcode),
         }
     }

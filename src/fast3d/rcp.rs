@@ -1,3 +1,4 @@
+use imgui_glow_renderer::glow;
 use log::trace;
 
 use super::{
@@ -33,23 +34,38 @@ impl RCP {
     /// This funtion is called to process a work buffer.
     /// It takes in a pointer to the start of the work buffer and will
     /// process until it hits a `G_ENDDL` inidicating the end.
-    pub fn run(&mut self, gfx_context: &GraphicsContext, commands: usize) {
+    pub fn run(
+        &mut self,
+        gl_context: &glow::Context,
+        gfx_context: &GraphicsContext,
+        commands: usize,
+    ) {
         self.reset();
 
         // self.rdp.setup_draw();
-        self.run_dl(gfx_context, commands);
+        self.run_dl(gl_context, gfx_context, commands);
         // self.rdp.flush();
     }
 
-    fn run_dl(&mut self, gfx_context: &GraphicsContext, commands: usize) {
+    fn run_dl(
+        &mut self,
+        gl_context: &glow::Context,
+        gfx_context: &GraphicsContext,
+        commands: usize,
+    ) {
         let mut command = commands as *mut Gfx;
 
         loop {
-            match self
-                .gbi
-                .handle_command(&mut self.rdp, &mut self.rsp, gfx_context, &mut command)
-            {
-                GBIResult::Recurse(new_command) => self.run_dl(gfx_context, new_command),
+            match self.gbi.handle_command(
+                &mut self.rdp,
+                &mut self.rsp,
+                gl_context,
+                gfx_context,
+                &mut command,
+            ) {
+                GBIResult::Recurse(new_command) => {
+                    self.run_dl(gl_context, gfx_context, new_command)
+                }
                 GBIResult::Unknown(opcode) => {
                     trace!("Unknown GBI command: {:#x}", opcode)
                 }
@@ -84,5 +100,9 @@ pub extern "C" fn RCPRunDL(
 ) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    rcp.run_dl(gfx_context, commands);
+
+    unsafe {
+        let gl_context = glow::Context::from_loader_function(|_| std::ptr::null());
+        rcp.run_dl(&gl_context, gfx_context, commands);
+    }
 }

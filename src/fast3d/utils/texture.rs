@@ -1,6 +1,7 @@
 use farbe::image::n64::{
     ImageFormat as FarbeImageFormat, ImageSize as FarbeImageSize, NativeImage, TLUT,
 };
+use imgui_glow_renderer::glow;
 use log::trace;
 
 use super::super::graphics::GraphicsContext;
@@ -182,6 +183,7 @@ impl TextureManager {
 
     pub fn lookup(
         &mut self,
+        gl_context: &glow::Context,
         gfx_context: &GraphicsContext,
         tmem_index: usize,
         orig_addr: usize,
@@ -192,7 +194,7 @@ impl TextureManager {
             if value.format == format && value.size == size {
                 gfx_context
                     .api
-                    .select_texture(tmem_index as i32, value.texture_id);
+                    .select_texture(gl_context, tmem_index as i32, value.texture_id);
                 self.lru.retain(|&k| k != orig_addr);
                 self.lru.push_back(orig_addr);
                 return Some(value);
@@ -203,6 +205,7 @@ impl TextureManager {
 
     pub fn insert_if_not_found(
         &mut self,
+        gl_context: &glow::Context,
         gfx_context: &GraphicsContext,
         tmem_index: usize,
         orig_addr: usize,
@@ -215,13 +218,13 @@ impl TextureManager {
                 // TODO: Remove texture from gfx_device
             }
         }
-        let texture_id = gfx_context.api.new_texture();
+        let texture_id = gfx_context.api.new_texture(gl_context);
         gfx_context
             .api
-            .select_texture(tmem_index as i32, texture_id);
+            .select_texture(gl_context, tmem_index as i32, texture_id);
         gfx_context
             .api
-            .set_sampler_parameters(tmem_index as i32, false, 0, 0);
+            .set_sampler_parameters(gl_context, tmem_index as i32, false, 0, 0);
         let value = self.map.entry(orig_addr).or_insert(Texture {
             texture_addr: orig_addr,
             format,
@@ -237,6 +240,7 @@ impl TextureManager {
 
     pub fn insert(
         &mut self,
+        gl_context: &glow::Context,
         gfx_context: &GraphicsContext,
         tmem_index: usize,
         orig_addr: usize,
@@ -249,13 +253,13 @@ impl TextureManager {
                 // TODO: Remove texture from gfx_device
             }
         }
-        let texture_id = gfx_context.api.new_texture();
+        let texture_id = gfx_context.api.new_texture(gl_context);
         gfx_context
             .api
-            .select_texture(tmem_index as i32, texture_id);
+            .select_texture(gl_context, tmem_index as i32, texture_id);
         gfx_context
             .api
-            .set_sampler_parameters(tmem_index as i32, false, 0, 0);
+            .set_sampler_parameters(gl_context, tmem_index as i32, false, 0, 0);
         let value = self.map.entry(orig_addr).or_insert(Texture {
             texture_addr: orig_addr,
             format,

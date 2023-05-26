@@ -1,6 +1,7 @@
 use crate::fast3d::graphics::{CullMode, GraphicsAPI, GraphicsContext, ShaderProgram};
+use imgui_glow_renderer::glow;
 use std::any::Any;
-use wgpu::BlendState;
+use wgpu::{BlendState, CompareFunction};
 
 #[repr(C)]
 pub struct CGraphicsDevice {
@@ -63,16 +64,15 @@ impl GraphicsAPI for ExternGraphicsDevice {
         unsafe { ((*self.inner).z_is_from_0_to_1)() }
     }
 
-    fn unload_shader(&self, shader: *mut ShaderProgram) {
+    fn unload_shader(&self, _gl: &glow::Context, shader: *mut ShaderProgram) {
         unsafe { ((*self.inner).unload_shader)(shader) }
     }
 
     fn new_shader(
         &self,
-        vertex: *const u8,
-        vertex_len: usize,
-        fragment: *const u8,
-        fragment_len: usize,
+        _gl: &glow::Context,
+        vertex: String,
+        fragment: String,
         num_floats: usize,
         uses_tex0: bool,
         uses_tex1: bool,
@@ -83,10 +83,10 @@ impl GraphicsAPI for ExternGraphicsDevice {
     ) -> *mut ShaderProgram {
         unsafe {
             ((*self.inner).new_shader)(
-                vertex,
-                vertex_len,
-                fragment,
-                fragment_len,
+                vertex.as_ptr(),
+                vertex.len(),
+                fragment.as_ptr(),
+                fragment.len(),
                 num_floats,
                 uses_tex0,
                 uses_tex1,
@@ -98,43 +98,43 @@ impl GraphicsAPI for ExternGraphicsDevice {
         }
     }
 
-    fn load_shader(&self, shader: *mut ShaderProgram) {
+    fn load_shader(&self, _gl: &glow::Context, shader: *mut ShaderProgram) {
         unsafe { ((*self.inner).load_shader)(shader) }
     }
 
-    fn new_texture(&self) -> u32 {
+    fn new_texture(&self, _gl: &glow::Context) -> u32 {
         unsafe { ((*self.inner).new_texture)() }
     }
 
-    fn select_texture(&self, unit: i32, id: u32) {
+    fn select_texture(&self, _gl: &glow::Context, unit: i32, id: u32) {
         unsafe { ((*self.inner).select_texture)(unit, id) }
     }
 
-    fn upload_texture(&self, data: *const u8, width: i32, height: i32) {
+    fn upload_texture(&self, _gl: &glow::Context, data: *const u8, width: i32, height: i32) {
         unsafe { ((*self.inner).upload_texture)(data, width, height) }
     }
 
-    fn set_sampler_parameters(&self, unit: i32, linear: bool, s: u32, t: u32) {
+    fn set_sampler_parameters(&self, _gl: &glow::Context, unit: i32, linear: bool, s: u32, t: u32) {
         unsafe { ((*self.inner).set_sampler_parameters)(unit, linear, s, t) }
     }
 
-    fn set_depth_test(&self, enable: bool) {
+    fn set_depth_test(&self, _gl: &glow::Context, enable: bool) {
         unsafe { ((*self.inner).set_depth_test)(enable) }
     }
 
-    fn set_depth_compare(&self, compare: u8) {
-        unsafe { ((*self.inner).set_depth_compare)(compare) }
+    fn set_depth_compare(&self, _gl: &glow::Context, compare: CompareFunction) {
+        unsafe { ((*self.inner).set_depth_compare)(compare as u8) }
     }
 
-    fn set_depth_write(&self, enable: bool) {
+    fn set_depth_write(&self, _gl: &glow::Context, enable: bool) {
         unsafe { ((*self.inner).set_depth_write)(enable) }
     }
 
-    fn set_polygon_offset(&self, enable: bool) {
+    fn set_polygon_offset(&self, _gl: &glow::Context, enable: bool) {
         unsafe { ((*self.inner).set_polygon_offset)(enable) }
     }
 
-    fn set_viewport(&self, x: i32, y: i32, width: i32, height: i32) {
+    fn set_viewport(&mut self, _gl: &glow::Context, x: i32, y: i32, width: i32, height: i32) {
         unsafe { ((*self.inner).set_viewport)(x, y, width, height) }
     }
 

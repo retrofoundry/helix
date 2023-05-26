@@ -1,17 +1,12 @@
 use anyhow::Result;
-use imgui::{Context, FontSource, Image, MouseCursor, TextureId, Ui};
-use imgui_wgpu::{Renderer, RendererConfig, Texture, TextureConfig};
-use imgui_winit_support::winit::{
-    event::{Event, WindowEvent},
-    event_loop::EventLoop,
-    window::{Window, WindowBuilder},
-};
+use glutin::{event_loop::EventLoop, Api, ContextWrapper, GlRequest, PossiblyCurrent};
+use imgui::{Context, FontSource, MouseCursor, Ui};
+use imgui_glow_renderer::{glow, AutoRenderer};
+use imgui_winit_support::winit::window::Window;
 use log::trace;
-use pollster::block_on;
 use std::str;
 use std::{ffi::CStr, time::Instant};
-use winit::dpi::LogicalSize;
-use winit::event_loop::ControlFlow;
+use winit::event::{Event, WindowEvent};
 use winit::platform::run_return::EventLoopExtRunReturn;
 
 use crate::fast3d::{
@@ -23,23 +18,14 @@ pub struct Gui {
     // window
     width: u32,
     height: u32,
-    pub window: Window,
-
-    // wgpu
-    surface: wgpu::Surface,
-    device: wgpu::Device,
-    queue: wgpu::Queue,
+    pub window: ContextWrapper<PossiblyCurrent, Window>,
 
     // render
-    renderer: Renderer,
+    renderer: AutoRenderer,
     platform: imgui_winit_support::WinitPlatform,
 
     // imgui
     imgui: Context,
-
-    // content
-    graphics_context: GraphicsContext,
-    content_texture_id: TextureId,
 
     // ui state
     ui_state: UIState,
@@ -67,50 +53,25 @@ impl Gui {
         D: Fn(&Ui) + 'static,
     {
         let (width, height) = (800, 600);
-        let mut last_frame_size = [width as f32, height as f32];
+        let last_frame_size = [width as f32, height as f32];
 
         // Create the window
-        let window = WindowBuilder::new()
+
+        let window = glutin::window::WindowBuilder::new()
             .with_title(title)
-            .with_inner_size(LogicalSize::new(width, height))
-            .with_resizable(true)
-            .build(&event_loop_wrapper.event_loop)?;
+            .with_inner_size(glutin::dpi::LogicalSize::new(1024, 768));
 
-        // Create the wgpu instance
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::PRIMARY,
-            ..Default::default()
-        });
+        let window = glutin::ContextBuilder::new()
+            .with_gl(GlRequest::Specific(Api::OpenGl, (3, 3)))
+            .with_vsync(true)
+            .build_windowed(window, &event_loop_wrapper.event_loop)
+            .expect("could not create window");
 
-        // Create the wgpu surface
-        let surface = unsafe { instance.create_surface(&window)? };
-
-        let hidpi_factor = window.scale_factor();
-
-        // Request the adapter
-        let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
-            compatible_surface: Some(&surface),
-            force_fallback_adapter: false,
-        }))
-        .ok_or(anyhow::anyhow!("Failed to request the adapter."))?;
-
-        // Request the device and queue
-        let (device, queue) =
-            block_on(adapter.request_device(&wgpu::DeviceDescriptor::default(), None))?;
-
-        // Configure the surface
-        let surface_desc = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: wgpu::TextureFormat::Bgra8UnormSrgb,
-            width,
-            height,
-            present_mode: wgpu::PresentMode::Fifo,
-            alpha_mode: wgpu::CompositeAlphaMode::Auto,
-            view_formats: vec![wgpu::TextureFormat::Bgra8Unorm],
+        let window = unsafe {
+            window
+                .make_current()
+                .expect("could not make window context current")
         };
-
-        surface.configure(&device, &surface_desc);
 
         // Setup ImGui
         let mut imgui = Context::create();
@@ -119,7 +80,7 @@ impl Gui {
         let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
         platform.attach_window(
             imgui.io_mut(),
-            &window,
+            window.window(),
             imgui_winit_support::HiDpiMode::Default,
         );
 
@@ -127,8 +88,9 @@ impl Gui {
         imgui.set_ini_filename(None);
 
         // Setup fonts
-        let font_size = (13.0 * hidpi_factor) as f32;
-        imgui.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
+        // let hidpi_factor = window.window().scale_factor();
+        let font_size = (13.0 * platform.hidpi_factor()) as f32;
+        imgui.io_mut().font_global_scale = (1.0 / platform.hidpi_factor()) as f32;
 
         imgui.fonts().add_font(&[FontSource::DefaultFontData {
             config: Some(imgui::FontConfig {
@@ -139,52 +101,26 @@ impl Gui {
             }),
         }]);
 
-        // Set up dear imgui wgpu renderer
-        let renderer_config = RendererConfig {
-            texture_format: surface_desc.format,
-            ..Default::default()
-        };
+        // Initialize gl
+        let gl =
+            unsafe { glow::Context::from_loader_function(|s| window.get_proc_address(s).cast()) };
 
-        // Create the egui render pass
-        let mut renderer = Renderer::new(&mut imgui, &device, &queue, renderer_config);
+        // Setup Renderer
+        let renderer = imgui_glow_renderer::AutoRenderer::initialize(gl, &mut imgui)
+            .expect("Failed to create renderer");
 
         // Initial UI state
         let last_frame_time = Instant::now();
 
-        let mut last_cursor = None;
-
-        // Setup graphics context
-        let mut dummy_device = DummyGraphicsDevice::init(&surface_desc, &device, &queue);
-        let graphics_context = GraphicsContext::new(Box::new(dummy_device));
-
-        // Stores a texture for displaying with imgui::Image(),
-        // also as a texture view for rendering into it
-
-        let texture_config = TextureConfig {
-            size: wgpu::Extent3d {
-                width: width,
-                height: height,
-                ..Default::default()
-            },
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            ..Default::default()
-        };
-
-        let texture = Texture::new(&device, &renderer, texture_config);
-        let content_texture_id = renderer.textures.insert(texture);
+        let last_cursor = None;
 
         Ok(Self {
             width,
             height,
             window,
-            surface,
-            device,
-            queue,
             renderer,
             platform,
             imgui,
-            graphics_context,
-            content_texture_id,
             ui_state: UIState {
                 last_frame_time,
                 last_cursor,
@@ -195,57 +131,64 @@ impl Gui {
         })
     }
 
-    fn recreate_swapchain(&mut self) -> Result<()> {
-        let size = self.window.inner_size();
-        self.width = size.width;
-        self.height = size.height;
-        trace!("Recreating swapchain: {}x{}", size.width, size.height);
+    // fn recreate_swapchain(&mut self) -> Result<()> {
+    //     let size = self.window.inner_size();
+    //     self.width = size.width;
+    //     self.height = size.height;
+    //     trace!("Recreating swapchain: {}x{}", size.width, size.height);
 
-        let surface_desc = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: wgpu::TextureFormat::Bgra8UnormSrgb,
-            width: size.width,
-            height: size.height,
-            present_mode: wgpu::PresentMode::Fifo,
-            alpha_mode: wgpu::CompositeAlphaMode::Auto,
-            view_formats: vec![wgpu::TextureFormat::Bgra8Unorm],
-        };
+    //     let surface_desc = wgpu::SurfaceConfiguration {
+    //         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+    //         format: wgpu::TextureFormat::Bgra8UnormSrgb,
+    //         width: size.width,
+    //         height: size.height,
+    //         present_mode: wgpu::PresentMode::Fifo,
+    //         alpha_mode: wgpu::CompositeAlphaMode::Auto,
+    //         view_formats: vec![wgpu::TextureFormat::Bgra8Unorm],
+    //     };
 
-        self.surface.configure(&self.device, &surface_desc);
-        Ok(())
-    }
+    //     self.surface.configure(&self.device, &surface_desc);
+    //     Ok(())
+    // }
 
     fn handle_events(&mut self, event_loop_wrapper: &mut EventLoopWrapper) {
         event_loop_wrapper
             .event_loop
             .run_return(|event, _, control_flow| {
-                *control_flow = ControlFlow::Poll;
-
                 match event {
                     Event::WindowEvent {
                         event: WindowEvent::Resized(_),
                         ..
                     } => {
-                        self.recreate_swapchain().unwrap();
+                        trace!("Window resized");
                     }
-                    Event::WindowEvent {
-                        event: WindowEvent::ScaleFactorChanged { .. },
-                        ..
-                    } => {
-                        self.recreate_swapchain().unwrap();
+
+                    glutin::event::Event::NewEvents(_) => {
+                        let now = Instant::now();
+                        self.imgui
+                            .io_mut()
+                            .update_delta_time(now.duration_since(self.ui_state.last_frame_time));
+                        self.ui_state.last_frame_time = now;
                     }
-                    Event::WindowEvent {
-                        event: WindowEvent::CloseRequested,
+                    glutin::event::Event::MainEventsCleared => control_flow.set_exit(),
+                    glutin::event::Event::WindowEvent {
+                        event: glutin::event::WindowEvent::CloseRequested,
                         ..
                     } => {
                         std::process::exit(0);
                     }
-                    Event::MainEventsCleared => control_flow.set_exit(),
-                    _ => (),
+                    glutin::event::Event::LoopDestroyed => {
+                        // let gl = ig_renderer.gl_context();
+                        // tri_renderer.destroy(gl);
+                    }
+                    event => {
+                        self.platform.handle_event(
+                            self.imgui.io_mut(),
+                            self.window.window(),
+                            &event,
+                        );
+                    }
                 }
-
-                self.platform
-                    .handle_event(self.imgui.io_mut(), &self.window, &event);
             });
     }
 
@@ -254,81 +197,38 @@ impl Gui {
         self.handle_events(event_loop_wrapper);
 
         // Update the time
-        let now = Instant::now();
-        self.imgui
-            .io_mut()
-            .update_delta_time(now - self.ui_state.last_frame_time);
-        self.ui_state.last_frame_time = now;
+        // let now = Instant::now();
+        // self.imgui
+        //     .io_mut()
+        //     .update_delta_time(now - self.ui_state.last_frame_time);
+        // self.ui_state.last_frame_time = now;
 
         // Get the ImGui context and begin drawing the frame
         self.platform
-            .prepare_frame(self.imgui.io_mut(), &self.window);
+            .prepare_frame(self.imgui.io_mut(), self.window.window());
     }
 
     fn render(&mut self) -> Result<()> {
-        // Get the output frame
-        let frame = self.surface.get_current_texture()?;
-
-        let view = frame
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
         // Begin drawing UI
         let ui = self.imgui.frame();
         ui.main_menu_bar(|| {
             (self.draw_menu_callback)(ui);
         });
 
-        // Draw the content
-
-        let dummy_device = self
-            .graphics_context
-            .api
-            .as_any_mut()
-            .downcast_mut::<DummyGraphicsDevice>()
-            .unwrap();
-
-        // Render example normally at background
-        dummy_device.update(ui.io().delta_time);
-        dummy_device.setup_camera(&self.queue, ui.io().display_size);
-        dummy_device.render(&view, &self.device, &self.queue);
-
         // Demo window for now
         let mut opened = true;
         ui.show_metrics_window(&mut opened);
 
-        let mut encoder: wgpu::CommandEncoder =
-            self.device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Main Command Encoder"),
-                });
+        self.platform.prepare_render(ui, self.window.window());
+        let draw_data = self.imgui.render();
 
-        if self.ui_state.last_cursor != ui.mouse_cursor() {
-            self.ui_state.last_cursor = ui.mouse_cursor();
-            self.platform.prepare_render(ui, &self.window);
-        }
-
-        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: None,
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: true,
-                },
-            })],
-            depth_stencil_attachment: None,
-        });
-
+        // Render ImGui on top of any drawn content
         self.renderer
-            .render(self.imgui.render(), &self.queue, &self.device, &mut rpass)?;
+            .render(draw_data)
+            .expect("error rendering imgui");
 
-        drop(rpass);
-
-        self.queue.submit(Some(encoder.finish()));
-
-        frame.present();
+        // Swap buffers
+        self.window.swap_buffers()?;
 
         Ok(())
     }
@@ -339,7 +239,8 @@ impl Gui {
     }
 
     pub fn draw_lists(&mut self, gfx_context: &GraphicsContext, commands: usize) -> Result<()> {
-        self.rcp.run(gfx_context, commands);
+        self.rcp
+            .run(self.renderer.gl_context(), gfx_context, commands);
         // TODO: Draw rendered game image
         // let image = self.rcp.finish();
 
@@ -406,9 +307,29 @@ pub extern "C" fn GUIDrawLists(
 }
 
 #[no_mangle]
-pub extern "C" fn GUIDrawListsDummy(gui: Option<&mut Gui>) {
+pub extern "C" fn GUIDrawListsDummy(
+    gui: Option<&mut Gui>,
+    gfx_context: Option<&mut GraphicsContext>,
+) {
     let gui = gui.unwrap();
+    let gfx_context = gfx_context.unwrap();
+
+    let dummy_device = gfx_context
+        .api
+        .as_any_mut()
+        .downcast_mut::<DummyGraphicsDevice>()
+        .unwrap();
+
+    dummy_device.render(gui.renderer.gl_context());
+
     gui.draw_lists_dummy().unwrap();
+}
+
+#[no_mangle]
+pub extern "C" fn GUICreateGraphicsContext(gui: Option<&mut Gui>) -> Box<GraphicsContext> {
+    let gui: &mut Gui = gui.unwrap();
+    let dummy_device = DummyGraphicsDevice::new(gui.renderer.gl_context(), "#version 330");
+    Box::new(GraphicsContext::new(Box::new(dummy_device)))
 }
 
 #[no_mangle]
