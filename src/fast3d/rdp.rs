@@ -101,7 +101,7 @@ pub struct RenderingState {
     pub scissor: Rect,
     pub shader_program_hash: u64,
     pub textures: [Texture; 2],
-    pub cull_mode: CullMode,
+    pub cull_mode: Option<wgpu::Face>,
 }
 
 impl RenderingState {
@@ -116,7 +116,7 @@ impl RenderingState {
         scissor: Rect::ZERO,
         shader_program_hash: 0,
         textures: [Texture::EMPTY; 2],
-        cull_mode: CullMode::None,
+        cull_mode: None,
     };
 }
 
@@ -463,7 +463,7 @@ impl RDP {
             for i in 0..2 {
                 if i == 0 || self.uses_texture1() {
                     if self.textures_changed[i as usize] {
-                        self.flush(gfx_context);
+                        self.flush(gl_context, gfx_context);
                         self.import_tile_texture(gl_context, gfx_context, i as usize);
                         self.textures_changed[i as usize] = false;
                     }
@@ -493,9 +493,10 @@ impl RDP {
         }
     }
 
-    pub fn flush(&mut self, gfx_context: &GraphicsContext) {
+    pub fn flush(&mut self, gl_context: &glow::Context, gfx_context: &GraphicsContext) {
         if self.buf_vbo_len > 0 {
             gfx_context.api.draw_triangles(
+                gl_context,
                 &self.buf_vbo as *const f32,
                 self.buf_vbo_len,
                 self.buf_vbo_num_tris,
@@ -571,12 +572,12 @@ impl RDP {
             };
 
             if depth_compare != self.rendering_state.depth_compare {
-                self.flush(gfx_context);
+                self.flush(gl_context, gfx_context);
                 gfx_context.api.set_depth_compare(gl_context, depth_compare);
                 self.rendering_state.depth_compare = depth_compare;
             }
         } else if self.rendering_state.depth_compare != CompareFunction::Always {
-            self.flush(gfx_context);
+            self.flush(gl_context, gfx_context);
             gfx_context
                 .api
                 .set_depth_compare(gl_context, CompareFunction::Always);
@@ -586,7 +587,7 @@ impl RDP {
         // handle depth write
         let depth_write = render_mode & (1 << OtherModeLayoutL::Z_UPD as u32) != 0;
         if depth_write != self.rendering_state.depth_write {
-            self.flush(gfx_context);
+            self.flush(gl_context, gfx_context);
             gfx_context.api.set_depth_write(gl_context, depth_write);
             self.rendering_state.depth_write = depth_write;
         }
@@ -594,8 +595,10 @@ impl RDP {
         // handle polygon offset (slope scale depth bias)
         let polygon_offset = zmode == ZMode::ZMODE_DEC as u32;
         if polygon_offset != self.rendering_state.polygon_offset {
-            self.flush(gfx_context);
-            gfx_context.api.set_polygon_offset(gl_context, polygon_offset);
+            self.flush(gl_context, gfx_context);
+            gfx_context
+                .api
+                .set_polygon_offset(gl_context, polygon_offset);
             self.rendering_state.polygon_offset = polygon_offset;
         }
 
@@ -614,8 +617,10 @@ impl RDP {
         if use_alpha != self.rendering_state.blend_enabled {
             let blend_state = BlendState::ALPHA_BLENDING;
 
-            self.flush(gfx_context);
-            gfx_context.api.set_blend_state(use_alpha, blend_state);
+            self.flush(gl_context, gfx_context);
+            gfx_context
+                .api
+                .set_blend_state(gl_context, use_alpha, blend_state);
             self.rendering_state.blend_enabled = use_alpha;
         }
     }
@@ -623,20 +628,20 @@ impl RDP {
     pub fn update_render_state(
         &mut self,
         gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
+        gfx_context: &mut GraphicsContext,
         geometry_mode: u32,
     ) {
         let depth_test = geometry_mode & RSPGeometry::G_ZBUFFER as u32 != 0;
         if depth_test != self.rendering_state.depth_test {
-            self.flush(gfx_context);
+            self.flush(gl_context, gfx_context);
             gfx_context.api.set_depth_test(gl_context, depth_test);
             self.rendering_state.depth_test = depth_test;
         }
 
         let cull_mode = translate_cull_mode(geometry_mode);
         if cull_mode != self.rendering_state.cull_mode {
-            self.flush(gfx_context);
-            gfx_context.api.set_cull_mode(cull_mode);
+            self.flush(gl_context, gfx_context);
+            gfx_context.api.set_cull_mode(gl_context, cull_mode);
             self.rendering_state.cull_mode = cull_mode;
         }
 
@@ -645,7 +650,7 @@ impl RDP {
         if self.viewport_or_scissor_changed {
             let viewport = self.viewport;
             if viewport != self.rendering_state.viewport {
-                self.flush(gfx_context);
+                self.flush(gl_context, gfx_context);
                 gfx_context.api.set_viewport(
                     gl_context,
                     viewport.x as i32,
@@ -657,8 +662,9 @@ impl RDP {
             }
             let scissor = self.scissor;
             if scissor != self.rendering_state.scissor {
-                self.flush(gfx_context);
+                self.flush(gl_context, gfx_context);
                 gfx_context.api.set_scissor(
+                    gl_context,
                     scissor.x as i32,
                     scissor.y as i32,
                     scissor.width as i32,
@@ -698,5 +704,5 @@ pub extern "C" fn RDPSetOutputDimensions(rcp: Option<&mut RCP>, dimensions: Outp
 pub extern "C" fn RDPFlush(rcp: Option<&mut RCP>, gfx_context: Option<&mut GraphicsContext>) {
     let rcp = rcp.unwrap();
     let gfx_context = gfx_context.unwrap();
-    rcp.rdp.flush(gfx_context);
+    // rcp.rdp.flush(gfx_context);
 }

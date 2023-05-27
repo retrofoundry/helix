@@ -72,18 +72,18 @@ pub fn translate_blend_param_b(param: u32, src: BlendFactor) -> BlendFactor {
     }
 }
 
-pub fn translate_cull_mode(geometry_mode: u32) -> CullMode {
+pub fn translate_cull_mode(geometry_mode: u32) -> Option<wgpu::Face> {
     let cull_front = (geometry_mode & RSPGeometry::G_CULL_FRONT as u32) != 0;
     let cull_back = (geometry_mode & RSPGeometry::G_CULL_BACK as u32) != 0;
 
     if cull_front && cull_back {
-        CullMode::FrontAndBack
+        panic!("Culling both front and back faces is not supported");
     } else if cull_front {
-        CullMode::Front
+        Some(wgpu::Face::Front)
     } else if cull_back {
-        CullMode::Back
+        Some(wgpu::Face::Back)
     } else {
-        CullMode::None
+        None
     }
 }
 

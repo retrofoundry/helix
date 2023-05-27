@@ -138,19 +138,31 @@ impl GraphicsAPI for ExternGraphicsDevice {
         unsafe { ((*self.inner).set_viewport)(x, y, width, height) }
     }
 
-    fn set_scissor(&self, x: i32, y: i32, width: i32, height: i32) {
+    fn set_scissor(&self, _gl: &glow::Context, x: i32, y: i32, width: i32, height: i32) {
         unsafe { ((*self.inner).set_scissor)(x, y, width, height) }
     }
 
-    fn set_blend_state(&self, enabled: bool, blend_state: BlendState) {
+    fn set_blend_state(&self, _gl: &glow::Context, enabled: bool, blend_state: BlendState) {
         unsafe { ((*self.inner).set_blend_state)(enabled, blend_state) }
     }
 
-    fn set_cull_mode(&self, cull_mode: CullMode) {
+    fn set_cull_mode(&self, _gl: &glow::Context, cull_mode: Option<wgpu::Face>) {
+        let cull_mode = match cull_mode {
+            Some(wgpu::Face::Front) => CullMode::Front,
+            Some(wgpu::Face::Back) => CullMode::Back,
+            None => CullMode::None,
+        };
+
         unsafe { ((*self.inner).set_cull_mode)(cull_mode) }
     }
 
-    fn draw_triangles(&self, vertices: *const f32, count: usize, stride: usize) {
+    fn draw_triangles(
+        &self,
+        _gl: &glow::Context,
+        vertices: *const f32,
+        count: usize,
+        stride: usize,
+    ) {
         unsafe { ((*self.inner).draw_triangles)(vertices, count, stride) }
     }
 
@@ -162,7 +174,7 @@ impl GraphicsAPI for ExternGraphicsDevice {
         unsafe { ((*self.inner).on_resize)() }
     }
 
-    fn start_frame(&self) {
+    fn start_frame(&mut self, _gl: &glow::Context) {
         unsafe { ((*self.inner).start_frame)() }
     }
 

@@ -174,7 +174,7 @@ impl F3DEX2 {
         _rdp: &mut RDP,
         rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -238,7 +238,7 @@ impl F3DEX2 {
         _rdp: &mut RDP,
         rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };
@@ -269,7 +269,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -304,7 +304,7 @@ impl F3DEX2 {
         _rdp: &mut RDP,
         rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -330,7 +330,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -356,7 +356,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -522,7 +522,7 @@ impl F3DEX2 {
         _rdp: &mut RDP,
         rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -541,7 +541,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
+        gfx_context: &mut GraphicsContext,
         vertex_id1: usize,
         vertex_id2: usize,
         vertex_id3: usize,
@@ -569,7 +569,7 @@ impl F3DEX2 {
         let new_program = rdp.shader_cache.get(&shader_hash).unwrap().compiled_program;
 
         if shader_hash != rdp.rendering_state.shader_program_hash {
-            rdp.flush(gfx_context);
+            rdp.flush(gl_context, gfx_context);
 
             if let Some(old_program) = rdp
                 .shader_cache
@@ -587,8 +587,10 @@ impl F3DEX2 {
         if use_alpha != rdp.rendering_state.blend_enabled {
             let blend_state = BlendState::ALPHA_BLENDING;
 
-            rdp.flush(gfx_context);
-            gfx_context.api.set_blend_state(use_alpha, blend_state);
+            rdp.flush(gl_context, gfx_context);
+            gfx_context
+                .api
+                .set_blend_state(gl_context, use_alpha, blend_state);
             rdp.rendering_state.blend_enabled = use_alpha;
         }
 
@@ -702,7 +704,7 @@ impl F3DEX2 {
 
         rdp.buf_vbo_num_tris += 1;
         if rdp.buf_vbo_num_tris == MAX_BUFFERED {
-            rdp.flush(gfx_context);
+            rdp.flush(gl_context, gfx_context);
         }
 
         GBIResult::Continue
@@ -712,7 +714,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
+        gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -736,7 +738,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
+        gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -774,7 +776,7 @@ impl F3DEX2 {
         _rdp: &mut RDP,
         _rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -798,7 +800,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -815,7 +817,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -844,7 +846,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -874,7 +876,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -889,7 +891,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -931,7 +933,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -959,7 +961,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -984,7 +986,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };
@@ -1015,7 +1017,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -1048,7 +1050,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -1088,7 +1090,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };
@@ -1106,7 +1108,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };
@@ -1124,7 +1126,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };
@@ -1142,7 +1144,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };
@@ -1160,7 +1162,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };
@@ -1174,7 +1176,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };
@@ -1187,7 +1189,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         gl_context: &glow::Context,
-        _gfx_context: &GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -1205,7 +1207,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
+        gfx_context: &mut GraphicsContext,
         ulx: i32,
         uly: i32,
         lrx: i32,
@@ -1307,7 +1309,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
+        gfx_context: &mut GraphicsContext,
         ulx: i32,
         uly: i32,
         mut lrx: i32,
@@ -1377,7 +1379,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
+        gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -1429,7 +1431,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
+        gfx_context: &mut GraphicsContext,
         ulx: i32,
         uly: i32,
         mut lrx: i32,
@@ -1467,7 +1469,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
+        gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };

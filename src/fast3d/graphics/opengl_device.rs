@@ -1,23 +1,75 @@
 use std::{any::Any, num::NonZeroU32};
 
-use imgui_glow_renderer::glow::{self, HasContext, NativeProgram, NativeTexture, Program};
-use wgpu::CompareFunction;
+use imgui_glow_renderer::glow::{self, HasContext, NativeProgram, NativeTexture, NativeUniformLocation};
 
 use crate::fast3d::gbi::defines::G_TX;
 
 use super::{GraphicsAPI, ShaderProgram};
 
+const FLOAT_SIZE: usize = std::mem::size_of::<f32>();
+
 pub struct OpenGLGraphicsDevice {
+    pub vbo: <glow::Context as HasContext>::Buffer,
+    pub vao: <glow::Context as HasContext>::VertexArray,
+
     pub frame_count: i32,
     pub current_height: i32,
 }
 
 impl OpenGLGraphicsDevice {
-    fn new() -> Self {
+    pub fn new(gl: &glow::Context) -> Self {
+        let vbo = unsafe { gl.create_buffer().unwrap() };
+        let vao = unsafe { gl.create_vertex_array().unwrap() };
+
+        unsafe {
+            gl.bind_buffer(glow::ARRAY_BUFFER, Some(vbo));
+            gl.bind_vertex_array(Some(vao));
+        }
+
         Self {
+            vbo,
+            vao,
             frame_count: 0,
             current_height: 0,
         }
+    }
+
+    unsafe fn set_vertex_array_attrib(&self, gl: &glow::Context, shader: *mut ShaderProgram) {
+        let mut position = 0;
+
+        for i in 0..(*shader).num_attribs {
+            gl.enable_vertex_attrib_array((*shader).attrib_locations[i as usize] as u32);
+            gl.vertex_attrib_pointer_f32(
+                (*shader).attrib_locations[i as usize] as u32,
+                (*shader).attrib_sizes[i as usize] as i32,
+                glow::FLOAT,
+                false,
+                (*shader).num_floats as i32 * FLOAT_SIZE as i32,
+                position * FLOAT_SIZE as i32
+            );
+
+            position += (*shader).attrib_sizes[i as usize] as i32;
+        }
+    }
+
+    unsafe fn set_uniforms(&self, gl: &glow::Context, shader: *mut ShaderProgram) {
+        if (*shader).used_noise {   
+            gl.uniform_1_i32(Some(&NativeUniformLocation((*shader).noise_location as u32)), self.frame_count);
+            gl.uniform_1_i32(Some(&NativeUniformLocation((*shader).noise_scale_location as u32)), self.current_height);
+        }
+
+        // // set uniforms
+        // if (*shader).used_noise {
+        //     // TODO: verify this works and if so we don't need to store uniform locations into shader program object
+        //     gl.uniform_1_i32(
+                // Some(&gl.get_uniform_location(program, "uNoise").unwrap()),
+        //         self.frame_count,
+        //     );
+        //     gl.uniform_1_i32(
+        //         Some(&gl.get_uniform_location(program, "uNoiseScale").unwrap()),
+        //         self.current_height,
+        //     );
+        // }
     }
 
     fn gfx_cm_to_opengl(val: u32) -> i32 {
@@ -30,6 +82,34 @@ impl OpenGLGraphicsDevice {
         }
 
         glow::REPEAT as i32
+    }
+
+    fn gfx_blend_operation_to_gl(operation: wgpu::BlendOperation) -> u32 {
+        match operation {
+            wgpu::BlendOperation::Add => glow::FUNC_ADD,
+            wgpu::BlendOperation::Subtract => glow::FUNC_SUBTRACT,
+            wgpu::BlendOperation::ReverseSubtract => glow::FUNC_REVERSE_SUBTRACT,
+            wgpu::BlendOperation::Min => glow::MIN,
+            wgpu::BlendOperation::Max => glow::MAX,
+        }
+    }
+
+    fn gfx_blend_factor_to_gl(factor: wgpu::BlendFactor) -> u32 {
+        match factor {
+            wgpu::BlendFactor::Zero => glow::ZERO,
+            wgpu::BlendFactor::One => glow::ONE,
+            wgpu::BlendFactor::Src => glow::SRC_COLOR,
+            wgpu::BlendFactor::OneMinusSrc => glow::ONE_MINUS_SRC_COLOR,
+            wgpu::BlendFactor::SrcAlpha => glow::SRC_ALPHA,
+            wgpu::BlendFactor::OneMinusSrcAlpha => glow::ONE_MINUS_SRC_ALPHA,
+            wgpu::BlendFactor::Dst => glow::DST_COLOR,
+            wgpu::BlendFactor::OneMinusDst => glow::ONE_MINUS_DST_COLOR,
+            wgpu::BlendFactor::DstAlpha => glow::DST_ALPHA,
+            wgpu::BlendFactor::OneMinusDstAlpha => glow::ONE_MINUS_DST_ALPHA,
+            wgpu::BlendFactor::SrcAlphaSaturated => glow::SRC_ALPHA_SATURATE,
+            wgpu::BlendFactor::Constant => glow::CONSTANT_COLOR,
+            wgpu::BlendFactor::OneMinusConstant => glow::ONE_MINUS_CONSTANT_COLOR,
+        }
     }
 }
 
@@ -68,7 +148,7 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
         uses_alpha: bool,
         uses_noise: bool,
         num_inputs: u8,
-    ) -> *mut ShaderProgram {
+    ) -> ShaderProgram {
         unsafe {
             let mut shaders = [
                 (glow::VERTEX_SHADER, vertex, None),
@@ -119,13 +199,13 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
 
             for i in 0..num_inputs {
                 shader_program.attrib_locations[count] = gl
-                    .get_attrib_location(program, &format!("aInput{}", i))
+                    .get_attrib_location(program, &format!("aInput{}", i + 1))
                     .unwrap() as i32;
                 shader_program.attrib_sizes[count] = if uses_alpha { 4 } else { 3 };
                 count += 1;
             }
 
-            shader_program.shader_id = program.0.into();
+            shader_program.opengl_program_id = program.0.into();
             shader_program.num_attribs = count as u8;
             shader_program.num_floats = num_floats as u8;
 
@@ -151,7 +231,7 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
                 shader_program.used_noise = false;
             }
 
-            Box::into_raw(Box::new(shader_program))
+            shader_program
         }
     }
 
@@ -159,35 +239,8 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
         unsafe {
             let program = NativeProgram(NonZeroU32::new((*shader).opengl_program_id).unwrap());
             gl.use_program(Some(program));
-
-            // enable vertex attribs and set pointers
-            let mut position = 0;
-            for i in 0..(*shader).num_attribs {
-                gl.enable_vertex_attrib_array((*shader).attrib_locations[i as usize] as u32);
-                gl.vertex_attrib_pointer_f32(
-                    (*shader).attrib_locations[i as usize] as u32,
-                    (*shader).attrib_sizes[i as usize] as i32,
-                    glow::FLOAT,
-                    false,
-                    (*shader).num_floats as i32 * 4,
-                    position * 4,
-                );
-
-                position += (*shader).attrib_sizes[i as usize] as i32;
-            }
-
-            // set uniforms
-            if (*shader).used_noise {
-                // TODO: verify this works and if so we don't need to store uniform locations into shader program object
-                gl.uniform_1_i32(
-                    Some(&gl.get_uniform_location(program, "uNoise").unwrap()),
-                    self.frame_count,
-                );
-                gl.uniform_1_i32(
-                    Some(&gl.get_uniform_location(program, "uNoiseScale").unwrap()),
-                    self.current_height,
-                );
-            }
+            self.set_vertex_array_attrib(gl, shader);
+            self.set_uniforms(gl, shader);
         };
     }
 
@@ -268,17 +321,17 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
         }
     }
 
-    fn set_depth_compare(&self, gl: &glow::Context, compare: CompareFunction) {
+    fn set_depth_compare(&self, gl: &glow::Context, compare: wgpu::CompareFunction) {
         unsafe {
             match compare {
-                CompareFunction::Never => gl.depth_func(glow::NEVER),
-                CompareFunction::Less => gl.depth_func(glow::LESS),
-                CompareFunction::Equal => gl.depth_func(glow::EQUAL),
-                CompareFunction::LessEqual => gl.depth_func(glow::LEQUAL),
-                CompareFunction::Greater => gl.depth_func(glow::GREATER),
-                CompareFunction::NotEqual => gl.depth_func(glow::NOTEQUAL),
-                CompareFunction::GreaterEqual => gl.depth_func(glow::GEQUAL),
-                CompareFunction::Always => gl.depth_func(glow::ALWAYS),
+                wgpu::CompareFunction::Never => gl.depth_func(glow::NEVER),
+                wgpu::CompareFunction::Less => gl.depth_func(glow::LESS),
+                wgpu::CompareFunction::Equal => gl.depth_func(glow::EQUAL),
+                wgpu::CompareFunction::LessEqual => gl.depth_func(glow::LEQUAL),
+                wgpu::CompareFunction::Greater => gl.depth_func(glow::GREATER),
+                wgpu::CompareFunction::NotEqual => gl.depth_func(glow::NOTEQUAL),
+                wgpu::CompareFunction::GreaterEqual => gl.depth_func(glow::GEQUAL),
+                wgpu::CompareFunction::Always => gl.depth_func(glow::ALWAYS),
             }
         }
     }
@@ -309,39 +362,86 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
         self.current_height = height;
     }
 
-    fn set_scissor(&self, x: i32, y: i32, width: i32, height: i32) {
-        todo!()
+    fn set_scissor(&self, gl: &glow::Context, x: i32, y: i32, width: i32, height: i32) {
+        unsafe {
+            gl.scissor(x, y, width, height);
+        }
     }
 
-    fn set_blend_state(&self, enabled: bool, blend_state: wgpu::BlendState) {
-        todo!()
+    fn set_blend_state(&self, gl: &glow::Context, enabled: bool, blend_state: wgpu::BlendState) {
+        unsafe {
+            if !enabled {
+                gl.disable(glow::BLEND);
+                return;
+            }
+
+            gl.enable(glow::BLEND);
+
+            gl.blend_equation_separate(
+                Self::gfx_blend_operation_to_gl(blend_state.color.operation),
+                Self::gfx_blend_operation_to_gl(blend_state.alpha.operation),
+            );
+
+            gl.blend_func_separate(
+                Self::gfx_blend_factor_to_gl(blend_state.color.src_factor),
+                Self::gfx_blend_factor_to_gl(blend_state.color.dst_factor),
+                Self::gfx_blend_factor_to_gl(blend_state.alpha.src_factor),
+                Self::gfx_blend_factor_to_gl(blend_state.alpha.dst_factor),
+            );
+        }
     }
 
-    fn set_cull_mode(&self, cull_mode: super::CullMode) {
-        todo!()
+    fn set_cull_mode(&self, gl: &glow::Context, cull_mode: Option<wgpu::Face>) {
+        unsafe {
+            match cull_mode {
+                Some(wgpu::Face::Front) => {
+                    gl.enable(glow::CULL_FACE);
+                    gl.cull_face(glow::FRONT);
+                }
+                Some(wgpu::Face::Back) => {
+                    gl.enable(glow::CULL_FACE);
+                    gl.cull_face(glow::BACK);
+                }
+                None => gl.disable(glow::CULL_FACE),
+            }
+        }
     }
 
-    fn draw_triangles(&self, vertices: *const f32, count: usize, stride: usize) {
-        todo!()
+    fn draw_triangles(
+        &self,
+        gl: &glow::Context,
+        buf_vbo: *const f32,
+        buf_vbo_len: usize,
+        buf_vbo_num_tris: usize,
+    ) {
+        unsafe {
+            let data = std::slice::from_raw_parts(
+                buf_vbo as *const u8,
+                buf_vbo_len * FLOAT_SIZE,
+            );
+
+            gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, data, glow::STREAM_DRAW);
+            gl.draw_arrays(glow::TRIANGLES, 0, buf_vbo_num_tris as i32 * 3);
+        }
     }
 
-    fn init(&self) {
-        todo!()
+    fn init(&self) {}
+
+    fn on_resize(&self) {}
+
+    fn start_frame(&mut self, gl: &glow::Context) {
+        self.frame_count += 1;
+
+        unsafe {
+            gl.disable(glow::SCISSOR_TEST);
+            gl.depth_mask(true);
+            gl.clear_color(0.0, 0.0, 0.0, 1.0);
+            gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
+            gl.enable(glow::SCISSOR_TEST);
+        }
     }
 
-    fn on_resize(&self) {
-        todo!()
-    }
+    fn end_frame(&self) {}
 
-    fn start_frame(&self) {
-        todo!()
-    }
-
-    fn end_frame(&self) {
-        todo!()
-    }
-
-    fn finish_render(&self) {
-        todo!()
-    }
+    fn finish_render(&self) {}
 }

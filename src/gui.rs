@@ -1,6 +1,7 @@
-use anyhow::Result;
+use anyhow::{Ok, Result};
 use glutin::{event_loop::EventLoop, Api, ContextWrapper, GlRequest, PossiblyCurrent};
 use imgui::{Context, FontSource, MouseCursor, Ui};
+use imgui_glow_renderer::glow::HasContext;
 use imgui_glow_renderer::{glow, AutoRenderer};
 use imgui_winit_support::winit::window::Window;
 use log::trace;
@@ -9,6 +10,8 @@ use std::{ffi::CStr, time::Instant};
 use winit::event::{Event, WindowEvent};
 use winit::platform::run_return::EventLoopExtRunReturn;
 
+use crate::fast3d::graphics::opengl_device::OpenGLGraphicsDevice;
+use crate::fast3d::rdp::OutputDimensions;
 use crate::fast3d::{
     graphics::{dummy_device::DummyGraphicsDevice, GraphicsContext},
     rcp::RCP,
@@ -59,7 +62,7 @@ impl Gui {
 
         let window = glutin::window::WindowBuilder::new()
             .with_title(title)
-            .with_inner_size(glutin::dpi::LogicalSize::new(1024, 768));
+            .with_inner_size(glutin::dpi::LogicalSize::new(width, height));
 
         let window = glutin::ContextBuilder::new()
             .with_gl(GlRequest::Specific(Api::OpenGl, (3, 3)))
@@ -156,13 +159,6 @@ impl Gui {
             .event_loop
             .run_return(|event, _, control_flow| {
                 match event {
-                    Event::WindowEvent {
-                        event: WindowEvent::Resized(_),
-                        ..
-                    } => {
-                        trace!("Window resized");
-                    }
-
                     glutin::event::Event::NewEvents(_) => {
                         let now = Instant::now();
                         self.imgui
@@ -178,6 +174,7 @@ impl Gui {
                         std::process::exit(0);
                     }
                     glutin::event::Event::LoopDestroyed => {
+                        trace!("Loop destroyed");
                         // let gl = ig_renderer.gl_context();
                         // tri_renderer.destroy(gl);
                     }
@@ -192,25 +189,44 @@ impl Gui {
             });
     }
 
-    pub fn start_frame(&mut self, event_loop_wrapper: &mut EventLoopWrapper) {
+    fn sync_frame_rate(&mut self, fps: u32) {
+        let now = Instant::now();
+        let delta = now.duration_since(self.ui_state.last_frame_time);
+        let target_delta = std::time::Duration::from_millis(1000 / fps as u64);
+
+        if delta < target_delta {
+            std::thread::sleep(target_delta - delta);
+        }
+    }
+
+    pub fn start_frame(&mut self, event_loop_wrapper: &mut EventLoopWrapper) -> Result<()> {
+        // Limit FPS to 30 for now
+        // TODO: Fix off by one error
+        self.sync_frame_rate(31);
+
         // Handle events
         self.handle_events(event_loop_wrapper);
 
-        // Update the time
-        // let now = Instant::now();
-        // self.imgui
-        //     .io_mut()
-        //     .update_delta_time(now - self.ui_state.last_frame_time);
-        // self.ui_state.last_frame_time = now;
+        // Grab current window size and store them
+        let size = self.window.window().inner_size();
+        let dimensions = OutputDimensions {
+            width: size.width,
+            height: size.height,
+            aspect_ratio: size.width as f32 / size.height as f32,
+        };
+        trace!("Window size: {}x{}", dimensions.width, dimensions.height);
+        self.rcp.rdp.output_dimensions = dimensions;
 
         // Get the ImGui context and begin drawing the frame
         self.platform
-            .prepare_frame(self.imgui.io_mut(), self.window.window());
+            .prepare_frame(self.imgui.io_mut(), self.window.window())?;
+
+        Ok(())
     }
 
     fn render(&mut self) -> Result<()> {
         // Begin drawing UI
-        let ui = self.imgui.frame();
+        let ui = self.imgui.new_frame();
         ui.main_menu_bar(|| {
             (self.draw_menu_callback)(ui);
         });
@@ -227,9 +243,6 @@ impl Gui {
             .render(draw_data)
             .expect("error rendering imgui");
 
-        // Swap buffers
-        self.window.swap_buffers()?;
-
         Ok(())
     }
 
@@ -238,13 +251,19 @@ impl Gui {
         EventLoopWrapper { event_loop }
     }
 
-    pub fn draw_lists(&mut self, gfx_context: &GraphicsContext, commands: usize) -> Result<()> {
+    pub fn draw_lists(&mut self, gfx_context: &mut GraphicsContext, commands: usize) -> Result<()> {
+        // Run the RCP
         self.rcp
             .run(self.renderer.gl_context(), gfx_context, commands);
-        // TODO: Draw rendered game image
-        // let image = self.rcp.finish();
 
+        // Finish rendering
+        gfx_context.api.end_frame();
+
+        // Render ImGui on top of any drawn content
         self.render()?;
+
+        // Swap buffers
+        self.window.swap_buffers()?;
 
         Ok(())
     }
@@ -254,7 +273,9 @@ impl Gui {
         Ok(())
     }
 
-    pub fn end_frame(&mut self) {}
+    pub fn end_frame(&mut self) -> Result<()> {
+        Ok(())
+    }
 }
 
 // MARK: - C API
@@ -328,8 +349,8 @@ pub extern "C" fn GUIDrawListsDummy(
 #[no_mangle]
 pub extern "C" fn GUICreateGraphicsContext(gui: Option<&mut Gui>) -> Box<GraphicsContext> {
     let gui: &mut Gui = gui.unwrap();
-    let dummy_device = DummyGraphicsDevice::new(gui.renderer.gl_context(), "#version 330");
-    Box::new(GraphicsContext::new(Box::new(dummy_device)))
+    let opengl_device = OpenGLGraphicsDevice::new(gui.renderer.gl_context());
+    Box::new(GraphicsContext::new(Box::new(opengl_device)))
 }
 
 #[no_mangle]

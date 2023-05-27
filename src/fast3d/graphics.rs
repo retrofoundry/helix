@@ -18,7 +18,6 @@ pub struct ShaderProgram {
     pub used_noise: bool,
     pub noise_location: i32,
     pub noise_scale_location: i32,
-    // .. ommiting the rest
 }
 
 impl ShaderProgram {
@@ -74,13 +73,13 @@ pub trait GraphicsAPI {
     fn set_depth_write(&self, gl: &glow::Context, enable: bool);
     fn set_polygon_offset(&self, _gl: &glow::Context, enable: bool);
     fn set_viewport(&mut self, _gl: &glow::Context, x: i32, y: i32, width: i32, height: i32);
-    fn set_scissor(&self, x: i32, y: i32, width: i32, height: i32);
-    fn set_blend_state(&self, enabled: bool, blend_state: BlendState);
-    fn set_cull_mode(&self, cull_mode: CullMode);
-    fn draw_triangles(&self, vertices: *const f32, count: usize, stride: usize);
+    fn set_scissor(&self, gl: &glow::Context, x: i32, y: i32, width: i32, height: i32);
+    fn set_blend_state(&self, gl: &glow::Context, enabled: bool, blend_state: BlendState);
+    fn set_cull_mode(&self, gl: &glow::Context, cull_mode: Option<wgpu::Face>);
+    fn draw_triangles(&self, gl: &glow::Context, vertices: *const f32, count: usize, stride: usize);
     fn init(&self);
     fn on_resize(&self);
-    fn start_frame(&self);
+    fn start_frame(&mut self, gl: &glow::Context);
     fn end_frame(&self);
     fn finish_render(&self);
 }

@@ -25,7 +25,7 @@ impl F3DEX2E {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
+        gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -79,7 +79,7 @@ impl F3DEX2E {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
+        gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };

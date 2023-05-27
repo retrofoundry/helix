@@ -23,7 +23,7 @@ pub type GBICommand = fn(
     dp: &mut RDP,
     rsp: &mut RSP,
     gl_context: &glow::Context,
-    gfx_context: &GraphicsContext,
+    gfx_context: &mut GraphicsContext,
     command: &mut *mut Gfx,
 ) -> GBIResult;
 
@@ -66,7 +66,7 @@ impl GBI {
         rdp: &mut RDP,
         rsp: &mut RSP,
         gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
+        gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };

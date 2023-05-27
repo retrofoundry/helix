@@ -37,20 +37,19 @@ impl RCP {
     pub fn run(
         &mut self,
         gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
+        gfx_context: &mut GraphicsContext,
         commands: usize,
     ) {
         self.reset();
 
-        // self.rdp.setup_draw();
         self.run_dl(gl_context, gfx_context, commands);
-        // self.rdp.flush();
+        self.rdp.flush(gl_context, gfx_context);
     }
 
     fn run_dl(
         &mut self,
         gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
+        gfx_context: &mut GraphicsContext,
         commands: usize,
     ) {
         let mut command = commands as *mut Gfx;
@@ -95,7 +94,7 @@ pub extern "C" fn RCPCreate() -> Box<RCP> {
 #[no_mangle]
 pub extern "C" fn RCPRunDL(
     rcp: Option<&mut RCP>,
-    gfx_context: Option<&GraphicsContext>,
+    gfx_context: Option<&mut GraphicsContext>,
     commands: usize,
 ) {
     let rcp = rcp.unwrap();
