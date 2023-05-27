@@ -1,13 +1,11 @@
 use anyhow::{Ok, Result};
 use glutin::{event_loop::EventLoop, Api, ContextWrapper, GlRequest, PossiblyCurrent};
 use imgui::{Context, FontSource, MouseCursor, Ui};
-use imgui_glow_renderer::glow::HasContext;
 use imgui_glow_renderer::{glow, AutoRenderer};
 use imgui_winit_support::winit::window::Window;
 use log::trace;
 use std::str;
 use std::{ffi::CStr, time::Instant};
-use winit::event::{Event, WindowEvent};
 use winit::platform::run_return::EventLoopExtRunReturn;
 
 use crate::fast3d::graphics::opengl_device::OpenGLGraphicsDevice;
@@ -170,12 +168,17 @@ impl Gui {
                     } => {
                         std::process::exit(0);
                     }
-                    glutin::event::Event::LoopDestroyed => {
-                        trace!("Loop destroyed");
-                        // let gl = ig_renderer.gl_context();
-                        // tri_renderer.destroy(gl);
-                    }
+                    glutin::event::Event::LoopDestroyed => {}
                     event => {
+                        // if event is resize, let's also resize the swapchain
+                        if let glutin::event::Event::WindowEvent {
+                            event: glutin::event::WindowEvent::Resized(physical_size),
+                            ..
+                        } = event
+                        {
+                            self.window.resize(physical_size);
+                        }
+
                         self.platform.handle_event(
                             self.imgui.io_mut(),
                             self.window.window(),
@@ -211,7 +214,6 @@ impl Gui {
             height: size.height,
             aspect_ratio: size.width as f32 / size.height as f32,
         };
-        trace!("Window size: {}x{}", dimensions.width, dimensions.height);
         self.rcp.rdp.output_dimensions = dimensions;
 
         // Get the ImGui context and begin drawing the frame
@@ -249,6 +251,9 @@ impl Gui {
     }
 
     pub fn draw_lists(&mut self, gfx_context: &mut GraphicsContext, commands: usize) -> Result<()> {
+        // Prepare the context device
+        gfx_context.api.start_frame(self.renderer.gl_context());
+
         // Run the RCP
         self.rcp
             .run(self.renderer.gl_context(), gfx_context, commands);
@@ -262,11 +267,6 @@ impl Gui {
         // Swap buffers
         self.window.swap_buffers()?;
 
-        Ok(())
-    }
-
-    pub fn draw_lists_dummy(&mut self) -> Result<()> {
-        self.render()?;
         Ok(())
     }
 
