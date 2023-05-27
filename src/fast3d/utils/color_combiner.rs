@@ -1,5 +1,4 @@
-use crate::fast3d::{gbi::utils::get_cmd, graphics::CompiledProgram, rcp::RCP};
-use std::collections::HashMap;
+use crate::fast3d::gbi::utils::get_cmd;
 
 #[derive(Debug)]
 pub struct ShaderInputMapping {
@@ -257,7 +256,7 @@ impl CombineParams {
 
                                 if input_number[property as usize] == 0 {
                                     input_mapping[i][(next_input_number - 1) as usize] = property;
-                                    input_number[property as usize] = next_input_number as u8;
+                                    input_number[property as usize] = next_input_number;
                                     next_input_number += 1;
 
                                     mirror_mapping[i][j] =
@@ -265,10 +264,9 @@ impl CombineParams {
 
                                     if mirror_mapping[i][j] >= SHADER::ONE
                                         && mirror_mapping[i][j] <= SHADER::FOUR
+                                        && mirror_mapping[i][j] as u8 > num_inputs
                                     {
-                                        if mirror_mapping[i][j] as u8 > num_inputs {
-                                            num_inputs = input_number[property as usize];
-                                        }
+                                        num_inputs = input_number[property as usize];
                                     }
                                 }
                             }
@@ -297,10 +295,9 @@ impl CombineParams {
 
                                     if mirror_mapping[i][j] >= SHADER::ONE
                                         && mirror_mapping[i][j] <= SHADER::FOUR
+                                        && mirror_mapping[i][j] as u8 > num_inputs
                                     {
-                                        if mirror_mapping[i][j] as u8 > num_inputs {
-                                            num_inputs = input_number[property as usize];
-                                        }
+                                        num_inputs = input_number[property as usize];
                                     }
                                 }
                             }

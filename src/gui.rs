@@ -3,7 +3,7 @@ use glutin::{event_loop::EventLoop, Api, ContextWrapper, GlRequest, PossiblyCurr
 use imgui::{Context, FontSource, MouseCursor, Ui};
 use imgui_glow_renderer::{glow, AutoRenderer};
 use imgui_winit_support::winit::window::Window;
-use log::trace;
+
 use std::str;
 use std::{ffi::CStr, time::Instant};
 use winit::platform::run_return::EventLoopExtRunReturn;

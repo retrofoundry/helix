@@ -1,3 +1,5 @@
+use imgui_glow_renderer::glow;
+
 use crate::fast3d::gbi::utils::{
     other_mode_l_uses_alpha, other_mode_l_uses_fog, other_mode_l_uses_noise,
     other_mode_l_uses_texture_edge,
@@ -5,8 +7,6 @@ use crate::fast3d::gbi::utils::{
 
 use crate::fast3d::utils::color_combiner::{CombineParams, ShaderInputMapping, SHADER};
 use std::collections::HashMap;
-
-use super::CompiledProgram;
 
 #[derive(PartialEq, Eq)]
 pub enum ShaderType {
@@ -25,7 +25,7 @@ pub struct OpenGLProgram {
     // Compiled program.
     pub preprocessed_vertex: String,
     pub preprocessed_frag: String,
-    pub compiled_program: Option<CompiledProgram>,
+    pub compiled_program: Option<glow::NativeProgram>,
 
     // inputs
     pub both: String,
@@ -87,7 +87,7 @@ impl OpenGLProgram {
     // MARK: - Preprocessing
 
     pub fn preprocess(&mut self, context_version: ContextVersion) {
-        if self.preprocessed_vertex.len() > 0 {
+        if !self.preprocessed_vertex.is_empty() {
             return;
         }
 
@@ -239,7 +239,7 @@ impl OpenGLProgram {
             self.generate_vtx_inputs_body(),
         );
 
-        self.fragment = self.generate_frag().to_string();
+        self.fragment = self.generate_frag();
     }
 
     fn generate_vtx_inputs_params(&mut self) -> String {
@@ -415,7 +415,6 @@ impl OpenGLProgram {
                 use_alpha,
             ),
         )
-        .to_string()
     }
 
     fn generate_color_combiner_inputs(
@@ -472,7 +471,7 @@ impl OpenGLProgram {
         inputs_have_alpha: bool,
         hint_single_element: bool,
     ) -> String {
-        return if !only_alpha {
+        if !only_alpha {
             match input {
                 SHADER::ZERO => {
                     if with_alpha {
@@ -519,12 +518,10 @@ impl OpenGLProgram {
                 SHADER::TEXEL0A => {
                     if hint_single_element {
                         "texVal0.a"
+                    } else if with_alpha {
+                        "vec4(texVal0.a, texVal0.a, texVal0.a, texVal0.a)"
                     } else {
-                        if with_alpha {
-                            "vec4(texVal0.a, texVal0.a, texVal0.a, texVal0.a)"
-                        } else {
-                            "vec3(texVal0.a, texVal0.a, texVal0.a)"
-                        }
+                        "vec3(texVal0.a, texVal0.a, texVal0.a)"
                     }
                 }
                 SHADER::TEXEL1 => {
@@ -547,6 +544,6 @@ impl OpenGLProgram {
                 SHADER::TEXEL1 => "texVal1.a",
             }
         }
-        .to_string();
+        .to_string()
     }
 }

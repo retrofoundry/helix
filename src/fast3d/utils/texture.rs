@@ -192,9 +192,11 @@ impl TextureManager {
     ) -> Option<&mut Texture> {
         if let Some(value) = self.map.get_mut(&orig_addr) {
             if value.format == format && value.size == size {
-                gfx_context
-                    .api
-                    .select_texture(gl_context, tmem_index as i32, value.texture_id);
+                gfx_context.api.select_texture(
+                    gl_context,
+                    tmem_index as i32,
+                    value.native_texture.unwrap(),
+                );
                 self.lru.retain(|&k| k != orig_addr);
                 self.lru.push_back(orig_addr);
                 return Some(value);
@@ -218,10 +220,10 @@ impl TextureManager {
                 // TODO: Remove texture from gfx_device
             }
         }
-        let texture_id = gfx_context.api.new_texture(gl_context);
+        let native_texture = gfx_context.api.new_texture(gl_context);
         gfx_context
             .api
-            .select_texture(gl_context, tmem_index as i32, texture_id);
+            .select_texture(gl_context, tmem_index as i32, native_texture);
         gfx_context
             .api
             .set_sampler_parameters(gl_context, tmem_index as i32, false, 0, 0);
@@ -229,7 +231,7 @@ impl TextureManager {
             texture_addr: orig_addr,
             format,
             size,
-            texture_id,
+            native_texture: Some(native_texture),
             cms: 0,
             cmt: 0,
             linear_filter: false,
@@ -253,10 +255,10 @@ impl TextureManager {
                 // TODO: Remove texture from gfx_device
             }
         }
-        let texture_id = gfx_context.api.new_texture(gl_context);
+        let native_texture = gfx_context.api.new_texture(gl_context);
         gfx_context
             .api
-            .select_texture(gl_context, tmem_index as i32, texture_id);
+            .select_texture(gl_context, tmem_index as i32, native_texture);
         gfx_context
             .api
             .set_sampler_parameters(gl_context, tmem_index as i32, false, 0, 0);
@@ -264,7 +266,7 @@ impl TextureManager {
             texture_addr: orig_addr,
             format,
             size,
-            texture_id,
+            native_texture: Some(native_texture),
             cms: 0,
             cmt: 0,
             linear_filter: false,
@@ -335,7 +337,7 @@ pub struct Texture {
     pub format: ImageFormat,
     pub size: ImageSize,
 
-    pub texture_id: u32,
+    pub native_texture: Option<glow::NativeTexture>,
     pub cms: u8,
     pub cmt: u8,
 
@@ -347,7 +349,7 @@ impl Texture {
         texture_addr: 0,
         format: ImageFormat::G_IM_FMT_YUV,
         size: ImageSize::G_IM_SIZ_16b,
-        texture_id: 0,
+        native_texture: None,
         cms: 0,
         cmt: 0,
         linear_filter: false,

@@ -1,6 +1,6 @@
 use imgui_glow_renderer::glow;
 
-use crate::fast3d::{graphics::GraphicsContext, rcp::RCP, rdp::RDP, rsp::RSP};
+use crate::fast3d::{graphics::GraphicsContext, rdp::RDP, rsp::RSP};
 
 use super::{
     defines::{Gfx, G_FILLRECT, G_TEXRECT, G_TEXRECTFLIP},

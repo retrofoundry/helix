@@ -1,12 +1,10 @@
-use std::{any::Any, num::NonZeroU32};
+use std::any::Any;
 
-use imgui_glow_renderer::glow::{
-    self, HasContext, NativeProgram, NativeTexture, NativeUniformLocation,
-};
+use imgui_glow_renderer::glow::{self, HasContext};
 
 use crate::fast3d::gbi::defines::G_TX;
 
-use super::{CompiledProgram, GraphicsAPI};
+use super::{opengl_program::OpenGLProgram, GraphicsAPI};
 
 const FLOAT_SIZE: usize = std::mem::size_of::<f32>();
 
@@ -34,52 +32,6 @@ impl OpenGLGraphicsDevice {
             frame_count: 0,
             current_height: 0,
         }
-    }
-
-    unsafe fn set_vertex_array_attrib(&self, gl: &glow::Context, shader: &CompiledProgram) {
-        let mut position = 0;
-
-        for i in 0..(*shader).num_attribs {
-            gl.enable_vertex_attrib_array((*shader).attrib_locations[i as usize] as u32);
-            gl.vertex_attrib_pointer_f32(
-                (*shader).attrib_locations[i as usize] as u32,
-                (*shader).attrib_sizes[i as usize] as i32,
-                glow::FLOAT,
-                false,
-                (*shader).num_floats as i32 * FLOAT_SIZE as i32,
-                position * FLOAT_SIZE as i32,
-            );
-
-            position += (*shader).attrib_sizes[i as usize] as i32;
-        }
-    }
-
-    unsafe fn set_uniforms(&self, gl: &glow::Context, shader: &CompiledProgram) {
-        if (*shader).used_noise {
-            gl.uniform_1_i32(
-                Some(&NativeUniformLocation((*shader).noise_location as u32)),
-                self.frame_count,
-            );
-            gl.uniform_1_i32(
-                Some(&NativeUniformLocation(
-                    (*shader).noise_scale_location as u32,
-                )),
-                self.current_height,
-            );
-        }
-
-        // // set uniforms
-        // if (*shader).used_noise {
-        //     // TODO: verify this works and if so we don't need to store uniform locations into shader program object
-        //     gl.uniform_1_i32(
-        // Some(&gl.get_uniform_location(program, "uNoise").unwrap()),
-        //         self.frame_count,
-        //     );
-        //     gl.uniform_1_i32(
-        //         Some(&gl.get_uniform_location(program, "uNoiseScale").unwrap()),
-        //         self.current_height,
-        //     );
-        // }
     }
 
     fn gfx_cm_to_opengl(val: u32) -> i32 {
@@ -136,34 +88,48 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
         false
     }
 
-    fn unload_shader(&self, gl: &glow::Context, shader: &CompiledProgram) {
+    fn unload_program(&self, gl: &glow::Context, program: &OpenGLProgram) {
         unsafe {
-            for i in 0..(*shader).num_attribs {
-                gl.disable_vertex_attrib_array((*shader).attrib_locations[i as usize] as u32);
+            let native_program = program.compiled_program.unwrap();
+
+            let vtx_pos = gl.get_attrib_location(native_program, "aVtxPos").unwrap();
+            gl.disable_vertex_attrib_array(vtx_pos);
+
+            if program.get_define_bool("USE_TEXTURE0") || program.get_define_bool("USE_TEXTURE1") {
+                let tex_coord = gl.get_attrib_location(native_program, "aTexCoord").unwrap();
+                gl.disable_vertex_attrib_array(tex_coord);
+            }
+
+            if program.get_define_bool("USE_FOG") {
+                let fog = gl.get_attrib_location(native_program, "aFog").unwrap();
+                gl.disable_vertex_attrib_array(fog);
+            }
+
+            for i in 0..program.shader_input_mapping.num_inputs {
+                let input = gl
+                    .get_attrib_location(native_program, &format!("aInput{}", i + 1))
+                    .unwrap();
+                gl.disable_vertex_attrib_array(input);
             }
         }
     }
 
-    fn new_shader(
-        &self,
-        gl: &glow::Context,
-        vertex: String,
-        fragment: String,
-        num_floats: usize,
-        uses_tex0: bool,
-        uses_tex1: bool,
-        uses_fog: bool,
-        uses_alpha: bool,
-        uses_noise: bool,
-        num_inputs: u8,
-    ) -> CompiledProgram {
+    fn compile_program(&self, gl: &glow::Context, program: &mut OpenGLProgram) {
         unsafe {
             let mut shaders = [
-                (glow::VERTEX_SHADER, vertex, None),
-                (glow::FRAGMENT_SHADER, fragment, None),
+                (
+                    glow::VERTEX_SHADER,
+                    program.preprocessed_vertex.clone(),
+                    None,
+                ),
+                (
+                    glow::FRAGMENT_SHADER,
+                    program.preprocessed_frag.clone(),
+                    None,
+                ),
             ];
 
-            let program = gl.create_program().expect("Cannot create program");
+            let native_program = gl.create_program().expect("Cannot create program");
 
             for (kind, source, handle) in &mut shaders {
                 let shader = gl.create_shader(*kind).expect("Cannot create shader");
@@ -173,96 +139,133 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
                     panic!("{}", gl.get_shader_info_log(shader));
                 }
 
-                gl.attach_shader(program, shader);
+                gl.attach_shader(native_program, shader);
                 *handle = Some(shader);
             }
 
-            gl.link_program(program);
-            if !gl.get_program_link_status(program) {
-                panic!("{}", gl.get_program_info_log(program));
+            gl.link_program(native_program);
+            if !gl.get_program_link_status(native_program) {
+                panic!("{}", gl.get_program_info_log(native_program));
             }
-
-            // Grab the locations of the attributes
-            let mut count: usize = 0;
-
-            let mut shader_program = CompiledProgram::new();
-            shader_program.attrib_locations[count] =
-                gl.get_attrib_location(program, "aVtxPos").unwrap() as i32;
-            shader_program.attrib_sizes[count] = 4;
-            count += 1;
-
-            if uses_tex0 || uses_tex1 {
-                shader_program.attrib_locations[count] =
-                    gl.get_attrib_location(program, "aTexCoord").unwrap() as i32;
-                shader_program.attrib_sizes[count] = 2;
-                count += 1;
-            }
-
-            if uses_fog {
-                shader_program.attrib_locations[count] =
-                    gl.get_attrib_location(program, "aFog").unwrap() as i32;
-                shader_program.attrib_sizes[count] = 1;
-                count += 1;
-            }
-
-            for i in 0..num_inputs {
-                shader_program.attrib_locations[count] = gl
-                    .get_attrib_location(program, &format!("aInput{}", i + 1))
-                    .unwrap() as i32;
-                shader_program.attrib_sizes[count] = if uses_alpha { 4 } else { 3 };
-                count += 1;
-            }
-
-            shader_program.opengl_program_id = program.0.into();
-            shader_program.num_attribs = count as u8;
-            shader_program.num_floats = num_floats as u8;
 
             // Handle uniforms
 
-            if uses_tex0 {
-                let sampler_location = gl.get_uniform_location(program, "uTex0").unwrap();
+            if program.get_define_bool("USE_TEXTURE0") {
+                let sampler_location = gl.get_uniform_location(native_program, "uTex0").unwrap();
                 gl.uniform_1_i32(Some(&sampler_location), 0);
             }
 
-            if uses_tex1 {
-                let sampler_location = gl.get_uniform_location(program, "uTex1").unwrap();
+            if program.get_define_bool("USE_TEXTURE1") {
+                let sampler_location = gl.get_uniform_location(native_program, "uTex1").unwrap();
                 gl.uniform_1_i32(Some(&sampler_location), 1);
             }
 
-            if uses_alpha && uses_noise {
-                shader_program.used_noise = true;
-                shader_program.noise_location =
-                    gl.get_uniform_location(program, "uNoise").unwrap().0 as i32;
-                shader_program.noise_scale_location =
-                    gl.get_uniform_location(program, "uNoiseScale").unwrap().0 as i32;
-            } else {
-                shader_program.used_noise = false;
-            }
-
-            shader_program
+            program.compiled_program = Some(native_program);
         }
     }
 
-    fn load_shader(&self, gl: &glow::Context, shader: &CompiledProgram) {
+    fn load_program(&self, gl: &glow::Context, program: &OpenGLProgram) {
         unsafe {
-            let program = NativeProgram(NonZeroU32::new((*shader).opengl_program_id).unwrap());
-            gl.use_program(Some(program));
-            self.set_vertex_array_attrib(gl, shader);
-            self.set_uniforms(gl, shader);
+            let native_program = program.compiled_program;
+            gl.use_program(native_program);
+            let native_program = native_program.unwrap();
+
+            // Set the vertex attributes
+            let mut accumulated_offset = 0;
+
+            let vtx_pos = gl.get_attrib_location(native_program, "aVtxPos").unwrap();
+            gl.enable_vertex_attrib_array(vtx_pos);
+            gl.vertex_attrib_pointer_f32(
+                vtx_pos,
+                4,
+                glow::FLOAT,
+                false,
+                program.num_floats as i32 * FLOAT_SIZE as i32,
+                0,
+            );
+            accumulated_offset += 4;
+
+            if program.get_define_bool("USE_TEXTURE0") || program.get_define_bool("USE_TEXTURE1") {
+                let tex_coord = gl.get_attrib_location(native_program, "aTexCoord").unwrap();
+                gl.enable_vertex_attrib_array(tex_coord);
+                gl.vertex_attrib_pointer_f32(
+                    tex_coord,
+                    2,
+                    glow::FLOAT,
+                    false,
+                    program.num_floats as i32 * FLOAT_SIZE as i32,
+                    accumulated_offset * FLOAT_SIZE as i32,
+                );
+
+                accumulated_offset += 2;
+            }
+
+            if program.get_define_bool("USE_FOG") {
+                let fog = gl.get_attrib_location(native_program, "aFog").unwrap();
+                gl.enable_vertex_attrib_array(fog);
+                gl.vertex_attrib_pointer_f32(
+                    fog,
+                    1,
+                    glow::FLOAT,
+                    false,
+                    program.num_floats as i32 * FLOAT_SIZE as i32,
+                    accumulated_offset * FLOAT_SIZE as i32,
+                );
+
+                accumulated_offset += 1;
+            }
+
+            for i in 0..program.shader_input_mapping.num_inputs {
+                let input = gl
+                    .get_attrib_location(native_program, &format!("aInput{}", i + 1))
+                    .unwrap();
+                gl.enable_vertex_attrib_array(input);
+
+                let size = if program.get_define_bool("USE_ALPHA") {
+                    4
+                } else {
+                    3
+                };
+
+                gl.vertex_attrib_pointer_f32(
+                    input,
+                    size,
+                    glow::FLOAT,
+                    false,
+                    program.num_floats as i32 * FLOAT_SIZE as i32,
+                    accumulated_offset * FLOAT_SIZE as i32,
+                );
+
+                accumulated_offset += size;
+            }
+
+            // Set the uniforms
+
+            if program.get_define_bool("USE_ALPHA") && program.get_define_bool("USE_NOISE") {
+                // TODO: verify this works and if so we don't need to store uniform locations into shader program object
+                gl.uniform_1_i32(
+                    Some(&gl.get_uniform_location(native_program, "uNoise").unwrap()),
+                    self.frame_count,
+                );
+                gl.uniform_1_i32(
+                    Some(
+                        &gl.get_uniform_location(native_program, "uNoiseScale")
+                            .unwrap(),
+                    ),
+                    self.current_height,
+                );
+            }
         };
     }
 
-    fn new_texture(&self, gl: &glow::Context) -> u32 {
-        unsafe { gl.create_texture().unwrap().0.into() }
+    fn new_texture(&self, gl: &glow::Context) -> glow::NativeTexture {
+        unsafe { gl.create_texture().unwrap() }
     }
 
-    fn select_texture(&self, gl: &glow::Context, tile: i32, id: u32) {
+    fn select_texture(&self, gl: &glow::Context, tile: i32, texture: glow::NativeTexture) {
         unsafe {
             gl.active_texture(glow::TEXTURE0 + tile as u32);
-            gl.bind_texture(
-                glow::TEXTURE_2D,
-                Some(NativeTexture(NonZeroU32::new(id).unwrap())),
-            );
+            gl.bind_texture(glow::TEXTURE_2D, Some(texture));
         }
     }
 

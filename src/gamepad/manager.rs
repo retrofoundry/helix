@@ -76,7 +76,7 @@ impl GamepadManager {
 // MARK: - C API
 
 #[no_mangle]
-pub pub extern "C" fn GamepadManagerCreate() -> Box<GamepadManager> {
+pub extern "C" fn GamepadManagerCreate() -> Box<GamepadManager> {
     let hub = GamepadManager::new();
     Box::new(hub)
 }

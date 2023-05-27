@@ -2,38 +2,10 @@ use imgui_glow_renderer::glow;
 use std::any::Any;
 use wgpu::{BlendState, CompareFunction};
 
+use self::opengl_program::OpenGLProgram;
+
 pub mod opengl_device;
 pub mod opengl_program;
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct CompiledProgram {
-    pub shader_id: u32,
-    pub opengl_program_id: u32,
-    pub num_floats: u8,
-    pub attrib_locations: [i32; 7],
-    pub attrib_sizes: [u8; 7],
-    pub num_attribs: u8,
-    pub used_noise: bool,
-    pub noise_location: i32,
-    pub noise_scale_location: i32,
-}
-
-impl CompiledProgram {
-    pub fn new() -> Self {
-        CompiledProgram {
-            shader_id: 0,
-            opengl_program_id: 0,
-            num_floats: 0,
-            attrib_locations: [0; 7],
-            attrib_sizes: [0; 7],
-            num_attribs: 0,
-            used_noise: false,
-            noise_location: 0,
-            noise_scale_location: 0,
-        }
-    }
-}
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,23 +20,11 @@ pub trait GraphicsAPI {
     fn as_any_ref(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
     fn z_is_from_0_to_1(&self) -> bool;
-    fn unload_shader(&self, gl: &glow::Context, shader: &CompiledProgram);
-    fn new_shader(
-        &self,
-        gl: &glow::Context,
-        vertex: String,
-        fragment: String,
-        num_floats: usize,
-        uses_tex0: bool,
-        uses_tex1: bool,
-        uses_fog: bool,
-        uses_alpha: bool,
-        uses_noise: bool,
-        num_inputs: u8,
-    ) -> CompiledProgram;
-    fn load_shader(&self, gl: &glow::Context, shader: &CompiledProgram);
-    fn new_texture(&self, gl: &glow::Context) -> u32;
-    fn select_texture(&self, gl: &glow::Context, unit: i32, id: u32);
+    fn unload_program(&self, gl: &glow::Context, program: &OpenGLProgram);
+    fn compile_program(&self, gl: &glow::Context, program: &mut OpenGLProgram);
+    fn load_program(&self, gl: &glow::Context, program: &OpenGLProgram);
+    fn new_texture(&self, gl: &glow::Context) -> glow::NativeTexture;
+    fn select_texture(&self, gl: &glow::Context, unit: i32, texture: glow::NativeTexture);
     fn upload_texture(&self, gl: &glow::Context, data: *const u8, width: i32, height: i32);
     fn set_sampler_parameters(&self, gl: &glow::Context, unit: i32, linear: bool, s: u32, t: u32);
     fn set_depth_test(&self, gl: &glow::Context, enable: bool);

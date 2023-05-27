@@ -4,11 +4,9 @@ use std::hash::{Hash, Hasher};
 
 use imgui_glow_renderer::glow;
 use log::trace;
-use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState, CompareFunction};
+use wgpu::{BlendState, CompareFunction};
 
-use crate::fast3d::gbi::utils::{
-    other_mode_l_uses_alpha, other_mode_l_uses_texture_edge, translate_blend_param_b,
-};
+use crate::fast3d::gbi::utils::{other_mode_l_uses_alpha, other_mode_l_uses_texture_edge};
 
 use super::graphics::opengl_program::ContextVersion;
 use super::{
@@ -18,12 +16,11 @@ use super::{
             get_cycle_type_from_other_mode_h, get_textfilter_from_other_mode_h, translate_cull_mode,
         },
     },
-    graphics::{CompiledProgram, CullMode, GraphicsContext},
-    rcp::RCP,
+    graphics::GraphicsContext,
     rsp::RSPGeometry,
     utils::{
         color::Color,
-        color_combiner::{CombineParams, ACMUX, CCMUX, SHADER},
+        color_combiner::CombineParams,
         texture::{
             translate_tile_ci4, translate_tile_ci8, translate_tile_i4, translate_tile_i8,
             translate_tile_ia16, translate_tile_ia4, translate_tile_ia8, translate_tile_rgba16,
@@ -528,20 +525,8 @@ impl RDP {
         program.init();
         program.preprocess(ContextVersion::OpenGL330);
 
-        let compiled_program = gfx_context.api.new_shader(
-            gl_context,
-            program.preprocessed_vertex.clone(),
-            program.preprocessed_frag.clone(),
-            program.num_floats,
-            program.get_define_bool("USE_TEXTURE0"),
-            program.get_define_bool("USE_TEXTURE1"),
-            program.get_define_bool("USE_FOG"),
-            program.get_define_bool("USE_ALPHA"),
-            program.get_define_bool("USE_NOISE"),
-            program.shader_input_mapping.num_inputs,
-        );
+        gfx_context.api.compile_program(gl_context, &mut program);
 
-        program.compiled_program = Some(compiled_program);
         self.shader_cache.insert(hash, program);
 
         hash
