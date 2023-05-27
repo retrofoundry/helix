@@ -687,18 +687,3 @@ impl RDP {
         self.buf_vbo_len += 1;
     }
 }
-
-// MARK: - C Bridge
-
-#[no_mangle]
-pub extern "C" fn RDPSetOutputDimensions(rcp: Option<&mut RCP>, dimensions: OutputDimensions) {
-    let rcp = rcp.unwrap();
-    rcp.rdp.output_dimensions = dimensions;
-}
-
-#[no_mangle]
-pub extern "C" fn RDPFlush(rcp: Option<&mut RCP>, gfx_context: Option<&mut GraphicsContext>) {
-    let rcp = rcp.unwrap();
-    let gfx_context = gfx_context.unwrap();
-    // rcp.rdp.flush(gfx_context);
-}

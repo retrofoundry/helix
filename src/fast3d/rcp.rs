@@ -76,32 +76,3 @@ impl RCP {
         }
     }
 }
-
-// MARK: C Bridge
-
-#[no_mangle]
-pub extern "C" fn RCPReset(rcp: Option<&mut RCP>) {
-    let rcp = rcp.unwrap();
-    rcp.reset();
-}
-
-#[no_mangle]
-pub extern "C" fn RCPCreate() -> Box<RCP> {
-    let rcp = RCP::new();
-    Box::new(rcp)
-}
-
-#[no_mangle]
-pub extern "C" fn RCPRunDL(
-    rcp: Option<&mut RCP>,
-    gfx_context: Option<&mut GraphicsContext>,
-    commands: usize,
-) {
-    let rcp = rcp.unwrap();
-    let gfx_context = gfx_context.unwrap();
-
-    unsafe {
-        let gl_context = glow::Context::from_loader_function(|_| std::ptr::null());
-        rcp.run_dl(&gl_context, gfx_context, commands);
-    }
-}
