@@ -566,7 +566,6 @@ impl F3DEX2 {
         let shader_hash = rdp
             .lookup_or_create_program(gl_context, gfx_context)
             .clone();
-        let new_program = rdp.shader_cache.get(&shader_hash).unwrap().compiled_program;
 
         if shader_hash != rdp.rendering_state.shader_program_hash {
             rdp.flush(gl_context, gfx_context);
@@ -577,10 +576,17 @@ impl F3DEX2 {
             {
                 gfx_context
                     .api
-                    .unload_shader(gl_context, old_program.compiled_program);
+                    .unload_shader(gl_context, old_program.compiled_program.as_ref().unwrap());
             }
 
-            gfx_context.api.load_shader(gl_context, new_program);
+            let new_program = rdp
+                .shader_cache
+                .get(&shader_hash)
+                .unwrap()
+                .compiled_program
+                .as_ref()
+                .unwrap();
+            gfx_context.api.load_shader(gl_context, &new_program);
             rdp.rendering_state.shader_program_hash = shader_hash;
         }
 

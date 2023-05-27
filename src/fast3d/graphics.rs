@@ -2,13 +2,12 @@ use imgui_glow_renderer::glow;
 use std::any::Any;
 use wgpu::{BlendState, CompareFunction};
 
-pub mod dummy_device;
-mod extern_device;
 pub mod opengl_device;
 pub mod opengl_program;
 
 #[repr(C)]
-pub struct ShaderProgram {
+#[derive(Debug)]
+pub struct CompiledProgram {
     pub shader_id: u32,
     pub opengl_program_id: u32,
     pub num_floats: u8,
@@ -20,9 +19,9 @@ pub struct ShaderProgram {
     pub noise_scale_location: i32,
 }
 
-impl ShaderProgram {
+impl CompiledProgram {
     pub fn new() -> Self {
-        ShaderProgram {
+        CompiledProgram {
             shader_id: 0,
             opengl_program_id: 0,
             num_floats: 0,
@@ -49,7 +48,7 @@ pub trait GraphicsAPI {
     fn as_any_ref(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
     fn z_is_from_0_to_1(&self) -> bool;
-    fn unload_shader(&self, gl: &glow::Context, shader: *mut ShaderProgram);
+    fn unload_shader(&self, gl: &glow::Context, shader: &CompiledProgram);
     fn new_shader(
         &self,
         gl: &glow::Context,
@@ -62,8 +61,8 @@ pub trait GraphicsAPI {
         uses_alpha: bool,
         uses_noise: bool,
         num_inputs: u8,
-    ) -> *mut ShaderProgram;
-    fn load_shader(&self, gl: &glow::Context, shader: *mut ShaderProgram);
+    ) -> CompiledProgram;
+    fn load_shader(&self, gl: &glow::Context, shader: &CompiledProgram);
     fn new_texture(&self, gl: &glow::Context) -> u32;
     fn select_texture(&self, gl: &glow::Context, unit: i32, id: u32);
     fn upload_texture(&self, gl: &glow::Context, data: *const u8, width: i32, height: i32);

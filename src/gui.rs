@@ -12,10 +12,7 @@ use winit::platform::run_return::EventLoopExtRunReturn;
 
 use crate::fast3d::graphics::opengl_device::OpenGLGraphicsDevice;
 use crate::fast3d::rdp::OutputDimensions;
-use crate::fast3d::{
-    graphics::{dummy_device::DummyGraphicsDevice, GraphicsContext},
-    rcp::RCP,
-};
+use crate::fast3d::{graphics::GraphicsContext, rcp::RCP};
 
 pub struct Gui {
     // window
@@ -328,25 +325,6 @@ pub extern "C" fn GUIDrawLists(
 }
 
 #[no_mangle]
-pub extern "C" fn GUIDrawListsDummy(
-    gui: Option<&mut Gui>,
-    gfx_context: Option<&mut GraphicsContext>,
-) {
-    let gui = gui.unwrap();
-    let gfx_context = gfx_context.unwrap();
-
-    let dummy_device = gfx_context
-        .api
-        .as_any_mut()
-        .downcast_mut::<DummyGraphicsDevice>()
-        .unwrap();
-
-    dummy_device.render(gui.renderer.gl_context());
-
-    gui.draw_lists_dummy().unwrap();
-}
-
-#[no_mangle]
 pub extern "C" fn GUICreateGraphicsContext(gui: Option<&mut Gui>) -> Box<GraphicsContext> {
     let gui: &mut Gui = gui.unwrap();
     let opengl_device = OpenGLGraphicsDevice::new(gui.renderer.gl_context());
@@ -357,4 +335,10 @@ pub extern "C" fn GUICreateGraphicsContext(gui: Option<&mut Gui>) -> Box<Graphic
 pub extern "C" fn GUIEndFrame(gui: Option<&mut Gui>) {
     let gui = gui.unwrap();
     gui.end_frame();
+}
+
+#[no_mangle]
+pub extern "C" fn GUIGetAspectRatio(gui: Option<&mut Gui>) -> f32 {
+    let gui = gui.unwrap();
+    gui.rcp.rdp.output_dimensions.aspect_ratio
 }

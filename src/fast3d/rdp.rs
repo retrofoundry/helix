@@ -18,14 +18,12 @@ use super::{
             get_cycle_type_from_other_mode_h, get_textfilter_from_other_mode_h, translate_cull_mode,
         },
     },
-    graphics::{CullMode, GraphicsContext, ShaderProgram},
+    graphics::{CompiledProgram, CullMode, GraphicsContext},
     rcp::RCP,
     rsp::RSPGeometry,
     utils::{
         color::Color,
-        color_combiner::{
-            ColorCombiner, ColorCombinerManager, CombineParams, ACMUX, CCMUX, SHADER,
-        },
+        color_combiner::{CombineParams, ACMUX, CCMUX, SHADER},
         texture::{
             translate_tile_ci4, translate_tile_ci8, translate_tile_i4, translate_tile_i8,
             translate_tile_ia16, translate_tile_ia4, translate_tile_ia8, translate_tile_rgba16,
@@ -227,7 +225,6 @@ pub struct RDP {
     pub tmem_map: HashMap<u16, TMEMMapEntry>, // tmem address -> texture image state address
     pub textures_changed: [bool; 2],
 
-    pub color_combiner_manager: ColorCombinerManager,
     pub shader_cache: HashMap<u64, OpenGLProgram>,
 
     pub viewport: Rect,
@@ -266,7 +263,6 @@ impl RDP {
             tmem_map: HashMap::new(),
             textures_changed: [false; 2],
 
-            color_combiner_manager: ColorCombinerManager::new(),
             shader_cache: HashMap::new(),
 
             viewport: Rect::ZERO,
@@ -545,7 +541,7 @@ impl RDP {
             program.shader_input_mapping.num_inputs,
         );
 
-        program.compiled_program = compiled_program;
+        program.compiled_program = Some(compiled_program);
         self.shader_cache.insert(hash, program);
 
         hash

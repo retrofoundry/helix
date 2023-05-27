@@ -42,6 +42,7 @@ impl RCP {
     ) {
         self.reset();
 
+        gfx_context.api.start_frame(gl_context);
         self.run_dl(gl_context, gfx_context, commands);
         self.rdp.flush(gl_context, gfx_context);
     }

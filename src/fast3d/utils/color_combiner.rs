@@ -1,4 +1,4 @@
-use crate::fast3d::{gbi::utils::get_cmd, graphics::ShaderProgram, rcp::RCP};
+use crate::fast3d::{gbi::utils::get_cmd, graphics::CompiledProgram, rcp::RCP};
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -423,71 +423,4 @@ impl SHADER {
             _ => panic!("Invalid SHADER value: {}", val),
         }
     }
-}
-
-pub struct ColorCombinerManager {
-    pub combiners: HashMap<u32, ColorCombiner>,
-    pub current_combiner: Option<u32>,
-}
-
-impl ColorCombinerManager {
-    pub fn new() -> Self {
-        Self {
-            combiners: HashMap::new(),
-            current_combiner: None,
-        }
-    }
-
-    pub fn lookup_color_combiner(&mut self, cc_id: u32) -> Option<&ColorCombiner> {
-        if let Some(current_cc_id) = self.current_combiner {
-            if current_cc_id == cc_id {
-                if let Some(cc) = self.combiners.get(&cc_id) {
-                    return Some(cc);
-                }
-            }
-        }
-
-        if let Some(cc) = self.combiners.get(&cc_id) {
-            self.current_combiner = Some(cc_id);
-            return Some(cc);
-        }
-
-        None
-    }
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct ColorCombiner {
-    pub cc_id: u32,
-    pub prg: *mut ShaderProgram,
-    pub shader_input_mapping: [[u8; 4]; 2],
-}
-
-impl ColorCombiner {
-    pub fn new(
-        shader_id: u32,
-        shader_program: *mut ShaderProgram,
-        shader_input_mapping: [[u8; 4]; 2],
-    ) -> Self {
-        Self {
-            cc_id: shader_id,
-            prg: shader_program,
-            shader_input_mapping,
-        }
-    }
-}
-
-// MARK: - C Bridge
-
-#[no_mangle]
-pub extern "C" fn RDPGetColorCombiner(rcp: Option<&mut RCP>, cc_id: u32) -> *const ColorCombiner {
-    let rcp = rcp.unwrap();
-    let color_combiner = rcp
-        .rdp
-        .color_combiner_manager
-        .combiners
-        .get_mut(&cc_id)
-        .unwrap();
-    color_combiner as *const ColorCombiner
 }

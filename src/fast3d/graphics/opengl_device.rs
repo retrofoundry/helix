@@ -1,10 +1,12 @@
 use std::{any::Any, num::NonZeroU32};
 
-use imgui_glow_renderer::glow::{self, HasContext, NativeProgram, NativeTexture, NativeUniformLocation};
+use imgui_glow_renderer::glow::{
+    self, HasContext, NativeProgram, NativeTexture, NativeUniformLocation,
+};
 
 use crate::fast3d::gbi::defines::G_TX;
 
-use super::{GraphicsAPI, ShaderProgram};
+use super::{CompiledProgram, GraphicsAPI};
 
 const FLOAT_SIZE: usize = std::mem::size_of::<f32>();
 
@@ -34,7 +36,7 @@ impl OpenGLGraphicsDevice {
         }
     }
 
-    unsafe fn set_vertex_array_attrib(&self, gl: &glow::Context, shader: *mut ShaderProgram) {
+    unsafe fn set_vertex_array_attrib(&self, gl: &glow::Context, shader: &CompiledProgram) {
         let mut position = 0;
 
         for i in 0..(*shader).num_attribs {
@@ -45,24 +47,32 @@ impl OpenGLGraphicsDevice {
                 glow::FLOAT,
                 false,
                 (*shader).num_floats as i32 * FLOAT_SIZE as i32,
-                position * FLOAT_SIZE as i32
+                position * FLOAT_SIZE as i32,
             );
 
             position += (*shader).attrib_sizes[i as usize] as i32;
         }
     }
 
-    unsafe fn set_uniforms(&self, gl: &glow::Context, shader: *mut ShaderProgram) {
-        if (*shader).used_noise {   
-            gl.uniform_1_i32(Some(&NativeUniformLocation((*shader).noise_location as u32)), self.frame_count);
-            gl.uniform_1_i32(Some(&NativeUniformLocation((*shader).noise_scale_location as u32)), self.current_height);
+    unsafe fn set_uniforms(&self, gl: &glow::Context, shader: &CompiledProgram) {
+        if (*shader).used_noise {
+            gl.uniform_1_i32(
+                Some(&NativeUniformLocation((*shader).noise_location as u32)),
+                self.frame_count,
+            );
+            gl.uniform_1_i32(
+                Some(&NativeUniformLocation(
+                    (*shader).noise_scale_location as u32,
+                )),
+                self.current_height,
+            );
         }
 
         // // set uniforms
         // if (*shader).used_noise {
         //     // TODO: verify this works and if so we don't need to store uniform locations into shader program object
         //     gl.uniform_1_i32(
-                // Some(&gl.get_uniform_location(program, "uNoise").unwrap()),
+        // Some(&gl.get_uniform_location(program, "uNoise").unwrap()),
         //         self.frame_count,
         //     );
         //     gl.uniform_1_i32(
@@ -126,12 +136,10 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
         false
     }
 
-    fn unload_shader(&self, gl: &glow::Context, shader: *mut ShaderProgram) {
-        if !shader.is_null() {
-            unsafe {
-                for i in 0..(*shader).num_attribs {
-                    gl.disable_vertex_attrib_array((*shader).attrib_locations[i as usize] as u32);
-                }
+    fn unload_shader(&self, gl: &glow::Context, shader: &CompiledProgram) {
+        unsafe {
+            for i in 0..(*shader).num_attribs {
+                gl.disable_vertex_attrib_array((*shader).attrib_locations[i as usize] as u32);
             }
         }
     }
@@ -148,7 +156,7 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
         uses_alpha: bool,
         uses_noise: bool,
         num_inputs: u8,
-    ) -> ShaderProgram {
+    ) -> CompiledProgram {
         unsafe {
             let mut shaders = [
                 (glow::VERTEX_SHADER, vertex, None),
@@ -177,7 +185,7 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
             // Grab the locations of the attributes
             let mut count: usize = 0;
 
-            let mut shader_program = ShaderProgram::new();
+            let mut shader_program = CompiledProgram::new();
             shader_program.attrib_locations[count] =
                 gl.get_attrib_location(program, "aVtxPos").unwrap() as i32;
             shader_program.attrib_sizes[count] = 4;
@@ -235,7 +243,7 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
         }
     }
 
-    fn load_shader(&self, gl: &glow::Context, shader: *mut ShaderProgram) {
+    fn load_shader(&self, gl: &glow::Context, shader: &CompiledProgram) {
         unsafe {
             let program = NativeProgram(NonZeroU32::new((*shader).opengl_program_id).unwrap());
             gl.use_program(Some(program));
@@ -415,10 +423,7 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
         buf_vbo_num_tris: usize,
     ) {
         unsafe {
-            let data = std::slice::from_raw_parts(
-                buf_vbo as *const u8,
-                buf_vbo_len * FLOAT_SIZE,
-            );
+            let data = std::slice::from_raw_parts(buf_vbo as *const u8, buf_vbo_len * FLOAT_SIZE);
 
             gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, data, glow::STREAM_DRAW);
             gl.draw_arrays(glow::TRIANGLES, 0, buf_vbo_num_tris as i32 * 3);

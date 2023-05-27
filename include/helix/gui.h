@@ -3,17 +3,17 @@
 
 #include <stdint.h>
 
+#include <libultra/ultratypes.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void* GUICreateEventLoop(void);
-void* GUICreate(const char* title, void* event_loop, void (*draw_menu_callback)());
-void* GUICreateGraphicsContext(void* gui);
-void GUIStartFrame(void* gui, void* event_loop);
-void GUIDrawLists(void* gui, void* gfx_context, uint64_t* commands);
-void GUIDrawListsDummy(void* gui, void* gfx_context);
-void GUIEndFrame(void* gui);
+void HLXDisplaySetup(const char* title, void (*draw_menu)());
+void HLXDisplayStartFrame();
+void HLXDisplayProcessDrawLists(u64* commands);
+void HLXDisplayEndFrame();
+float HLXDisplayGetAspectRatio();
 
 #ifdef __cplusplus
 }

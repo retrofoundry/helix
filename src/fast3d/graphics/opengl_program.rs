@@ -6,7 +6,7 @@ use crate::fast3d::gbi::utils::{
 use crate::fast3d::utils::color_combiner::{CombineParams, ShaderInputMapping, SHADER};
 use std::collections::HashMap;
 
-use super::ShaderProgram;
+use super::CompiledProgram;
 
 #[derive(PartialEq, Eq)]
 pub enum ShaderType {
@@ -25,7 +25,7 @@ pub struct OpenGLProgram {
     // Compiled program.
     pub preprocessed_vertex: String,
     pub preprocessed_frag: String,
-    pub compiled_program: *mut ShaderProgram,
+    pub compiled_program: Option<CompiledProgram>,
 
     // inputs
     pub both: String,
@@ -153,7 +153,7 @@ impl OpenGLProgram {
         Self {
             preprocessed_vertex: "".to_string(),
             preprocessed_frag: "".to_string(),
-            compiled_program: std::ptr::null_mut(),
+            compiled_program: None,
 
             both: "".to_string(),
             vertex: "".to_string(),
