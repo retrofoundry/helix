@@ -5,7 +5,7 @@ use crate::fast3d::gbi::utils::{
     other_mode_l_uses_texture_edge,
 };
 
-use crate::fast3d::utils::color_combiner::{CombineParams, ShaderInputMapping, SHADER};
+use crate::fast3d::utils::color_combiner::{CombineParams, ShaderInputMapping, SHADER, CCMUX, ACMUX};
 use std::collections::HashMap;
 
 #[derive(PartialEq, Eq)]
@@ -170,6 +170,9 @@ impl OpenGLProgram {
     }
 
     pub fn init(&mut self) {
+        // for debugging
+        self.set_define_bool("USE_ALPHA_VISUALIZER".to_string(), false);
+
         self.set_define_bool("USE_TEXTURE0".to_string(), self.combine.uses_texture0());
         self.set_define_bool("USE_TEXTURE1".to_string(), self.combine.uses_texture1());
         self.set_define_bool(
@@ -183,8 +186,7 @@ impl OpenGLProgram {
         );
         self.set_define_bool(
             "USE_ALPHA".to_string(),
-            other_mode_l_uses_alpha(self.other_mode_l)
-                || other_mode_l_uses_texture_edge(self.other_mode_l),
+            other_mode_l_uses_alpha(self.other_mode_l) || other_mode_l_uses_texture_edge(self.other_mode_l),
         );
         self.set_define_bool(
             "USE_NOISE".to_string(),
@@ -344,6 +346,11 @@ impl OpenGLProgram {
                     texel.a *= floor(random(vec3(floor(gl_FragCoord.xy * (240.0 / float(uNoiseScale))), float(uNoise))) + 0.5);
                 #endif
 
+                #if defined(USE_ALPHA) && defined(USE_ALPHA_VISUALIZER)
+                    texel.rgb = vec3(texel.a);
+                    texel.a = 1.0;
+                #endif
+
                 #ifdef USE_ALPHA
                     gl_FragColor = texel;
                 #else
@@ -358,20 +365,16 @@ impl OpenGLProgram {
 
     fn generate_color_combiner(&mut self) -> String {
         let do_single: [bool; 2] = [
-            self.shader_input_mapping.mirror_mapping[0][2] == SHADER::ZERO,
-            self.shader_input_mapping.mirror_mapping[1][2] == SHADER::ZERO,
+            self.combine.c0.c == CCMUX::COMBINED,
+            self.combine.a0.c == ACMUX::COMBINED__LOD_FRAC,
         ];
         let do_multiply: [bool; 2] = [
-            self.shader_input_mapping.mirror_mapping[0][1] == SHADER::ZERO
-                && self.shader_input_mapping.mirror_mapping[0][3] == SHADER::ZERO,
-            self.shader_input_mapping.mirror_mapping[1][1] == SHADER::ZERO
-                && self.shader_input_mapping.mirror_mapping[1][3] == SHADER::ZERO,
+            self.combine.c0.b == CCMUX::COMBINED && self.combine.c0.d == CCMUX::COMBINED,
+            self.combine.a0.b == ACMUX::COMBINED__LOD_FRAC && self.combine.a0.d == ACMUX::COMBINED__LOD_FRAC,
         ];
         let do_mix: [bool; 2] = [
-            self.shader_input_mapping.mirror_mapping[0][1]
-                == self.shader_input_mapping.mirror_mapping[0][3],
-            self.shader_input_mapping.mirror_mapping[1][1]
-                == self.shader_input_mapping.mirror_mapping[1][3],
+            self.combine.c0.b == self.combine.c0.d,
+            self.combine.a0.b == self.combine.a0.d,
         ];
 
         let use_alpha = self.get_define_bool("USE_ALPHA");
@@ -480,28 +483,28 @@ impl OpenGLProgram {
                         "vec3(0.0, 0.0, 0.0)"
                     }
                 }
-                SHADER::ONE => {
+                SHADER::INPUT1 => {
                     if with_alpha || !inputs_have_alpha {
                         "vInput1"
                     } else {
                         "vInput1.rgb"
                     }
                 }
-                SHADER::TWO => {
+                SHADER::INPUT2 => {
                     if with_alpha || !inputs_have_alpha {
                         "vInput2"
                     } else {
                         "vInput2.rgb"
                     }
                 }
-                SHADER::THREE => {
+                SHADER::INPUT3 => {
                     if with_alpha || !inputs_have_alpha {
                         "vInput3"
                     } else {
                         "vInput3.rgb"
                     }
                 }
-                SHADER::FOUR => {
+                SHADER::INPUT4 => {
                     if with_alpha || !inputs_have_alpha {
                         "vInput4"
                     } else {
@@ -535,10 +538,10 @@ impl OpenGLProgram {
         } else {
             match input {
                 SHADER::ZERO => "0.0",
-                SHADER::ONE => "vInput1.a",
-                SHADER::TWO => "vInput2.a",
-                SHADER::THREE => "vInput3.a",
-                SHADER::FOUR => "vInput4.a",
+                SHADER::INPUT1 => "vInput1.a",
+                SHADER::INPUT2 => "vInput2.a",
+                SHADER::INPUT3 => "vInput3.a",
+                SHADER::INPUT4 => "vInput4.a",
                 SHADER::TEXEL0 => "texVal0.a",
                 SHADER::TEXEL0A => "texVal0.a",
                 SHADER::TEXEL1 => "texVal1.a",
