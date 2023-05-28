@@ -175,44 +175,50 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
 
             let vtx_pos = gl.get_attrib_location(native_program, "aVtxPos").unwrap();
             gl.enable_vertex_attrib_array(vtx_pos);
+
+            let pos_size = 4;
             gl.vertex_attrib_pointer_f32(
                 vtx_pos,
-                4,
+                pos_size,
                 glow::FLOAT,
                 false,
-                program.num_floats as i32 * FLOAT_SIZE as i32,
+                (program.num_floats * FLOAT_SIZE) as i32,
                 0,
             );
-            accumulated_offset += 4;
+            accumulated_offset += pos_size;
 
             if program.get_define_bool("USE_TEXTURE0") || program.get_define_bool("USE_TEXTURE1") {
                 let tex_coord = gl.get_attrib_location(native_program, "aTexCoord").unwrap();
                 gl.enable_vertex_attrib_array(tex_coord);
+
+                let coord_size = 2;
                 gl.vertex_attrib_pointer_f32(
                     tex_coord,
-                    2,
+                    coord_size,
                     glow::FLOAT,
                     false,
-                    program.num_floats as i32 * FLOAT_SIZE as i32,
+                    (program.num_floats * FLOAT_SIZE) as i32,
                     accumulated_offset * FLOAT_SIZE as i32,
                 );
 
-                accumulated_offset += 2;
+                accumulated_offset += coord_size;
             }
 
             if program.get_define_bool("USE_FOG") {
                 let fog = gl.get_attrib_location(native_program, "aFog").unwrap();
                 gl.enable_vertex_attrib_array(fog);
+
+                let fog_size = 4;
                 gl.vertex_attrib_pointer_f32(
                     fog,
-                    1,
+                    fog_size,
                     glow::FLOAT,
                     false,
-                    program.num_floats as i32 * FLOAT_SIZE as i32,
+                    (program.num_floats * FLOAT_SIZE) as i32,
                     accumulated_offset * FLOAT_SIZE as i32,
                 );
 
-                accumulated_offset += 1;
+                accumulated_offset += fog_size;
             }
 
             for i in 0..program.shader_input_mapping.num_inputs {
@@ -221,7 +227,7 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
                     .unwrap();
                 gl.enable_vertex_attrib_array(input);
 
-                let size = if program.get_define_bool("USE_ALPHA") {
+                let input_size = if program.get_define_bool("USE_ALPHA") {
                     4
                 } else {
                     3
@@ -229,18 +235,17 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
 
                 gl.vertex_attrib_pointer_f32(
                     input,
-                    size,
+                    input_size,
                     glow::FLOAT,
                     false,
-                    program.num_floats as i32 * FLOAT_SIZE as i32,
+                    (program.num_floats * FLOAT_SIZE) as i32,
                     accumulated_offset * FLOAT_SIZE as i32,
                 );
 
-                accumulated_offset += size;
+                accumulated_offset += input_size;
             }
 
             // Set the uniforms
-
             if program.get_define_bool("USE_ALPHA") && program.get_define_bool("USE_NOISE") {
                 // TODO: verify this works and if so we don't need to store uniform locations into shader program object
                 gl.uniform_1_i32(
@@ -427,7 +432,6 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
     ) {
         unsafe {
             let data = std::slice::from_raw_parts(buf_vbo as *const u8, buf_vbo_len * FLOAT_SIZE);
-
             gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, data, glow::STREAM_DRAW);
             gl.draw_arrays(glow::TRIANGLES, 0, buf_vbo_num_tris as i32 * 3);
         }
