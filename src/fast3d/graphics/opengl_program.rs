@@ -2,12 +2,15 @@ use imgui_glow_renderer::glow;
 
 use crate::fast3d::gbi::utils::{
     other_mode_l_alpha_compare_dither, other_mode_l_alpha_compare_threshold,
-    other_mode_l_uses_alpha, other_mode_l_uses_fog, other_mode_l_uses_texture_edge,
+    other_mode_l_uses_alpha, other_mode_l_uses_fog, other_mode_l_uses_texture_edge, get_textfilter_from_other_mode_h,
 };
 
+use crate::fast3d::rdp::NUM_TILE_DESCRIPTORS;
 use crate::fast3d::utils::color_combiner::{
     CombineParams, ShaderInputMapping, ACMUX, CCMUX, SHADER,
 };
+use crate::fast3d::utils::texture::TextFilt;
+use crate::fast3d::utils::tile::TileDescriptor;
 use std::collections::HashMap;
 
 #[derive(PartialEq, Eq)]
@@ -33,6 +36,7 @@ pub struct OpenGLProgram {
     other_mode_h: u32,
     other_mode_l: u32,
     combine: CombineParams,
+    tile_descriptors: [TileDescriptor; NUM_TILE_DESCRIPTORS],
 
     pub shader_input_mapping: ShaderInputMapping,
     pub num_floats: usize,
@@ -121,7 +125,7 @@ impl OpenGLProgram {
 
     // MARK: - Defaults
 
-    pub fn new(other_mode_h: u32, other_mode_l: u32, combine: CombineParams) -> Self {
+    pub fn new(other_mode_h: u32, other_mode_l: u32, combine: CombineParams, tile_descriptors: [TileDescriptor; NUM_TILE_DESCRIPTORS]) -> Self {
         Self {
             preprocessed_vertex: "".to_string(),
             preprocessed_frag: "".to_string(),
@@ -135,6 +139,7 @@ impl OpenGLProgram {
             other_mode_h,
             other_mode_l,
             combine,
+            tile_descriptors,
 
             shader_input_mapping: ShaderInputMapping::ZERO,
             num_floats: 0,
@@ -218,11 +223,16 @@ impl OpenGLProgram {
 
                 {}
 
+                #if defined(USE_TEXTURE0) || defined(USE_TEXTURE1)
+                    {}
+                #endif
+
                 gl_Position = aVtxPos;
             }}
         "#,
             self.generate_vtx_inputs_params(),
             self.generate_vtx_inputs_body(),
+            self.generate_clamp(),
         );
 
         self.fragment = self.generate_frag();
@@ -259,6 +269,39 @@ impl OpenGLProgram {
         out
     }
 
+    fn generate_clamp(&mut self) -> String {
+        let mut out = String::new();
+        for i in 0..self.tile_descriptors.len() {
+            let tile = &self.tile_descriptors[i];
+            if tile.cm_s & 0x2 != 0 {
+                let coord_ratio = (((tile.lrs - tile.uls) >> 2) + 1) / tile.get_width();
+                let comp = if i == 0 { 'x' } else { 'z' };
+                if coord_ratio > 1 {
+                    out.push_str(&format!(
+                        "vTexCoord.{} = clamp(vTexCoord.{}, 0.0, {});\n",
+                        comp,
+                        comp,
+                        coord_ratio
+                    ));
+                }
+            }
+            if tile.cm_t & 0x2 != 0 {
+                let coord_ratio = (((tile.lrt - tile.ult) >> 2) + 1) / tile.get_width();
+                let comp = if i == 0 { 'y' } else { 'w' };
+                if coord_ratio > 1 {
+                    out.push_str(&format!(
+                        "vTexCoord.{} = clamp(vTexCoord.{}, 0.0, {});\n",
+                        comp,
+                        comp,
+                        coord_ratio
+                    ));
+                }
+            }
+        }
+
+        out
+    }
+
     fn generate_frag(&mut self) -> String {
         let mut inputs = String::new();
         for i in 0..self.shader_input_mapping.num_inputs {
@@ -272,6 +315,12 @@ impl OpenGLProgram {
                 i + 1
             ));
         }
+
+        let tex_filter = match get_textfilter_from_other_mode_h(self.other_mode_h) {
+            TextFilt::G_TF_POINT => "Point",
+            TextFilt::G_TF_AVERAGE => "Average",
+            TextFilt::G_TF_BILERP => "Bilerp",
+        };
 
         format!(
             r#"
@@ -312,12 +361,37 @@ impl OpenGLProgram {
 
             out vec4 outColor;
 
+            #define TEX_OFFSET(offset) texture(tex, texCoord - (offset) / texSize)
+
+            vec4 Texture2D_N64_Point(in sampler2D tex, in vec2 texCoord) {{
+                return texture(tex, texCoord);
+            }}
+            
+            vec4 Texture2D_N64_Average(in sampler2D tex, in vec2 texCoord) {{
+                // Unimplemented.
+                return texture(tex, texCoord);
+            }}
+            
+            // Implements N64-style "triangle bilienar filtering" with three taps.
+            // Based on ArthurCarvalho's implementation, modified for use here.
+            vec4 Texture2D_N64_Bilerp(in sampler2D tex, in vec2 texCoord) {{
+                vec2 texSize = vec2(textureSize(tex, 0));
+                vec2 offset = fract(texCoord * texSize - vec2(0.5));
+                offset -= step(1.0, offset.x + offset.y);
+                vec4 s0 = TEX_OFFSET(offset);
+                vec4 s1 = TEX_OFFSET(vec2(offset.x - sign(offset.x), offset.y));
+                vec4 s2 = TEX_OFFSET(vec2(offset.x, offset.y - sign(offset.y)));
+                return s0 + abs(offset.x) * (s1 - s0) + abs(offset.y) * (s2 - s0);
+            }}
+            
+            #define Texture2D_N64 Texture2D_N64_{}
+
             void main() {{
                 #ifdef USE_TEXTURE0
-                    vec4 texVal0 = texture(uTex0, vTexCoord);
+                    vec4 texVal0 = Texture2D_N64(uTex0, vTexCoord);
                 #endif
                 #ifdef USE_TEXTURE1
-                    vec4 texVal1 = texture(uTex1, vTexCoord);
+                    vec4 texVal1 = Texture2D_N64(uTex1, vTexCoord);
                 #endif
 
                 {}
@@ -357,7 +431,8 @@ impl OpenGLProgram {
             }}
         "#,
             inputs,
-            self.generate_color_combiner()
+            tex_filter,
+            self.generate_color_combiner(),
         )
     }
 

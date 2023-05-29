@@ -1111,7 +1111,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gl_context: &glow::Context,
-        gfx_context: &mut GraphicsContext,
+        _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };

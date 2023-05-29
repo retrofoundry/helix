@@ -38,7 +38,7 @@ pub const SCREEN_HEIGHT: f32 = 240.0;
 const MAX_VBO_SIZE: usize = 256;
 const TEXTURE_CACHE_MAX_SIZE: usize = 500;
 const MAX_TEXTURE_SIZE: usize = 4096;
-const NUM_TILE_DESCRIPTORS: usize = 8;
+pub const NUM_TILE_DESCRIPTORS: usize = 8;
 pub const MAX_BUFFERED: usize = 256;
 
 #[repr(C)]
@@ -505,9 +505,10 @@ impl RDP {
     pub fn shader_program_hash(&mut self) -> u64 {
         let mut hasher = DefaultHasher::new();
 
-        // self.other_mode_h.hash(&mut hasher);
+        self.other_mode_h.hash(&mut hasher);
         self.other_mode_l.hash(&mut hasher);
         self.combine.hash(&mut hasher);
+        self.tile_descriptors.hash(&mut hasher);
 
         hasher.finish()
     }
@@ -522,7 +523,7 @@ impl RDP {
             return hash;
         }
 
-        let mut program = OpenGLProgram::new(self.other_mode_h, self.other_mode_l, self.combine);
+        let mut program = OpenGLProgram::new(self.other_mode_h, self.other_mode_l, self.combine, self.tile_descriptors);
         program.init();
         program.preprocess();
 

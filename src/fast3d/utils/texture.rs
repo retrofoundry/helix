@@ -117,7 +117,7 @@ pub fn translate_tlut(
     decoded
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum ImageFormat {
     G_IM_FMT_RGBA = 0x00,
     G_IM_FMT_YUV = 0x01,
@@ -126,7 +126,7 @@ pub enum ImageFormat {
     G_IM_FMT_I = 0x04,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum ImageSize {
     G_IM_SIZ_4b = 0x00,
     G_IM_SIZ_8b = 0x01,

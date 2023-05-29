@@ -1,6 +1,6 @@
 use super::texture::{ImageFormat, ImageSize};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash)]
 pub struct TileDescriptor {
     pub uls: u16,
     pub ult: u16,
