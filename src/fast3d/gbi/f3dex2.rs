@@ -3,7 +3,6 @@ use std::slice;
 use glam::Mat4;
 use imgui_glow_renderer::glow;
 use log::trace;
-use wgpu::BlendState;
 
 use super::defines::{Gfx, Light, Viewport, Vtx, G_FILLRECT, G_MTX, G_TEXRECT, G_TEXRECTFLIP};
 use super::utils::{
@@ -559,7 +558,7 @@ impl F3DEX2 {
         rdp.update_render_state(gl_context, gfx_context, rsp.geometry_mode);
 
         // TODO: Produce draw calls for RDP to process later?
-        let use_alpha = other_mode_l_uses_alpha(rdp.other_mode_l)
+        let do_blend = other_mode_l_uses_alpha(rdp.other_mode_l)
             || other_mode_l_uses_texture_edge(rdp.other_mode_l);
         let use_fog = other_mode_l_uses_fog(rdp.other_mode_l);
 
@@ -578,16 +577,6 @@ impl F3DEX2 {
             let new_program = rdp.shader_cache.get(&shader_hash).unwrap();
             gfx_context.api.load_program(gl_context, new_program);
             rdp.rendering_state.shader_program_hash = shader_hash;
-        }
-
-        if use_alpha != rdp.rendering_state.blend_enabled {
-            let blend_state = BlendState::ALPHA_BLENDING;
-
-            rdp.flush(gl_context, gfx_context);
-            gfx_context
-                .api
-                .set_blend_state(gl_context, use_alpha, blend_state);
-            rdp.rendering_state.blend_enabled = use_alpha;
         }
 
         let use_texture = rdp.combine.uses_texture0() || rdp.combine.uses_texture1();
@@ -635,7 +624,7 @@ impl F3DEX2 {
             let num_inputs = shader_program.shader_input_mapping.num_inputs;
             for j in 0..num_inputs {
                 let mut color: Color;
-                for k in 0..(1 + if use_alpha { 1 } else { 0 }) {
+                for k in 0..(1 + if do_blend { 1 } else { 0 }) {
                     if k == 0 {
                         let shader_program = rdp.shader_cache.get(&shader_hash).unwrap();
                         match shader_program.shader_input_mapping.input_mapping[k][j as usize] {
@@ -1122,7 +1111,7 @@ impl F3DEX2 {
         rdp: &mut RDP,
         _rsp: &mut RSP,
         _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };
@@ -1133,6 +1122,7 @@ impl F3DEX2 {
         let a = get_cmd(w1, 0, 8) as u8;
 
         rdp.blend_color = Color::RGBA(r, g, b, a);
+
         GBIResult::Continue
     }
 

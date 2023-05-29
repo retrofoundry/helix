@@ -250,13 +250,16 @@ impl CombineParams {
                             CCMUX::TEXEL0 => mirror_mapping[i][j] = SHADER::TEXEL0,
                             CCMUX::TEXEL1 => mirror_mapping[i][j] = SHADER::TEXEL1,
                             CCMUX::TEXEL0_ALPHA => mirror_mapping[i][j] = SHADER::TEXEL0A,
-                            CCMUX::PRIMITIVE | CCMUX::SHADE | CCMUX::ENVIRONMENT | CCMUX::LOD_FRACTION => {
+                            CCMUX::PRIMITIVE
+                            | CCMUX::SHADE
+                            | CCMUX::ENVIRONMENT
+                            | CCMUX::LOD_FRACTION => {
                                 if cc_input_number[property as usize] == 0 {
-                                    input_mapping[i][(cc_next_input_number - 1) as usize] = property as u8;
+                                    input_mapping[i][(cc_next_input_number - 1) as usize] =
+                                        property as u8;
                                     cc_input_number[property as usize] = cc_next_input_number;
 
-                                    mirror_mapping[i][j] =
-                                        SHADER::from(cc_next_input_number);
+                                    mirror_mapping[i][j] = SHADER::from(cc_next_input_number);
 
                                     if mirror_mapping[i][j] >= SHADER::INPUT1
                                         && mirror_mapping[i][j] <= SHADER::INPUT4
@@ -283,7 +286,8 @@ impl CombineParams {
                             ACMUX::TEXEL1 => mirror_mapping[i][j] = SHADER::TEXEL1,
                             ACMUX::PRIMITIVE | ACMUX::SHADE | ACMUX::ENVIRONMENT => {
                                 if ac_input_number[property as usize] == 0 {
-                                    input_mapping[i][(ac_next_input_number - 1) as usize] = property as u8;
+                                    input_mapping[i][(ac_next_input_number - 1) as usize] =
+                                        property as u8;
                                     ac_input_number[property as usize] = ac_next_input_number;
                                     ac_next_input_number += 1;
 

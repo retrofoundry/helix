@@ -2,7 +2,7 @@ use std::any::Any;
 
 use imgui_glow_renderer::glow::{self, HasContext};
 
-use crate::fast3d::gbi::defines::G_TX;
+use crate::fast3d::{gbi::defines::G_TX, utils::color::Color};
 
 use super::{opengl_program::OpenGLProgram, GraphicsAPI};
 
@@ -14,6 +14,9 @@ pub struct OpenGLGraphicsDevice {
 
     pub frame_count: i32,
     pub current_height: i32,
+
+    pub alpha_threshold_location: Option<<glow::Context as HasContext>::UniformLocation>,
+    pub blend_color_alpha: i32,
 }
 
 impl OpenGLGraphicsDevice {
@@ -31,6 +34,9 @@ impl OpenGLGraphicsDevice {
             vao,
             frame_count: 0,
             current_height: 0,
+
+            alpha_threshold_location: None,
+            blend_color_alpha: 0,
         }
     }
 
@@ -164,7 +170,7 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
         }
     }
 
-    fn load_program(&self, gl: &glow::Context, program: &OpenGLProgram) {
+    fn load_program(&mut self, gl: &glow::Context, program: &OpenGLProgram) {
         unsafe {
             let native_program = program.compiled_program;
             gl.use_program(native_program);
@@ -246,19 +252,19 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
             }
 
             // Set the uniforms
-            if program.get_define_bool("USE_ALPHA") && program.get_define_bool("USE_NOISE") {
-                // TODO: verify this works and if so we don't need to store uniform locations into shader program object
-                gl.uniform_1_i32(
-                    Some(&gl.get_uniform_location(native_program, "uNoise").unwrap()),
-                    self.frame_count,
-                );
-                gl.uniform_1_i32(
-                    Some(
-                        &gl.get_uniform_location(native_program, "uNoiseScale")
-                            .unwrap(),
-                    ),
-                    self.current_height,
-                );
+            if program.get_define_bool("USE_ALPHA") {
+                if program.get_define_bool("ALPHA_COMPARE_DITHER") {
+                    if let Some(frame_count_location) = gl.get_uniform_location(native_program, "uFrameCount") {
+                        gl.uniform_1_i32(Some(&frame_count_location), self.frame_count);
+                    }
+
+                    if let Some(frame_height_location) = gl.get_uniform_location(native_program, "uFrameHeight") {
+                        gl.uniform_1_i32(Some(&frame_height_location), self.current_height);
+                    }
+                }
+
+                self.alpha_threshold_location =
+                    gl.get_uniform_location(native_program, "uAlphaThreshold");
             }
         };
     }
@@ -384,7 +390,13 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
         }
     }
 
-    fn set_blend_state(&self, gl: &glow::Context, enabled: bool, blend_state: wgpu::BlendState) {
+    fn set_blend_state(
+        &self,
+        gl: &glow::Context,
+        enabled: bool,
+        blend_state: wgpu::BlendState,
+        blend_color: Color,
+    ) {
         unsafe {
             if !enabled {
                 gl.disable(glow::BLEND);
@@ -404,6 +416,10 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
                 Self::gfx_blend_factor_to_gl(blend_state.alpha.src_factor),
                 Self::gfx_blend_factor_to_gl(blend_state.alpha.dst_factor),
             );
+
+            if let Some(alpha_threshold_location) = self.alpha_threshold_location {
+                gl.uniform_1_f32(Some(&alpha_threshold_location), blend_color.a as f32);
+            }
         }
     }
 

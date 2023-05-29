@@ -97,6 +97,7 @@ pub struct RenderingState {
     pub shader_program_hash: u64,
     pub textures: [Texture; 2],
     pub cull_mode: Option<wgpu::Face>,
+    pub blend_color: Color,
 }
 
 impl RenderingState {
@@ -112,6 +113,7 @@ impl RenderingState {
         shader_program_hash: 0,
         textures: [Texture::EMPTY; 2],
         cull_mode: None,
+        blend_color: Color::TRANSPARENT,
     };
 }
 
@@ -583,26 +585,18 @@ impl RDP {
             self.rendering_state.polygon_offset = polygon_offset;
         }
 
-        // TODO: Properly read this from render_mode
-        // let src_color = render_mode >> OtherModeLayoutL::P_2 as u32 & 0x03;
-        // let src_factor = render_mode >> OtherModeLayoutL::A_2 as u32 & 0x03;
-        // let dst_color = render_mode >> OtherModeLayoutL::M_2 as u32 & 0x03;
-        // let dst_factor = render_mode >> OtherModeLayoutL::B_2 as u32 & 0x03;
-        //
-        // let do_blend = render_mode & (1 << OtherModeLayoutL::FORCE_BL as u32) != 0
-        //     && dst_color == BlendParamPMColor::G_BL_CLR_MEM as u32;
-
-        let use_alpha = other_mode_l_uses_alpha(self.other_mode_l)
+        // handle alpha blending
+        let do_blend = other_mode_l_uses_alpha(self.other_mode_l)
             || other_mode_l_uses_texture_edge(self.other_mode_l);
 
-        if use_alpha != self.rendering_state.blend_enabled {
+        if do_blend != self.rendering_state.blend_enabled {
             let blend_state = BlendState::ALPHA_BLENDING;
 
             self.flush(gl_context, gfx_context);
             gfx_context
                 .api
-                .set_blend_state(gl_context, use_alpha, blend_state);
-            self.rendering_state.blend_enabled = use_alpha;
+                .set_blend_state(gl_context, do_blend, blend_state, self.blend_color);
+            self.rendering_state.blend_enabled = do_blend;
         }
     }
 

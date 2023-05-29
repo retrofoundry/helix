@@ -1,11 +1,13 @@
 use imgui_glow_renderer::glow;
 
 use crate::fast3d::gbi::utils::{
-    other_mode_l_uses_alpha, other_mode_l_uses_fog, other_mode_l_uses_noise,
-    other_mode_l_uses_texture_edge,
+    other_mode_l_alpha_compare_dither, other_mode_l_alpha_compare_threshold,
+    other_mode_l_uses_alpha, other_mode_l_uses_fog, other_mode_l_uses_texture_edge,
 };
 
-use crate::fast3d::utils::color_combiner::{CombineParams, ShaderInputMapping, SHADER, CCMUX, ACMUX};
+use crate::fast3d::utils::color_combiner::{
+    CombineParams, ShaderInputMapping, ACMUX, CCMUX, SHADER,
+};
 use std::collections::HashMap;
 
 #[derive(PartialEq, Eq)]
@@ -186,11 +188,17 @@ impl OpenGLProgram {
         );
         self.set_define_bool(
             "USE_ALPHA".to_string(),
-            other_mode_l_uses_alpha(self.other_mode_l) || other_mode_l_uses_texture_edge(self.other_mode_l),
+            other_mode_l_uses_alpha(self.other_mode_l)
+                || other_mode_l_uses_texture_edge(self.other_mode_l),
         );
         self.set_define_bool(
-            "USE_NOISE".to_string(),
-            other_mode_l_uses_noise(self.other_mode_l),
+            "ALPHA_COMPARE_DITHER".to_string(),
+            other_mode_l_alpha_compare_dither(self.other_mode_l),
+        );
+
+        self.set_define_bool(
+            "ALPHA_COMPARE_THRESHOLD".to_string(),
+            other_mode_l_alpha_compare_threshold(self.other_mode_l),
         );
 
         self.set_define_bool("COLOR_ALPHA_SAME".to_string(), self.combine.cc_ac_same(0));
@@ -206,6 +214,12 @@ impl OpenGLProgram {
         if self.get_define_bool("USE_FOG") {
             self.num_floats += 4;
         }
+
+        self.both = format!(
+            r#"
+            precision mediump float;
+            "#,
+        );
 
         self.vertex = format!(
             r#"
@@ -308,14 +322,20 @@ impl OpenGLProgram {
                 uniform sampler2D uTex1;
             #endif
 
-            #if defined(USE_ALPHA) && defined(USE_NOISE)
-                uniform int uNoise;
-                uniform int uNoiseScale;
+            #if defined(USE_ALPHA)
+                #if defined(ALPHA_COMPARE_DITHER)
+                    uniform int uFrameCount;
+                    uniform int uFrameHeight;
 
-                float random(in vec3 value) {{
-                    float random = dot(sin(value), vec3(12.9898, 78.233, 37.719));
-                    return fract(sin(random) * 143758.5453);
-                }}
+                    float random(in vec3 value) {{
+                        float random = dot(sin(value), vec3(12.9898, 78.233, 37.719));
+                        return fract(sin(random) * 143758.5453);
+                    }}
+                #endif
+
+                #if defined(ALPHA_COMPARE_THRESHOLD)
+                    uniform float uAlphaThreshold;
+                #endif
             #endif
 
             out vec4 outColor;
@@ -330,10 +350,6 @@ impl OpenGLProgram {
 
                 {}
 
-                #if defined(TEXTURE_EDGE) && defined(USE_ALPHA)
-                    if (texel.a > 0.3) texel.a = 1.0; else discard;
-                #endif
-
                 #ifdef USE_FOG
                     #ifdef USE_ALPHA
                         texel = vec4(mix(texel.rgb, vFog.rgb, vFog.a), texel.a);
@@ -342,13 +358,23 @@ impl OpenGLProgram {
                     #endif
                 #endif
 
-                #if defined(USE_ALPHA) && defined(USE_NOISE)
-                    texel.a *= floor(random(vec3(floor(gl_FragCoord.xy * (240.0 / float(uNoiseScale))), float(uNoise))) + 0.5);
-                #endif
+                #if defined(USE_ALPHA)
+                    #if defined(ALPHA_COMPARE_DITHER)
+                        texel.a *= floor(random(vec3(floor(gl_FragCoord.xy * (240.0 / float(uFrameHeight))), float(uFrameCount))) + 0.5);
+                    #endif
+                    
+                    #if defined(ALPHA_COMPARE_THRESHOLD)
+                        if (texel.a < uAlphaThreshold) discard;
+                    #endif
 
-                #if defined(USE_ALPHA) && defined(USE_ALPHA_VISUALIZER)
-                    texel.rgb = vec3(texel.a);
-                    texel.a = 1.0;
+                    #if defined(TEXTURE_EDGE)
+                        if (texel.a < 0.125) discard;
+                    #endif
+
+                    #if defined(USE_ALPHA_VISUALIZER)
+                        texel.rgb = vec3(texel.a);
+                        texel.a = 1.0;
+                    #endif
                 #endif
 
                 #ifdef USE_ALPHA
@@ -370,7 +396,8 @@ impl OpenGLProgram {
         ];
         let do_multiply: [bool; 2] = [
             self.combine.c0.b == CCMUX::COMBINED && self.combine.c0.d == CCMUX::COMBINED,
-            self.combine.a0.b == ACMUX::COMBINED__LOD_FRAC && self.combine.a0.d == ACMUX::COMBINED__LOD_FRAC,
+            self.combine.a0.b == ACMUX::COMBINED__LOD_FRAC
+                && self.combine.a0.d == ACMUX::COMBINED__LOD_FRAC,
         ];
         let do_mix: [bool; 2] = [
             self.combine.c0.b == self.combine.c0.d,
