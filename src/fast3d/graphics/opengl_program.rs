@@ -16,12 +16,6 @@ pub enum ShaderType {
     Fragment,
 }
 
-#[derive(PartialEq, Eq)]
-pub enum ContextVersion {
-    OpenGL110,
-    OpenGL330,
-}
-
 #[derive(Debug)]
 pub struct OpenGLProgram {
     // Compiled program.
@@ -88,18 +82,16 @@ impl OpenGLProgram {
 
     // MARK: - Preprocessing
 
-    pub fn preprocess(&mut self, context_version: ContextVersion) {
+    pub fn preprocess(&mut self) {
         if !self.preprocessed_vertex.is_empty() {
             return;
         }
 
         self.preprocessed_vertex = self.preprocess_shader(
-            &context_version,
             ShaderType::Vertex,
             &format!("{}{}", self.both, self.vertex),
         );
         self.preprocessed_frag = self.preprocess_shader(
-            &context_version,
             ShaderType::Fragment,
             &format!("{}{}", self.both, self.fragment),
         );
@@ -107,15 +99,9 @@ impl OpenGLProgram {
 
     pub fn preprocess_shader(
         &mut self,
-        context_version: &ContextVersion,
         shader_type: ShaderType,
         shader: &str,
     ) -> String {
-        let version_string = match context_version {
-            ContextVersion::OpenGL330 => "#version 330 core",
-            ContextVersion::OpenGL110 => "#version 110",
-        };
-
         let defines_string = self
             .defines
             .iter()
@@ -123,29 +109,13 @@ impl OpenGLProgram {
             .collect::<Vec<String>>()
             .join("");
 
-        let shader = match shader_type {
-            ShaderType::Vertex => match context_version {
-                ContextVersion::OpenGL330 => {
-                    shader.replace("attribute", "in").replace("varying", "out")
-                }
-                ContextVersion::OpenGL110 => shader.to_string(),
-            },
-            ShaderType::Fragment => match context_version {
-                ContextVersion::OpenGL330 => shader
-                    .replace("varying", "in")
-                    .replace("texture2D", "texture")
-                    .replace("gl_FragColor", "outColor"),
-                ContextVersion::OpenGL110 => shader.replace("out vec4 outColor;", ""),
-            },
-        };
-
         format!(
             r#"
-        {}
-        {}
-        {}
-        "#,
-            version_string, defines_string, shader
+            #version 330 core
+            {}
+            {}
+            "#,
+            defines_string, shader
         )
     }
 
@@ -223,16 +193,16 @@ impl OpenGLProgram {
 
         self.vertex = format!(
             r#"
-            attribute vec4 aVtxPos;
+            in vec4 aVtxPos;
 
             #if defined(USE_TEXTURE0) || defined(USE_TEXTURE1)
-                attribute vec2 aTexCoord;
-                varying vec2 vTexCoord;
+                in vec2 aTexCoord;
+                out vec2 vTexCoord;
             #endif
 
             #ifdef USE_FOG
-                attribute vec4 aFog;
-                varying vec4 vFog;
+                in vec4 aFog;
+                out vec4 vFog;
             #endif
 
             {}
@@ -265,8 +235,8 @@ impl OpenGLProgram {
         for i in 0..self.shader_input_mapping.num_inputs {
             out.push_str(&format!(
                 r#"
-                attribute vec{} aInput{};
-                varying vec{} vInput{};
+                in vec{} aInput{};
+                out vec{} vInput{};
             "#,
                 if use_alpha { 4 } else { 3 },
                 i + 1,
@@ -293,7 +263,7 @@ impl OpenGLProgram {
         let mut inputs = String::new();
         for i in 0..self.shader_input_mapping.num_inputs {
             inputs.push_str(&format!(
-                "varying vec{} vInput{};\n",
+                "in vec{} vInput{};\n",
                 if self.get_define_bool("USE_ALPHA") {
                     4
                 } else {
@@ -306,11 +276,11 @@ impl OpenGLProgram {
         format!(
             r#"
             #if defined(USE_TEXTURE0) || defined(USE_TEXTURE1)
-                varying vec2 vTexCoord;
+                in vec2 vTexCoord;
             #endif
 
             #ifdef USE_FOG
-                varying vec4 vFog;
+                in vec4 vFog;
             #endif
 
             {}
@@ -324,8 +294,10 @@ impl OpenGLProgram {
 
             #if defined(USE_ALPHA)
                 #if defined(ALPHA_COMPARE_DITHER)
-                    uniform int uFrameCount;
-                    uniform int uFrameHeight;
+                    layout(std140) uniform ubNoise {{
+                        int uFrameCount;
+                        int uFrameHeight;
+                    }};
 
                     float random(in vec3 value) {{
                         float random = dot(sin(value), vec3(12.9898, 78.233, 37.719));
@@ -342,10 +314,10 @@ impl OpenGLProgram {
 
             void main() {{
                 #ifdef USE_TEXTURE0
-                    vec4 texVal0 = texture2D(uTex0, vTexCoord);
+                    vec4 texVal0 = texture(uTex0, vTexCoord);
                 #endif
                 #ifdef USE_TEXTURE1
-                    vec4 texVal1 = texture2D(uTex1, vTexCoord);
+                    vec4 texVal1 = texture(uTex1, vTexCoord);
                 #endif
 
                 {}
@@ -378,9 +350,9 @@ impl OpenGLProgram {
                 #endif
 
                 #ifdef USE_ALPHA
-                    gl_FragColor = texel;
+                    outColor = texel;
                 #else
-                    gl_FragColor = vec4(texel, 1.0);
+                    outColor = vec4(texel, 1.0);
                 #endif
             }}
         "#,

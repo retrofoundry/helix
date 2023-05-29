@@ -8,7 +8,6 @@ use wgpu::{BlendState, CompareFunction};
 
 use crate::fast3d::gbi::utils::{other_mode_l_uses_alpha, other_mode_l_uses_texture_edge};
 
-use super::graphics::opengl_program::ContextVersion;
 use super::{
     gbi::{
         defines::Viewport,
@@ -525,7 +524,7 @@ impl RDP {
 
         let mut program = OpenGLProgram::new(self.other_mode_h, self.other_mode_l, self.combine);
         program.init();
-        program.preprocess(ContextVersion::OpenGL330);
+        program.preprocess();
 
         gfx_context.api.compile_program(gl_context, &mut program);
 
