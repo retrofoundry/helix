@@ -343,10 +343,8 @@ impl OpenGLProgram {
 
             #if defined(USE_ALPHA)
                 #if defined(ALPHA_COMPARE_DITHER)
-                    layout(std140) uniform ubNoise {{
-                        int uFrameCount;
-                        int uFrameHeight;
-                    }};
+                    uniform int uFrameCount;
+                    uniform int uFrameHeight;
 
                     float random(in vec3 value) {{
                         float random = dot(sin(value), vec3(12.9898, 78.233, 37.719));

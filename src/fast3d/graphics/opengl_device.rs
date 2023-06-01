@@ -254,8 +254,11 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
             // Set the uniforms
             if program.get_define_bool("USE_ALPHA") {
                 if program.get_define_bool("ALPHA_COMPARE_DITHER") {
-                    if let Some(frame_count_location) = gl.get_uniform_location(native_program, "ubNoise") {
-                        gl.uniform_1_f32_slice(Some(&frame_count_location), &[self.frame_count as f32, self.current_height as f32]);
+                    if let Some(frame_count_location) = gl.get_uniform_location(native_program, "uFrameCount") {
+                        gl.uniform_1_i32(Some(&frame_count_location), self.frame_count);
+                    }
+                    if let Some(frame_height_location) = gl.get_uniform_location(native_program, "uFrameHeight") {
+                        gl.uniform_1_i32(Some(&frame_height_location), self.current_height);
                     }
                 }
 
