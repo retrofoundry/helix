@@ -1,8 +1,9 @@
 use imgui_glow_renderer::glow;
 
 use crate::fast3d::gbi::utils::{
-    other_mode_l_alpha_compare_dither, other_mode_l_alpha_compare_threshold,
-    other_mode_l_uses_alpha, other_mode_l_uses_fog, other_mode_l_uses_texture_edge, get_textfilter_from_other_mode_h,
+    get_textfilter_from_other_mode_h, other_mode_l_alpha_compare_dither,
+    other_mode_l_alpha_compare_threshold, other_mode_l_uses_alpha, other_mode_l_uses_fog,
+    other_mode_l_uses_texture_edge,
 };
 
 use crate::fast3d::rdp::NUM_TILE_DESCRIPTORS;
@@ -91,21 +92,15 @@ impl OpenGLProgram {
             return;
         }
 
-        self.preprocessed_vertex = self.preprocess_shader(
-            ShaderType::Vertex,
-            &format!("{}{}", self.both, self.vertex),
-        );
+        self.preprocessed_vertex =
+            self.preprocess_shader(ShaderType::Vertex, &format!("{}{}", self.both, self.vertex));
         self.preprocessed_frag = self.preprocess_shader(
             ShaderType::Fragment,
             &format!("{}{}", self.both, self.fragment),
         );
     }
 
-    pub fn preprocess_shader(
-        &mut self,
-        shader_type: ShaderType,
-        shader: &str,
-    ) -> String {
+    pub fn preprocess_shader(&mut self, shader_type: ShaderType, shader: &str) -> String {
         let defines_string = self
             .defines
             .iter()
@@ -125,7 +120,12 @@ impl OpenGLProgram {
 
     // MARK: - Defaults
 
-    pub fn new(other_mode_h: u32, other_mode_l: u32, combine: CombineParams, tile_descriptors: [TileDescriptor; NUM_TILE_DESCRIPTORS]) -> Self {
+    pub fn new(
+        other_mode_h: u32,
+        other_mode_l: u32,
+        combine: CombineParams,
+        tile_descriptors: [TileDescriptor; NUM_TILE_DESCRIPTORS],
+    ) -> Self {
         Self {
             preprocessed_vertex: "".to_string(),
             preprocessed_frag: "".to_string(),
@@ -279,9 +279,7 @@ impl OpenGLProgram {
                 if coord_ratio > 1 {
                     out.push_str(&format!(
                         "vTexCoord.{} = clamp(vTexCoord.{}, 0.0, {});\n",
-                        comp,
-                        comp,
-                        coord_ratio
+                        comp, comp, coord_ratio
                     ));
                 }
             }
@@ -291,9 +289,7 @@ impl OpenGLProgram {
                 if coord_ratio > 1 {
                     out.push_str(&format!(
                         "vTexCoord.{} = clamp(vTexCoord.{}, 0.0, {});\n",
-                        comp,
-                        comp,
-                        coord_ratio
+                        comp, comp, coord_ratio
                     ));
                 }
             }

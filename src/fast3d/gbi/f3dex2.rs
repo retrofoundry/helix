@@ -1,14 +1,13 @@
 use std::slice;
 
-use glam::Mat4;
+use glam::{Mat4, Vec3A};
 use imgui_glow_renderer::glow;
 use log::trace;
 
 use super::defines::{Gfx, Light, Viewport, Vtx, G_FILLRECT, G_MTX, G_TEXRECT, G_TEXRECTFLIP};
 use super::utils::{
-    get_cmd, get_cycle_type_from_other_mode_h, get_segmented_address,
-    get_textfilter_from_other_mode_h, other_mode_l_uses_alpha, other_mode_l_uses_fog,
-    other_mode_l_uses_texture_edge,
+    get_cmd, get_cycle_type_from_other_mode_h, get_textfilter_from_other_mode_h,
+    other_mode_l_uses_alpha, other_mode_l_uses_fog, other_mode_l_uses_texture_edge,
 };
 use super::{
     super::{
@@ -19,7 +18,7 @@ use super::{
 };
 use super::{GBIDefinition, GBIResult, GBI};
 use crate::extensions::matrix::MatrixFrom;
-use crate::fast3d::gbi::defines::G_TX;
+use crate::fast3d::gbi::defines::{G_TX, LookAt};
 use crate::fast3d::rdp::MAX_BUFFERED;
 use crate::fast3d::utils::color::Color;
 use crate::fast3d::utils::color_combiner::{ACMUX, CCMUX};
@@ -184,11 +183,11 @@ impl F3DEX2 {
         let matrix: Mat4;
 
         if cfg!(feature = "gbifloats") {
-            let addr = get_segmented_address(w1) as *const f32;
+            let addr = rsp.from_segmented(w1) as *const f32;
             let slice = unsafe { slice::from_raw_parts(addr, 16) };
             matrix = Mat4::from_floats(slice);
         } else {
-            let addr = get_segmented_address(w1) as *const i32;
+            let addr = rsp.from_segmented(w1) as *const i32;
             let slice = unsafe { slice::from_raw_parts(addr, 16) };
             matrix = Mat4::from_fixed_point(slice);
         }
@@ -226,9 +225,8 @@ impl F3DEX2 {
             // Clear the lights_valid flag
             rsp.lights_valid = false;
         }
-
-        // Recalculate the modelview projection matrix
-        rsp.recompute_mvp_matrix();
+        
+        rsp.modelview_projection_matrix_changed = true;
 
         GBIResult::Continue
     }
@@ -275,8 +273,8 @@ impl F3DEX2 {
         let w1 = unsafe { (*(*command)).words.w1 };
 
         let index: u8 = get_cmd(w0, 0, 8) as u8;
-        let offset: u8 = get_cmd(w0, 8, 8) as u8 * 8;
-        let data = get_segmented_address(w1);
+        let offset = get_cmd(w0, 8, 8) * 8;
+        let data = rsp.from_segmented(w1);
 
         match index {
             index if index == F3DEX2::G_MV_VIEWPORT => {
@@ -284,16 +282,19 @@ impl F3DEX2 {
                 let viewport = unsafe { &*viewport_ptr };
                 rdp.calculate_and_set_viewport(*viewport);
             }
+            index if index == F3DEX2::G_MV_MATRIX => {
+                assert!(true, "Unimplemented move matrix");
+                unsafe { *command = (*command).add(1) };
+            }
             index if index == F3DEX2::G_MV_LIGHT => {
-                let light_index = (offset as i8 / 24) - 2;
-                if light_index >= 0 && (light_index as usize) < MAX_LIGHTS {
-                    let light_ptr = data as *const Light;
-                    let light = unsafe { &*light_ptr };
-                    rsp.lights[light_index as usize] = *light;
+                let index = offset / 24;
+                if index >= 2 {
+                    rsp.set_light(index - 2, w1);
+                } else {
+                    rsp.set_look_at(index, w1);
                 }
             }
-            // TODO: HANDLE G_MV_LOOKATY & G_MV_LOOKATX
-            _ => trace!("Unknown movemem index: {}", index),
+            _ => assert!(true, "Unimplemented move_mem command"),
         }
 
         GBIResult::Continue
@@ -309,17 +310,34 @@ impl F3DEX2 {
         let w0 = unsafe { (*(*command)).words.w0 };
         let w1 = unsafe { (*(*command)).words.w1 };
 
-        let index = get_cmd(w0, 16, 8) as u8;
-        let _offset: u16 = get_cmd(w0, 0, 16) as u16;
+        let m_type = get_cmd(w0, 16, 8) as u8;
 
-        match index {
-            index if index == G_MW::NUMLIGHT => rsp.set_num_lights(w1 as u8 / 24 + 1),
-            index if index == G_MW::FOG => {
-                rsp.fog_multiplier = (w1 >> 16) as i16;
-                rsp.fog_offset = w1 as i16;
+        match m_type {
+            m_type if m_type == G_MW::FORCEMTX => rsp.modelview_projection_matrix_changed = w1 == 0,
+            m_type if m_type == G_MW::NUMLIGHT => rsp.set_num_lights(w1 as u8 / 24),
+            m_type if m_type == G_MW::CLIP => {
+                rsp.set_clip_ratio(w1);
             }
-            // TODO: HANDLE G_MW_SEGMENT
-            _ => {}
+            m_type if m_type == G_MW::SEGMENT => {
+                let segment = get_cmd(w0, 2, 4);
+                rsp.set_segment(segment, w1 & 0x00FFFFFF)
+            }
+            m_type if m_type == G_MW::FOG => {
+                let multiplier = get_cmd(w1, 16, 16) as i16;
+                let offset = get_cmd(w1, 0, 16) as i16;
+                rsp.set_fog(multiplier, offset);
+            }
+            m_type if m_type == G_MW::LIGHTCOL => {
+                let index = get_cmd(w0, 0, 16) / 24;
+                rsp.set_light_color(index, w1 as u32);
+            }
+            m_type if m_type == G_MW::PERSPNORM => {
+                rsp.set_persp_norm(w1);
+            }
+            // TODO: G_MW_MATRIX
+            _ => {
+                assert!(false, "Unknown moveword type: {}", m_type)
+            }
         }
 
         GBIResult::Continue
@@ -361,9 +379,14 @@ impl F3DEX2 {
         let w0 = unsafe { (*(*command)).words.w0 };
         let w1 = unsafe { (*(*command)).words.w1 };
 
+        if rsp.modelview_projection_matrix_changed {
+            rsp.recompute_mvp_matrix();
+            rsp.modelview_projection_matrix_changed = false;
+        }
+
         let vertex_count = get_cmd(w0, 12, 8) as u8;
         let mut write_index = get_cmd(w0, 1, 7) as u8 - get_cmd(w0, 12, 8) as u8;
-        let vertices = get_segmented_address(w1) as *const Vtx;
+        let vertices = rsp.from_segmented(w1) as *const Vtx;
 
         for i in 0..vertex_count {
             let vertex = unsafe { &(*vertices.offset(i as isize)).vertex };
@@ -400,25 +423,29 @@ impl F3DEX2 {
 
             if rsp.geometry_mode & RSPGeometry::G_LIGHTING as u32 > 0 {
                 if !rsp.lights_valid {
-                    for i in 0..rsp.num_lights {
+                    for i in 0..(rsp.num_lights + 1) {
+                        let light: &Light = &rsp.lights[i as usize];
+                        let normalized_light_vector = Vec3A::new(
+                            unsafe { light.dir.dir[0] as f32 / 127.0 },
+                            unsafe { light.dir.dir[1] as f32 / 127.0 },
+                            unsafe { light.dir.dir[2] as f32 / 127.0 },
+                        );
+
                         calculate_normal_dir(
-                            &rsp.lights[i as usize],
+                            &normalized_light_vector,
                             &rsp.matrix_stack[rsp.matrix_stack_pointer - 1],
                             &mut rsp.lights_coeffs[i as usize],
                         );
                     }
 
-                    static LOOKAT_X: Light = Light::new([0, 0, 0], [0, 0, 0], [127, 0, 0]);
-                    static LOOKAT_Y: Light = Light::new([0, 0, 0], [0, 0, 0], [0, 127, 0]);
-
                     calculate_normal_dir(
-                        &LOOKAT_X,
+                        &rsp.lookat[0],
                         &rsp.matrix_stack[rsp.matrix_stack_pointer - 1],
                         &mut rsp.lookat_coeffs[0],
                     );
 
                     calculate_normal_dir(
-                        &LOOKAT_Y,
+                        &rsp.lookat[1],
                         &rsp.matrix_stack[rsp.matrix_stack_pointer - 1],
                         &mut rsp.lookat_coeffs[1],
                     );
@@ -426,11 +453,11 @@ impl F3DEX2 {
                     rsp.lights_valid = true
                 }
 
-                let mut r = rsp.lights[rsp.num_lights as usize - 1].col[0] as f32;
-                let mut g = rsp.lights[rsp.num_lights as usize - 1].col[1] as f32;
-                let mut b = rsp.lights[rsp.num_lights as usize - 1].col[2] as f32;
+                let mut r = unsafe { rsp.lights[rsp.num_lights as usize].dir.col[0] as f32 };
+                let mut g =  unsafe { rsp.lights[rsp.num_lights as usize].dir.col[1] as f32 };
+                let mut b =  unsafe { rsp.lights[rsp.num_lights as usize].dir.col[2] as f32 };
 
-                for i in 0..rsp.num_lights - 1 {
+                for i in 0..rsp.num_lights {
                     let mut intensity = vertex_normal.normal[0] as f32
                         * rsp.lights_coeffs[i as usize][0]
                         + vertex_normal.normal[1] as f32 * rsp.lights_coeffs[i as usize][1]
@@ -439,9 +466,9 @@ impl F3DEX2 {
                     intensity /= 127.0;
 
                     if intensity > 0.0 {
-                        r += intensity * rsp.lights[i as usize].col[0] as f32;
-                        g += intensity * rsp.lights[i as usize].col[1] as f32;
-                        b += intensity * rsp.lights[i as usize].col[2] as f32;
+                         unsafe { r += intensity * rsp.lights[i as usize].dir.col[0] as f32; }
+                         unsafe { g += intensity * rsp.lights[i as usize].dir.col[1] as f32; }
+                         unsafe { b += intensity * rsp.lights[i as usize].dir.col[2] as f32; }
                     }
                 }
 
@@ -759,7 +786,7 @@ impl F3DEX2 {
 
     pub fn sub_dl(
         _rdp: &mut RDP,
-        _rsp: &mut RSP,
+        rsp: &mut RSP,
         _gl_context: &glow::Context,
         _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
@@ -769,10 +796,10 @@ impl F3DEX2 {
 
         if get_cmd(w0, 16, 1) == 0 {
             // Push return address
-            let new_addr = get_segmented_address(w1);
+            let new_addr = rsp.from_segmented(w1);
             GBIResult::Recurse(new_addr)
         } else {
-            let new_addr = get_segmented_address(w1);
+            let new_addr = rsp.from_segmented(w1);
             let cmd = new_addr as *mut Gfx;
             unsafe {
                 *command = cmd.sub(1);
@@ -944,7 +971,7 @@ impl F3DEX2 {
 
     pub fn gdp_set_texture_image(
         rdp: &mut RDP,
-        _rsp: &mut RSP,
+        rsp: &mut RSP,
         _gl_context: &glow::Context,
         _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
@@ -955,7 +982,7 @@ impl F3DEX2 {
         let format = get_cmd(w0, 21, 3) as u8;
         let size = get_cmd(w0, 19, 2) as u8;
         let width = get_cmd(w0, 0, 10) as u16;
-        let address = get_segmented_address(w1);
+        let address = rsp.from_segmented(w1);
 
         rdp.texture_image_state = TextureImageState {
             format,
@@ -1160,20 +1187,20 @@ impl F3DEX2 {
 
     pub fn gdp_set_depth_image(
         rdp: &mut RDP,
-        _rsp: &mut RSP,
+        rsp: &mut RSP,
         _gl_context: &glow::Context,
         _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };
 
-        rdp.depth_image = get_segmented_address(w1);
+        rdp.depth_image = rsp.from_segmented(w1);
         GBIResult::Continue
     }
 
     pub fn gdp_set_color_image(
         rdp: &mut RDP,
-        _rsp: &mut RSP,
+        rsp: &mut RSP,
         _gl_context: &glow::Context,
         _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
@@ -1185,7 +1212,7 @@ impl F3DEX2 {
         let _size = get_cmd(w0, 19, 2);
         let _width = get_cmd(w0, 0, 11);
 
-        rdp.color_image = get_segmented_address(w1);
+        rdp.color_image = rsp.from_segmented(w1);
         GBIResult::Continue
     }
 

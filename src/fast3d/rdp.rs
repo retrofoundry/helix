@@ -523,7 +523,12 @@ impl RDP {
             return hash;
         }
 
-        let mut program = OpenGLProgram::new(self.other_mode_h, self.other_mode_l, self.combine, self.tile_descriptors);
+        let mut program = OpenGLProgram::new(
+            self.other_mode_h,
+            self.other_mode_l,
+            self.combine,
+            self.tile_descriptors,
+        );
         program.init();
         program.preprocess();
 

@@ -13,10 +13,6 @@ pub fn get_cmd(val: usize, start_bit: u32, num_bits: u32) -> usize {
     (val >> start_bit) & ((1 << num_bits) - 1)
 }
 
-pub fn get_segmented_address(w1: usize) -> usize {
-    w1
-}
-
 pub fn other_mode_l_uses_texture_edge(other_mode_l: u32) -> bool {
     other_mode_l >> (OtherModeLayoutL::CVG_X_ALPHA as u32) & 0x01 == 0x01
 }
