@@ -18,7 +18,7 @@ use super::{
 };
 use super::{GBIDefinition, GBIResult, GBI};
 use crate::extensions::matrix::MatrixFrom;
-use crate::fast3d::gbi::defines::{G_TX, LookAt};
+use crate::fast3d::gbi::defines::{LookAt, G_TX};
 use crate::fast3d::rdp::MAX_BUFFERED;
 use crate::fast3d::utils::color::Color;
 use crate::fast3d::utils::color_combiner::{ACMUX, CCMUX};
@@ -225,7 +225,7 @@ impl F3DEX2 {
             // Clear the lights_valid flag
             rsp.lights_valid = false;
         }
-        
+
         rsp.modelview_projection_matrix_changed = true;
 
         GBIResult::Continue
@@ -454,8 +454,8 @@ impl F3DEX2 {
                 }
 
                 let mut r = unsafe { rsp.lights[rsp.num_lights as usize].dir.col[0] as f32 };
-                let mut g =  unsafe { rsp.lights[rsp.num_lights as usize].dir.col[1] as f32 };
-                let mut b =  unsafe { rsp.lights[rsp.num_lights as usize].dir.col[2] as f32 };
+                let mut g = unsafe { rsp.lights[rsp.num_lights as usize].dir.col[1] as f32 };
+                let mut b = unsafe { rsp.lights[rsp.num_lights as usize].dir.col[2] as f32 };
 
                 for i in 0..rsp.num_lights {
                     let mut intensity = vertex_normal.normal[0] as f32
@@ -466,9 +466,15 @@ impl F3DEX2 {
                     intensity /= 127.0;
 
                     if intensity > 0.0 {
-                         unsafe { r += intensity * rsp.lights[i as usize].dir.col[0] as f32; }
-                         unsafe { g += intensity * rsp.lights[i as usize].dir.col[1] as f32; }
-                         unsafe { b += intensity * rsp.lights[i as usize].dir.col[2] as f32; }
+                        unsafe {
+                            r += intensity * rsp.lights[i as usize].dir.col[0] as f32;
+                        }
+                        unsafe {
+                            g += intensity * rsp.lights[i as usize].dir.col[1] as f32;
+                        }
+                        unsafe {
+                            b += intensity * rsp.lights[i as usize].dir.col[2] as f32;
+                        }
                     }
                 }
 
@@ -496,27 +502,6 @@ impl F3DEX2 {
 
             staging_vertex.uv[0] = U as f32;
             staging_vertex.uv[1] = V as f32;
-
-            // trivial clip rejection
-            staging_vertex.clip_reject = 0;
-            if x < -w {
-                staging_vertex.clip_reject |= 1;
-            }
-            if x > w {
-                staging_vertex.clip_reject |= 2;
-            }
-            if y < -w {
-                staging_vertex.clip_reject |= 4;
-            }
-            if y > w {
-                staging_vertex.clip_reject |= 8;
-            }
-            if z < -w {
-                staging_vertex.clip_reject |= 16;
-            }
-            if z > w {
-                staging_vertex.clip_reject |= 32;
-            }
 
             staging_vertex.position.x = x;
             staging_vertex.position.y = y;
@@ -577,8 +562,9 @@ impl F3DEX2 {
         let vertex3 = &rsp.vertex_table[vertex_id3];
         let vertex_array = [vertex1, vertex2, vertex3];
 
-        if (vertex1.clip_reject & vertex2.clip_reject & vertex3.clip_reject) > 0 {
-            // ...whole tri is offscreen, cull.
+        // Don't draw anything if both tris are being culled.
+        if (rsp.geometry_mode & RSPGeometry::G_CULL_BOTH as u32) == RSPGeometry::G_CULL_BOTH as u32
+        {
             return GBIResult::Continue;
         }
 
@@ -609,6 +595,10 @@ impl F3DEX2 {
         let use_texture = rdp.combine.uses_texture0() || rdp.combine.uses_texture1();
         rdp.flush_textures(gl_context, gfx_context);
 
+        gfx_context
+            .api
+            .set_uniforms(gl_context, &rdp.fog_color, &rdp.blend_color);
+
         let current_tile = rdp.tile_descriptors[rdp.texture_state.tile as usize];
         let tex_width = current_tile.get_width();
         let tex_height = current_tile.get_height();
@@ -627,6 +617,11 @@ impl F3DEX2 {
             rdp.add_to_buf_vbo(z);
             rdp.add_to_buf_vbo(w);
 
+            rdp.add_to_buf_vbo(vertex_array[i].color.r as f32 / 255.0);
+            rdp.add_to_buf_vbo(vertex_array[i].color.g as f32 / 255.0);
+            rdp.add_to_buf_vbo(vertex_array[i].color.b as f32 / 255.0);
+            rdp.add_to_buf_vbo(vertex_array[i].color.a as f32 / 255.0);
+
             if use_texture {
                 let mut u = (vertex_array[i].uv[0] - (current_tile.uls as f32) * 8.0) / 32.0;
                 let mut v = (vertex_array[i].uv[1] - (current_tile.ult as f32) * 8.0) / 32.0;
@@ -638,13 +633,6 @@ impl F3DEX2 {
 
                 rdp.add_to_buf_vbo(u / tex_width as f32);
                 rdp.add_to_buf_vbo(v / tex_height as f32);
-            }
-
-            if use_fog {
-                rdp.add_to_buf_vbo(rdp.fog_color.r as f32 / 255.0);
-                rdp.add_to_buf_vbo(rdp.fog_color.g as f32 / 255.0);
-                rdp.add_to_buf_vbo(rdp.fog_color.b as f32 / 255.0);
-                rdp.add_to_buf_vbo(vertex_array[i].color.a as f32 / 255.0);
             }
 
             let shader_program = rdp.shader_cache.get(&shader_hash).unwrap();

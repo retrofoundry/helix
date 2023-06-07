@@ -600,7 +600,7 @@ impl RDP {
             self.flush(gl_context, gfx_context);
             gfx_context
                 .api
-                .set_blend_state(gl_context, do_blend, blend_state, self.blend_color);
+                .set_blend_state(gl_context, do_blend, blend_state);
             self.rendering_state.blend_enabled = do_blend;
         }
     }

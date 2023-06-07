@@ -1,6 +1,9 @@
 use crate::fast3d::gbi::defines::DirLight;
 
-use super::{gbi::defines::{Light, LookAt}, utils::color::Color};
+use super::{
+    gbi::defines::{Light, LookAt},
+    utils::color::Color,
+};
 use glam::{Mat4, Vec3A};
 
 pub const MATRIX_STACK_SIZE: usize = 32;
@@ -141,10 +144,14 @@ impl RSP {
 
     pub fn set_light_color(&mut self, index: usize, value: u32) {
         assert!(index <= MAX_LIGHTS);
-        
+
         let light = &mut self.lights[index];
-        unsafe { light.raw.words[0] = value; }
-        unsafe { light.raw.words[1] = value; } 
+        unsafe {
+            light.raw.words[0] = value;
+        }
+        unsafe {
+            light.raw.words[1] = value;
+        }
         self.lights_valid = false;
     }
 
@@ -166,7 +173,7 @@ impl RSP {
     pub fn set_persp_norm(&mut self, _norm: usize) {
         // TODO: implement
     }
-    
+
     pub fn set_light(&mut self, index: usize, address: usize) {
         assert!(index <= MAX_LIGHTS);
 
@@ -184,9 +191,18 @@ impl RSP {
         let dir_light_ptr = data as *const DirLight;
         let dir_light = unsafe { &*dir_light_ptr };
 
-        let lookat = if index == 0 { &mut self.lookat[0] } else { &mut self.lookat[1] };
+        let lookat = if index == 0 {
+            &mut self.lookat[0]
+        } else {
+            &mut self.lookat[1]
+        };
         if dir_light.dir[0] != 0 || dir_light.dir[1] != 0 || dir_light.dir[2] != 0 {
-            *lookat = Vec3A::new(dir_light.dir[0] as f32, dir_light.dir[1] as f32, dir_light.dir[2] as f32).normalize();
+            *lookat = Vec3A::new(
+                dir_light.dir[0] as f32,
+                dir_light.dir[1] as f32,
+                dir_light.dir[2] as f32,
+            )
+            .normalize();
         } else {
             *lookat = Vec3A::ZERO;
         }

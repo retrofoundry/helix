@@ -180,14 +180,10 @@ impl OpenGLProgram {
 
         self.shader_input_mapping = self.combine.shader_input_mapping();
 
-        self.num_floats = 4;
+        self.num_floats = 8;
 
         if self.get_define_bool("USE_TEXTURE0") || self.get_define_bool("USE_TEXTURE1") {
             self.num_floats += 2;
-        }
-
-        if self.get_define_bool("USE_FOG") {
-            self.num_floats += 4;
         }
 
         self.both = format!(
@@ -200,25 +196,21 @@ impl OpenGLProgram {
             r#"
             in vec4 aVtxPos;
 
+            in vec4 aVtxColor;
+            out vec4 vVtxColor;
+
             #if defined(USE_TEXTURE0) || defined(USE_TEXTURE1)
                 in vec2 aTexCoord;
                 out vec2 vTexCoord;
             #endif
 
-            #ifdef USE_FOG
-                in vec4 aFog;
-                out vec4 vFog;
-            #endif
-
             {}
 
             void main() {{
+                vVtxColor = aVtxColor;
+
                 #if defined(USE_TEXTURE0) || defined(USE_TEXTURE1)
                     vTexCoord = aTexCoord;
-                #endif
-
-                #ifdef USE_FOG
-                    vFog = aFog;
                 #endif
 
                 {}
@@ -320,13 +312,20 @@ impl OpenGLProgram {
 
         format!(
             r#"
+            in vec4 vVtxColor;
+
             #if defined(USE_TEXTURE0) || defined(USE_TEXTURE1)
                 in vec2 vTexCoord;
             #endif
 
             #ifdef USE_FOG
-                in vec4 vFog;
+                uniform vec3 uFogColor;
             #endif
+
+            // blend parameters
+            uniform vec4 uBlendColor;
+
+            // combine parameters
 
             {}
 
@@ -346,10 +345,6 @@ impl OpenGLProgram {
                         float random = dot(sin(value), vec3(12.9898, 78.233, 37.719));
                         return fract(sin(random) * 143758.5453);
                     }}
-                #endif
-
-                #if defined(ALPHA_COMPARE_THRESHOLD)
-                    uniform float uAlphaThreshold;
                 #endif
             #endif
 
@@ -392,9 +387,9 @@ impl OpenGLProgram {
 
                 #ifdef USE_FOG
                     #ifdef USE_ALPHA
-                        texel = vec4(mix(texel.rgb, vFog.rgb, vFog.a), texel.a);
+                        texel = vec4(mix(texel.rgb, uFogColor.rgb, vVtxColor.a), texel.a);
                     #else
-                        texel = mix(texel, vFog.rgb, vFog.a);
+                        texel = mix(texel, uFogColor.rgb, vVtxColor.a);
                     #endif
                 #endif
 
@@ -404,7 +399,7 @@ impl OpenGLProgram {
                     #endif
                     
                     #if defined(ALPHA_COMPARE_THRESHOLD)
-                        if (texel.a < uAlphaThreshold) discard;
+                        if (texel.a < uBlendColor.a) discard;
                     #endif
 
                     #if defined(TEXTURE_EDGE)

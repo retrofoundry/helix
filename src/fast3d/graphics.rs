@@ -35,14 +35,9 @@ pub trait GraphicsAPI {
     fn set_polygon_offset(&self, _gl: &glow::Context, enable: bool);
     fn set_viewport(&mut self, _gl: &glow::Context, x: i32, y: i32, width: i32, height: i32);
     fn set_scissor(&self, gl: &glow::Context, x: i32, y: i32, width: i32, height: i32);
-    fn set_blend_state(
-        &self,
-        gl: &glow::Context,
-        enabled: bool,
-        blend_state: BlendState,
-        blend_color: Color,
-    );
+    fn set_blend_state(&self, gl: &glow::Context, enabled: bool, blend_state: BlendState);
     fn set_cull_mode(&self, gl: &glow::Context, cull_mode: Option<wgpu::Face>);
+    fn set_uniforms(&self, gl: &glow::Context, fog_color: &Color, blend_color: &Color);
     fn draw_triangles(&self, gl: &glow::Context, vertices: *const f32, count: usize, stride: usize);
     fn init(&self);
     fn on_resize(&self);

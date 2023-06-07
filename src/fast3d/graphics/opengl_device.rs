@@ -15,8 +15,8 @@ pub struct OpenGLGraphicsDevice {
     pub frame_count: i32,
     pub current_height: i32,
 
-    pub alpha_threshold_location: Option<<glow::Context as HasContext>::UniformLocation>,
-    pub blend_color_alpha: i32,
+    pub fog_color_location: Option<<glow::Context as HasContext>::UniformLocation>,
+    pub blend_color_location: Option<<glow::Context as HasContext>::UniformLocation>,
 }
 
 impl OpenGLGraphicsDevice {
@@ -35,8 +35,8 @@ impl OpenGLGraphicsDevice {
             frame_count: 0,
             current_height: 0,
 
-            alpha_threshold_location: None,
-            blend_color_alpha: 0,
+            fog_color_location: None,
+            blend_color_location: None,
         }
     }
 
@@ -101,14 +101,12 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
             let vtx_pos = gl.get_attrib_location(native_program, "aVtxPos").unwrap();
             gl.disable_vertex_attrib_array(vtx_pos);
 
+            let vtx_color = gl.get_attrib_location(native_program, "aVtxColor").unwrap();
+            gl.disable_vertex_attrib_array(vtx_color);
+
             if program.get_define_bool("USE_TEXTURE0") || program.get_define_bool("USE_TEXTURE1") {
                 let tex_coord = gl.get_attrib_location(native_program, "aTexCoord").unwrap();
                 gl.disable_vertex_attrib_array(tex_coord);
-            }
-
-            if program.get_define_bool("USE_FOG") {
-                let fog = gl.get_attrib_location(native_program, "aFog").unwrap();
-                gl.disable_vertex_attrib_array(fog);
             }
 
             for i in 0..program.shader_input_mapping.num_inputs {
@@ -193,6 +191,20 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
             );
             accumulated_offset += pos_size;
 
+            let vtx_color = gl.get_attrib_location(native_program, "aVtxColor").unwrap();
+            gl.enable_vertex_attrib_array(vtx_color);
+
+            let color_size = 4;
+            gl.vertex_attrib_pointer_f32(
+                vtx_color,
+                color_size,
+                glow::FLOAT,
+                false,
+                (program.num_floats * FLOAT_SIZE) as i32,
+                accumulated_offset * FLOAT_SIZE as i32,
+            );
+            accumulated_offset += color_size;
+
             if program.get_define_bool("USE_TEXTURE0") || program.get_define_bool("USE_TEXTURE1") {
                 let tex_coord = gl.get_attrib_location(native_program, "aTexCoord").unwrap();
                 gl.enable_vertex_attrib_array(tex_coord);
@@ -208,23 +220,6 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
                 );
 
                 accumulated_offset += coord_size;
-            }
-
-            if program.get_define_bool("USE_FOG") {
-                let fog = gl.get_attrib_location(native_program, "aFog").unwrap();
-                gl.enable_vertex_attrib_array(fog);
-
-                let fog_size = 4;
-                gl.vertex_attrib_pointer_f32(
-                    fog,
-                    fog_size,
-                    glow::FLOAT,
-                    false,
-                    (program.num_floats * FLOAT_SIZE) as i32,
-                    accumulated_offset * FLOAT_SIZE as i32,
-                );
-
-                accumulated_offset += fog_size;
             }
 
             for i in 0..program.shader_input_mapping.num_inputs {
@@ -251,6 +246,12 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
                 accumulated_offset += input_size;
             }
 
+            if program.get_define_bool("USE_FOG") {
+                self.fog_color_location = gl.get_uniform_location(native_program, "uFogColor");
+            }
+
+            self.blend_color_location = gl.get_uniform_location(native_program, "uBlendColor");
+
             // Set the uniforms
             if program.get_define_bool("USE_ALPHA") {
                 if program.get_define_bool("ALPHA_COMPARE_DITHER") {
@@ -265,9 +266,6 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
                         gl.uniform_1_i32(Some(&frame_height_location), self.current_height);
                     }
                 }
-
-                self.alpha_threshold_location =
-                    gl.get_uniform_location(native_program, "uAlphaThreshold");
             }
         };
     }
@@ -393,13 +391,7 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
         }
     }
 
-    fn set_blend_state(
-        &self,
-        gl: &glow::Context,
-        enabled: bool,
-        blend_state: wgpu::BlendState,
-        blend_color: Color,
-    ) {
+    fn set_blend_state(&self, gl: &glow::Context, enabled: bool, blend_state: wgpu::BlendState) {
         unsafe {
             if !enabled {
                 gl.disable(glow::BLEND);
@@ -419,10 +411,6 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
                 Self::gfx_blend_factor_to_gl(blend_state.alpha.src_factor),
                 Self::gfx_blend_factor_to_gl(blend_state.alpha.dst_factor),
             );
-
-            if let Some(alpha_threshold_location) = self.alpha_threshold_location {
-                gl.uniform_1_f32(Some(&alpha_threshold_location), blend_color.a as f32);
-            }
         }
     }
 
@@ -438,6 +426,29 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
                     gl.cull_face(glow::BACK);
                 }
                 None => gl.disable(glow::CULL_FACE),
+            }
+        }
+    }
+
+    fn set_uniforms(&self, gl: &glow::Context, fog_color: &Color, blend_color: &Color) {
+        unsafe {
+            if let Some(fog_color_location) = self.fog_color_location {
+                gl.uniform_3_f32(
+                    Some(&fog_color_location),
+                    fog_color.r as f32 / 255.0,
+                    fog_color.g as f32 / 255.0,
+                    fog_color.b as f32 / 255.0,
+                );
+            }
+
+            if let Some(blend_color_location) = self.blend_color_location {
+                gl.uniform_4_f32(
+                    Some(&blend_color_location),
+                    blend_color.r as f32 / 255.0,
+                    blend_color.g as f32 / 255.0,
+                    blend_color.b as f32 / 255.0,
+                    blend_color.a as f32 / 255.0,
+                );
             }
         }
     }
