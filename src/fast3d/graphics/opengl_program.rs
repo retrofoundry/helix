@@ -1,15 +1,13 @@
 use imgui_glow_renderer::glow;
 
 use crate::fast3d::gbi::utils::{
-    get_textfilter_from_other_mode_h, other_mode_l_alpha_compare_dither,
-    other_mode_l_alpha_compare_threshold, other_mode_l_uses_alpha, other_mode_l_uses_fog,
-    other_mode_l_uses_texture_edge,
+    get_cycle_type_from_other_mode_h, get_textfilter_from_other_mode_h,
+    other_mode_l_alpha_compare_dither, other_mode_l_alpha_compare_threshold,
+    other_mode_l_uses_alpha, other_mode_l_uses_fog, other_mode_l_uses_texture_edge,
 };
 
-use crate::fast3d::rdp::NUM_TILE_DESCRIPTORS;
-use crate::fast3d::utils::color_combiner::{
-    CombineParams, ShaderInputMapping, ACMUX, CCMUX, SHADER,
-};
+use crate::fast3d::rdp::{OtherModeHCycleType, NUM_TILE_DESCRIPTORS};
+use crate::fast3d::utils::color_combiner::{CombineParams, ACMUX, CCMUX};
 use crate::fast3d::utils::texture::TextFilt;
 use crate::fast3d::utils::tile::TileDescriptor;
 use std::collections::HashMap;
@@ -39,7 +37,6 @@ pub struct OpenGLProgram {
     combine: CombineParams,
     tile_descriptors: [TileDescriptor; NUM_TILE_DESCRIPTORS],
 
-    pub shader_input_mapping: ShaderInputMapping,
     pub num_floats: usize,
 }
 
@@ -141,7 +138,6 @@ impl OpenGLProgram {
             combine,
             tile_descriptors,
 
-            shader_input_mapping: ShaderInputMapping::ZERO,
             num_floats: 0,
         }
     }
@@ -149,7 +145,13 @@ impl OpenGLProgram {
     pub fn init(&mut self) {
         // for debugging
         self.set_define_bool("USE_ALPHA_VISUALIZER".to_string(), false);
+        self.set_define_bool("ONLY_VERTEX_COLOR".to_string(), false);
 
+        self.set_define_bool(
+            "TWO_CYCLE".to_string(),
+            get_cycle_type_from_other_mode_h(self.other_mode_h)
+                == OtherModeHCycleType::G_CYC_2CYCLE,
+        );
         self.set_define_bool("USE_TEXTURE0".to_string(), self.combine.uses_texture0());
         self.set_define_bool("USE_TEXTURE1".to_string(), self.combine.uses_texture1());
         self.set_define_bool(
@@ -178,8 +180,6 @@ impl OpenGLProgram {
 
         self.set_define_bool("COLOR_ALPHA_SAME".to_string(), self.combine.cc_ac_same(0));
 
-        self.shader_input_mapping = self.combine.shader_input_mapping();
-
         self.num_floats = 8;
 
         if self.get_define_bool("USE_TEXTURE0") || self.get_define_bool("USE_TEXTURE1") {
@@ -189,6 +189,10 @@ impl OpenGLProgram {
         self.both = format!(
             r#"
             precision mediump float;
+
+            const vec4 tZero = vec4(0.0);
+            const vec4 tHalf = vec4(0.5);
+            const vec4 tOne = vec4(1.0);
             "#,
         );
 
@@ -204,16 +208,12 @@ impl OpenGLProgram {
                 out vec2 vTexCoord;
             #endif
 
-            {}
-
             void main() {{
                 vVtxColor = aVtxColor;
 
                 #if defined(USE_TEXTURE0) || defined(USE_TEXTURE1)
                     vTexCoord = aTexCoord;
                 #endif
-
-                {}
 
                 #if defined(USE_TEXTURE0) || defined(USE_TEXTURE1)
                     {}
@@ -222,43 +222,10 @@ impl OpenGLProgram {
                 gl_Position = aVtxPos;
             }}
         "#,
-            self.generate_vtx_inputs_params(),
-            self.generate_vtx_inputs_body(),
             self.generate_clamp(),
         );
 
         self.fragment = self.generate_frag();
-    }
-
-    fn generate_vtx_inputs_params(&mut self) -> String {
-        let mut out = String::new();
-        let use_alpha = self.get_define_bool("USE_ALPHA");
-
-        for i in 0..self.shader_input_mapping.num_inputs {
-            out.push_str(&format!(
-                r#"
-                in vec{} aInput{};
-                out vec{} vInput{};
-            "#,
-                if use_alpha { 4 } else { 3 },
-                i + 1,
-                if use_alpha { 4 } else { 3 },
-                i + 1,
-            ));
-            self.num_floats += if use_alpha { 4 } else { 3 };
-        }
-
-        out
-    }
-
-    fn generate_vtx_inputs_body(&mut self) -> String {
-        let mut out = String::new();
-
-        for i in 0..self.shader_input_mapping.num_inputs {
-            out.push_str(&format!("vInput{} = aInput{};\n", i + 1, i + 1));
-        }
-
-        out
     }
 
     fn generate_clamp(&mut self) -> String {
@@ -291,23 +258,107 @@ impl OpenGLProgram {
     }
 
     fn generate_frag(&mut self) -> String {
-        let mut inputs = String::new();
-        for i in 0..self.shader_input_mapping.num_inputs {
-            inputs.push_str(&format!(
-                "in vec{} vInput{};\n",
-                if self.get_define_bool("USE_ALPHA") {
-                    4
-                } else {
-                    3
-                },
-                i + 1
-            ));
-        }
-
         let tex_filter = match get_textfilter_from_other_mode_h(self.other_mode_h) {
             TextFilt::G_TF_POINT => "Point",
             TextFilt::G_TF_AVERAGE => "Average",
             TextFilt::G_TF_BILERP => "Bilerp",
+        };
+
+        let color_input_common = |input| match input {
+            CCMUX::COMBINED => "tCombColor.rgb",
+            CCMUX::TEXEL0 => "texVal0.rgb",
+            CCMUX::TEXEL1 => "texVal1.rgb",
+            CCMUX::PRIMITIVE => "uPrimColor.rgb",
+            CCMUX::SHADE => "vVtxColor.rgb",
+            CCMUX::ENVIRONMENT => "uEnvColor.rgb",
+            _ => panic!("Should be unreachable"),
+        };
+
+        let color_input_a = |input| {
+            if input <= CCMUX::ENVIRONMENT {
+                color_input_common(input)
+            } else {
+                match input {
+                    CCMUX::CENTER__SCALE__ONE => "tOne.rgb", // matching against ONE
+                    CCMUX::COMBINED_ALPHA__NOISE__K4 => "vec3(RAND_NOISE, RAND_NOISE, RAND_NOISE)", // matching against NOISE
+                    _ => "tZero.rgb",
+                }
+            }
+        };
+
+        let color_input_b = |input| {
+            if input <= CCMUX::ENVIRONMENT {
+                color_input_common(input)
+            } else {
+                match input {
+                    CCMUX::CENTER__SCALE__ONE => "uKeyCenter", // matching against CENTER
+                    CCMUX::COMBINED_ALPHA__NOISE__K4 => "vec3(uK4, uK4, uK4)", // matching against K4
+                    _ => "tZero.rgb",
+                }
+            }
+        };
+
+        let color_input_c = |input| {
+            if input <= CCMUX::ENVIRONMENT {
+                color_input_common(input)
+            } else {
+                match input {
+                    CCMUX::CENTER__SCALE__ONE => "uKeyScale", // matching against SCALE
+                    CCMUX::COMBINED_ALPHA__NOISE__K4 => "tCombColor.aaa", // matching against COMBINED_ALPHA
+                    CCMUX::TEXEL0_ALPHA => "texVal0.aaa",
+                    CCMUX::TEXEL1_ALPHA => "texVal1.aaa",
+                    CCMUX::PRIMITIVE_ALPHA => "uPrimColor.aaa",
+                    CCMUX::SHADE_ALPHA => "vVtxColor.aaa",
+                    CCMUX::ENV_ALPHA => "uEnvColor.aaa",
+                    CCMUX::LOD_FRACTION => "tZero.rgb", // TODO: LOD FRACTION
+                    CCMUX::PRIM_LOD_FRACTION => "vec3(uPrimLodFrac, uPrimLodFrac, uPrimLodFrac)",
+                    CCMUX::K5 => "vec3(uK5, uK5, uK5)",
+                    _ => "tZero.rgb",
+                }
+            }
+        };
+
+        let color_input_d = |input| {
+            if input <= CCMUX::ENVIRONMENT {
+                color_input_common(input)
+            } else {
+                match input {
+                    CCMUX::CENTER__SCALE__ONE => "tOne.rgb", // matching against ONE
+                    _ => "tZero.rgb",
+                }
+            }
+        };
+
+        let alpha_input_abd = |input| {
+            match input {
+                ACMUX::COMBINED__LOD_FRAC => "tCombColor.a", // matching against COMBINED
+                ACMUX::TEXEL0 => "texVal0.a",
+                ACMUX::TEXEL1 => "texVal1.a",
+                ACMUX::PRIMITIVE => "uPrimColor.a",
+                ACMUX::SHADE => {
+                    if self.get_define_bool("USE_FOG") {
+                        "tOne.a"
+                    } else {
+                        "vVtxColor.a"
+                    }
+                }
+                ACMUX::ENVIRONMENT => "uEnvColor.a",
+                ACMUX::PRIM_LOD_FRAC__ONE => "tOne.a", // matching against ONE
+                _ => "tZero.a",
+            }
+        };
+
+        let alpha_input_c = |input| {
+            match input {
+                ACMUX::COMBINED__LOD_FRAC => "tZero.a", // TODO: LOD_FRAC
+                ACMUX::TEXEL0 => "texVal0.a",
+                ACMUX::TEXEL1 => "texVal1.a",
+                ACMUX::PRIMITIVE => "uPrimColor.a",
+                ACMUX::SHADE => "vVtxColor.a",
+                ACMUX::ENVIRONMENT => "uEnvColor.a",
+                ACMUX::PRIM_LOD_FRAC__ONE => "uPrimLodFrac",
+                _ => "tZero.a",
+            }
         };
 
         format!(
@@ -326,8 +377,14 @@ impl OpenGLProgram {
             uniform vec4 uBlendColor;
 
             // combine parameters
-
-            {}
+            // TODO: use a uniform block?
+            uniform vec4 uPrimColor;
+            uniform vec4 uEnvColor;
+            uniform vec3 uKeyCenter;
+            uniform vec3 uKeyScale;
+            uniform float uPrimLodFrac;
+            uniform float uK4;
+            uniform float uK5;
 
             #ifdef USE_TEXTURE0
                 uniform sampler2D uTex0;
@@ -351,6 +408,7 @@ impl OpenGLProgram {
             out vec4 outColor;
 
             #define TEX_OFFSET(offset) texture(tex, texCoord - (offset) / texSize)
+            #define RAND_NOISE "((random(vec3(floor(gl_FragCoord.xy * (240.0 / float(uFrameHeight)), float(uFrameCount))) + 1.0) / 2.0)"
 
             vec4 Texture2D_N64_Point(in sampler2D tex, in vec2 texCoord) {{
                 return texture(tex, texCoord);
@@ -375,27 +433,52 @@ impl OpenGLProgram {
             
             #define Texture2D_N64 Texture2D_N64_{}
 
+            vec3 CombineColorCycle0(vec4 tCombColor, vec4 texVal0, vec4 texVal1) {{
+                return ({} - {}) * {} + {};
+            }} 
+            
+            float CombineAlphaCycle0(vec4 tCombColor, vec4 texVal0, vec4 texVal1) {{
+                return ({} - {}) * {} + {};
+            }}
+            
+            vec3 CombineColorCycle1(vec4 tCombColor, vec4 texVal0, vec4 texVal1) {{
+                return ({} - {}) * {} + {};
+            }}
+            
+            float CombineAlphaCycle1(vec4 tCombColor, vec4 texVal0, vec4 texVal1) {{
+                return ({} - {}) * {} + {};
+            }}
+
             void main() {{
+                vec4 texVal0 = tOne, texVal1 = tOne;
+
                 #ifdef USE_TEXTURE0
-                    vec4 texVal0 = Texture2D_N64(uTex0, vTexCoord);
+                    texVal0 = Texture2D_N64(uTex0, vTexCoord);
                 #endif
                 #ifdef USE_TEXTURE1
-                    vec4 texVal1 = Texture2D_N64(uTex1, vTexCoord);
+                    texVal1 = Texture2D_N64(uTex1, vTexCoord);
                 #endif
 
-                {}
-
-                #ifdef USE_FOG
-                    #ifdef USE_ALPHA
-                        texel = vec4(mix(texel.rgb, uFogColor.rgb, vVtxColor.a), texel.a);
-                    #else
-                        texel = mix(texel, uFogColor.rgb, vVtxColor.a);
+                #ifdef ONLY_VERTEX_COLOR
+                    vec4 texel = vVtxColor;
+                #else
+                    vec4 texel = vec4(
+                        CombineColorCycle0(tHalf, texVal0, texVal1),
+                        CombineAlphaCycle0(tHalf, texVal0, texVal1)
+                    );
+                    
+                    #ifdef TWO_CYCLE
+                        // Note that in the second cycle, Tex0 and Tex1 are swapped
+                        texel = vec4(
+                            CombineColorCycle1(texel, texVal1, texVal0),
+                            CombineAlphaCycle1(texel, texVal1, texVal0)
+                        );
                     #endif
                 #endif
 
                 #if defined(USE_ALPHA)
                     #if defined(ALPHA_COMPARE_DITHER)
-                        texel.a *= floor(random(vec3(floor(gl_FragCoord.xy * (240.0 / float(uFrameHeight))), float(uFrameCount))) + 0.5);
+                        texel.a < floor(random(vec3(floor(gl_FragCoord.xy * (240.0 / float(uFrameHeight))), float(uFrameCount))) + 0.5) discard;
                     #endif
                     
                     #if defined(ALPHA_COMPARE_THRESHOLD)
@@ -407,209 +490,35 @@ impl OpenGLProgram {
                     #endif
 
                     #if defined(USE_ALPHA_VISUALIZER)
-                        texel.rgb = vec3(texel.a);
-                        texel.a = 1.0;
+                        texel = mix(texel, vec4(1.0f, 0.0f, 1.0f, 1.0f), 0.5f);
                     #endif
                 #endif
 
-                #ifdef USE_ALPHA
-                    outColor = texel;
-                #else
-                    outColor = vec4(texel, 1.0);
+                // TODO: Blender
+                #ifdef USE_FOG
+                    texel = vec4(mix(texel.rgb, uFogColor.rgb, vVtxColor.a), texel.a);
                 #endif
+
+                outColor = texel;
             }}
         "#,
-            inputs,
             tex_filter,
-            self.generate_color_combiner(),
+            color_input_a(self.combine.c0.a),
+            color_input_b(self.combine.c0.b),
+            color_input_c(self.combine.c0.c),
+            color_input_d(self.combine.c0.d),
+            alpha_input_abd(self.combine.a0.a),
+            alpha_input_abd(self.combine.a0.b),
+            alpha_input_c(self.combine.a0.c),
+            alpha_input_abd(self.combine.a0.d),
+            color_input_a(self.combine.c1.a),
+            color_input_b(self.combine.c1.b),
+            color_input_c(self.combine.c1.c),
+            color_input_d(self.combine.c1.d),
+            alpha_input_abd(self.combine.a1.a),
+            alpha_input_abd(self.combine.a1.b),
+            alpha_input_c(self.combine.a1.c),
+            alpha_input_abd(self.combine.a1.d),
         )
-    }
-
-    fn generate_color_combiner(&mut self) -> String {
-        let do_single: [bool; 2] = [
-            self.combine.c0.c == CCMUX::COMBINED,
-            self.combine.a0.c == ACMUX::COMBINED__LOD_FRAC,
-        ];
-        let do_multiply: [bool; 2] = [
-            self.combine.c0.b == CCMUX::COMBINED && self.combine.c0.d == CCMUX::COMBINED,
-            self.combine.a0.b == ACMUX::COMBINED__LOD_FRAC
-                && self.combine.a0.d == ACMUX::COMBINED__LOD_FRAC,
-        ];
-        let do_mix: [bool; 2] = [
-            self.combine.c0.b == self.combine.c0.d,
-            self.combine.a0.b == self.combine.a0.d,
-        ];
-
-        let use_alpha = self.get_define_bool("USE_ALPHA");
-
-        format!(
-            r#"
-                #ifdef USE_ALPHA
-                    vec4 texel = 
-                #else
-                    vec3 texel =
-                #endif
-
-                #if !defined(COLOR_ALPHA_SAME) && defined(USE_ALPHA)
-                    vec4({}, {});
-                #else
-                    {};
-                #endif
-        "#,
-            self.generate_color_combiner_inputs(
-                do_single[0],
-                do_multiply[0],
-                do_mix[0],
-                false,
-                false,
-                true,
-            ),
-            self.generate_color_combiner_inputs(
-                do_single[1],
-                do_multiply[1],
-                do_mix[1],
-                true,
-                true,
-                true,
-            ),
-            self.generate_color_combiner_inputs(
-                do_single[0],
-                do_multiply[0],
-                do_mix[0],
-                use_alpha,
-                false,
-                use_alpha,
-            ),
-        )
-    }
-
-    fn generate_color_combiner_inputs(
-        &mut self,
-        do_single: bool,
-        do_multiply: bool,
-        do_mix: bool,
-        with_alpha: bool,
-        only_alpha: bool,
-        use_alpha: bool,
-    ) -> String {
-        let mut out = String::new();
-        let shader_map = self.shader_input_mapping.mirror_mapping[if only_alpha { 1 } else { 0 }];
-
-        if do_single {
-            out.push_str(&self.shader_input(
-                shader_map[3],
-                with_alpha,
-                only_alpha,
-                use_alpha,
-                false,
-            ));
-        } else if do_multiply {
-            out.push_str(&format!(
-                "{} * {}",
-                self.shader_input(shader_map[0], with_alpha, only_alpha, use_alpha, false),
-                self.shader_input(shader_map[2], with_alpha, only_alpha, use_alpha, true),
-            ));
-        } else if do_mix {
-            out.push_str(&format!(
-                "mix({}, {}, {})",
-                self.shader_input(shader_map[1], with_alpha, only_alpha, use_alpha, false),
-                self.shader_input(shader_map[0], with_alpha, only_alpha, use_alpha, false),
-                self.shader_input(shader_map[2], with_alpha, only_alpha, use_alpha, true),
-            ));
-        } else {
-            out.push_str(&format!(
-                "({} - {}) * {} + {}",
-                self.shader_input(shader_map[0], with_alpha, only_alpha, use_alpha, false),
-                self.shader_input(shader_map[1], with_alpha, only_alpha, use_alpha, false),
-                self.shader_input(shader_map[2], with_alpha, only_alpha, use_alpha, true),
-                self.shader_input(shader_map[3], with_alpha, only_alpha, use_alpha, false),
-            ));
-        }
-
-        out
-    }
-
-    fn shader_input(
-        &self,
-        input: SHADER,
-        with_alpha: bool,
-        only_alpha: bool,
-        inputs_have_alpha: bool,
-        hint_single_element: bool,
-    ) -> String {
-        if !only_alpha {
-            match input {
-                SHADER::ZERO => {
-                    if with_alpha {
-                        "vec4(0.0, 0.0, 0.0, 0.0)"
-                    } else {
-                        "vec3(0.0, 0.0, 0.0)"
-                    }
-                }
-                SHADER::INPUT1 => {
-                    if with_alpha || !inputs_have_alpha {
-                        "vInput1"
-                    } else {
-                        "vInput1.rgb"
-                    }
-                }
-                SHADER::INPUT2 => {
-                    if with_alpha || !inputs_have_alpha {
-                        "vInput2"
-                    } else {
-                        "vInput2.rgb"
-                    }
-                }
-                SHADER::INPUT3 => {
-                    if with_alpha || !inputs_have_alpha {
-                        "vInput3"
-                    } else {
-                        "vInput3.rgb"
-                    }
-                }
-                SHADER::INPUT4 => {
-                    if with_alpha || !inputs_have_alpha {
-                        "vInput4"
-                    } else {
-                        "vInput4.rgb"
-                    }
-                }
-                SHADER::TEXEL0 => {
-                    if with_alpha {
-                        "texVal0"
-                    } else {
-                        "texVal0.rgb"
-                    }
-                }
-                SHADER::TEXEL0A => {
-                    if hint_single_element {
-                        "texVal0.a"
-                    } else if with_alpha {
-                        "vec4(texVal0.a, texVal0.a, texVal0.a, texVal0.a)"
-                    } else {
-                        "vec3(texVal0.a, texVal0.a, texVal0.a)"
-                    }
-                }
-                SHADER::TEXEL1 => {
-                    if with_alpha {
-                        "texVal1"
-                    } else {
-                        "texVal1.rgb"
-                    }
-                }
-            }
-        } else {
-            match input {
-                SHADER::ZERO => "0.0",
-                SHADER::INPUT1 => "vInput1.a",
-                SHADER::INPUT2 => "vInput2.a",
-                SHADER::INPUT3 => "vInput3.a",
-                SHADER::INPUT4 => "vInput4.a",
-                SHADER::TEXEL0 => "texVal0.a",
-                SHADER::TEXEL0A => "texVal0.a",
-                SHADER::TEXEL1 => "texVal1.a",
-            }
-        }
-        .to_string()
     }
 }

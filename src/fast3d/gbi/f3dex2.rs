@@ -1,6 +1,6 @@
 use std::slice;
 
-use glam::{Mat4, Vec3A};
+use glam::{Mat4, Vec2, Vec3A, Vec4};
 use imgui_glow_renderer::glow;
 use log::trace;
 
@@ -153,6 +153,9 @@ impl GBIDefinition for F3DEX2 {
         gbi.register(G_SET::TILE as usize, F3DEX2::gdp_set_tile);
         gbi.register(G_SET::TILESIZE as usize, F3DEX2::gdp_set_tile_size);
         gbi.register(G_SET::SCISSOR as usize, F3DEX2::gdp_set_scissor);
+        gbi.register(G_SET::CONVERT as usize, F3DEX2::gdp_set_convert);
+        gbi.register(G_SET::KEYR as usize, F3DEX2::gdp_set_key_r);
+        gbi.register(G_SET::KEYGB as usize, F3DEX2::gdp_set_key_gb);
         gbi.register(G_SET::COMBINE as usize, F3DEX2::gdp_set_combine);
         gbi.register(G_SET::ENVCOLOR as usize, F3DEX2::gdp_set_env_color);
         gbi.register(G_SET::PRIMCOLOR as usize, F3DEX2::gdp_set_prim_color);
@@ -478,9 +481,9 @@ impl F3DEX2 {
                     }
                 }
 
-                staging_vertex.color.r = if r > 255.0 { 255 } else { r as u8 };
-                staging_vertex.color.g = if g > 255.0 { 255 } else { g as u8 };
-                staging_vertex.color.b = if b > 255.0 { 255 } else { b as u8 };
+                staging_vertex.color.x = if r > 255.0 { 255.0 } else { r } / 255.0;
+                staging_vertex.color.y = if g > 255.0 { 255.0 } else { g } / 255.0;
+                staging_vertex.color.z = if b > 255.0 { 255.0 } else { b } / 255.0;
 
                 if rsp.geometry_mode & RSPGeometry::G_TEXTURE_GEN as u32 > 0 {
                     let dotx = vertex_normal.normal[0] as f32 * rsp.lookat_coeffs[0][0]
@@ -495,9 +498,9 @@ impl F3DEX2 {
                     V = ((doty / 127.0 + 1.0) / 4.0) as i16 * rdp.texture_state.scale_t as i16;
                 }
             } else {
-                staging_vertex.color.r = vertex.color.r;
-                staging_vertex.color.g = vertex.color.g;
-                staging_vertex.color.b = vertex.color.b;
+                staging_vertex.color.x = vertex.color.r as f32 / 255.0;
+                staging_vertex.color.y = vertex.color.g as f32 / 255.0;
+                staging_vertex.color.z = vertex.color.b as f32 / 255.0;
             }
 
             staging_vertex.uv[0] = U as f32;
@@ -518,9 +521,9 @@ impl F3DEX2 {
                 let fog = if fog < 0.0 { 0.0 } else { fog };
                 let fog = if fog > 255.0 { 255.0 } else { fog };
 
-                staging_vertex.color.a = fog as u8;
+                staging_vertex.color.w = fog / 255.0;
             } else {
-                staging_vertex.color.a = vertex.color.a;
+                staging_vertex.color.w = vertex.color.a as f32 / 255.0;
             }
 
             write_index += 1;
@@ -571,10 +574,6 @@ impl F3DEX2 {
         rdp.update_render_state(gl_context, gfx_context, rsp.geometry_mode);
 
         // TODO: Produce draw calls for RDP to process later?
-        let do_blend = other_mode_l_uses_alpha(rdp.other_mode_l)
-            || other_mode_l_uses_texture_edge(rdp.other_mode_l);
-        let use_fog = other_mode_l_uses_fog(rdp.other_mode_l);
-
         let shader_hash = rdp.lookup_or_create_program(gl_context, gfx_context);
 
         if shader_hash != rdp.rendering_state.shader_program_hash {
@@ -592,18 +591,27 @@ impl F3DEX2 {
             rdp.rendering_state.shader_program_hash = shader_hash;
         }
 
-        let use_texture = rdp.combine.uses_texture0() || rdp.combine.uses_texture1();
         rdp.flush_textures(gl_context, gfx_context);
 
-        gfx_context
-            .api
-            .set_uniforms(gl_context, &rdp.fog_color, &rdp.blend_color);
+        gfx_context.api.set_uniforms(
+            gl_context,
+            &rdp.fog_color,
+            &rdp.blend_color,
+            &rdp.prim_color,
+            &rdp.env_color,
+            &rdp.key_center,
+            &rdp.key_scale,
+            &rdp.prim_lod,
+            &rdp.convert_k,
+        );
 
         let current_tile = rdp.tile_descriptors[rdp.texture_state.tile as usize];
         let tex_width = current_tile.get_width();
         let tex_height = current_tile.get_height();
 
         let z_is_from_0_to_1 = gfx_context.api.z_is_from_0_to_1();
+
+        let use_texture = rdp.combine.uses_texture0() || rdp.combine.uses_texture1();
 
         for i in 0..3 {
             let mut z = vertex_array[i].position.z;
@@ -617,10 +625,10 @@ impl F3DEX2 {
             rdp.add_to_buf_vbo(z);
             rdp.add_to_buf_vbo(w);
 
-            rdp.add_to_buf_vbo(vertex_array[i].color.r as f32 / 255.0);
-            rdp.add_to_buf_vbo(vertex_array[i].color.g as f32 / 255.0);
-            rdp.add_to_buf_vbo(vertex_array[i].color.b as f32 / 255.0);
-            rdp.add_to_buf_vbo(vertex_array[i].color.a as f32 / 255.0);
+            rdp.add_to_buf_vbo(vertex_array[i].color.x);
+            rdp.add_to_buf_vbo(vertex_array[i].color.y);
+            rdp.add_to_buf_vbo(vertex_array[i].color.z);
+            rdp.add_to_buf_vbo(vertex_array[i].color.w);
 
             if use_texture {
                 let mut u = (vertex_array[i].uv[0] - (current_tile.uls as f32) * 8.0) / 32.0;
@@ -633,72 +641,6 @@ impl F3DEX2 {
 
                 rdp.add_to_buf_vbo(u / tex_width as f32);
                 rdp.add_to_buf_vbo(v / tex_height as f32);
-            }
-
-            let shader_program = rdp.shader_cache.get(&shader_hash).unwrap();
-            let num_inputs = shader_program.shader_input_mapping.num_inputs;
-            for j in 0..num_inputs {
-                let mut color: Color;
-                for k in 0..(1 + if do_blend { 1 } else { 0 }) {
-                    if k == 0 {
-                        let shader_program = rdp.shader_cache.get(&shader_hash).unwrap();
-                        match shader_program.shader_input_mapping.input_mapping[k][j as usize] {
-                            x if x == CCMUX::PRIMITIVE as u8 => {
-                                color = rdp.prim_color;
-                            }
-                            x if x == CCMUX::SHADE as u8 => {
-                                color = vertex_array[i].color;
-                            }
-                            x if x == CCMUX::ENVIRONMENT as u8 => {
-                                color = rdp.env_color;
-                            }
-                            x if x == CCMUX::LOD_FRACTION as u8 => {
-                                let mut distance_frac = (vertex1.position.w - 3000.0) / 3000.0;
-                                if distance_frac < 0.0 {
-                                    distance_frac = 0.0
-                                }
-                                if distance_frac > 1.0 {
-                                    distance_frac = 1.0
-                                }
-                                color = Color::RGBA(
-                                    (distance_frac * 255.0) as u8,
-                                    (distance_frac * 255.0) as u8,
-                                    (distance_frac * 255.0) as u8,
-                                    (distance_frac * 255.0) as u8,
-                                );
-                            }
-                            _ => {
-                                color = Color::TRANSPARENT;
-                            }
-                        }
-
-                        rdp.add_to_buf_vbo(color.r as f32 / 255.0);
-                        rdp.add_to_buf_vbo(color.g as f32 / 255.0);
-                        rdp.add_to_buf_vbo(color.b as f32 / 255.0);
-                    } else {
-                        let shader_program = rdp.shader_cache.get(&shader_hash).unwrap();
-                        match shader_program.shader_input_mapping.input_mapping[k][j as usize] {
-                            x if x == ACMUX::PRIMITIVE as u8 => {
-                                color = rdp.prim_color;
-                            }
-                            x if x == ACMUX::SHADE as u8 => {
-                                color = vertex_array[i].color;
-                            }
-                            x if x == ACMUX::ENVIRONMENT as u8 => {
-                                color = rdp.env_color;
-                            }
-                            _ => {
-                                color = Color::TRANSPARENT;
-                            }
-                        }
-
-                        if use_fog && color == vertex_array[i].color {
-                            rdp.add_to_buf_vbo(1.0);
-                        } else {
-                            rdp.add_to_buf_vbo(color.a as f32 / 255.0);
-                        }
-                    }
-                }
             }
         }
 
@@ -841,7 +783,6 @@ impl F3DEX2 {
         GBIResult::Continue
     }
 
-    // gdp_set_scissor
     pub fn gdp_set_scissor(
         rdp: &mut RDP,
         _rsp: &mut RSP,
@@ -869,6 +810,72 @@ impl F3DEX2 {
         rdp.scissor.height = height as u16;
 
         rdp.viewport_or_scissor_changed = true;
+        GBIResult::Continue
+    }
+
+    pub fn gdp_set_convert(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gl_context: &glow::Context,
+        _gfx_context: &mut GraphicsContext,
+        command: &mut *mut Gfx,
+    ) -> GBIResult {
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
+
+        let k0 = get_cmd(w0, 13, 9);
+        let k1 = get_cmd(w0, 4, 9);
+        let k2 = (get_cmd(w0, 0, 4) << 5) | get_cmd(w1, 27, 5);
+        let k3 = get_cmd(w1, 18, 9);
+        let k4 = get_cmd(w1, 9, 9);
+        let k5 = get_cmd(w1, 0, 9);
+
+        rdp.set_convert(
+            k0 as i32, k1 as i32, k2 as i32, k3 as i32, k4 as i32, k5 as i32,
+        );
+
+        GBIResult::Continue
+    }
+
+    pub fn gdp_set_key_r(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gl_context: &glow::Context,
+        _gfx_context: &mut GraphicsContext,
+        command: &mut *mut Gfx,
+    ) -> GBIResult {
+        let w1 = unsafe { (*(*command)).words.w1 };
+
+        let cr = get_cmd(w1, 8, 8);
+        let sr = get_cmd(w1, 0, 8);
+        let wr = get_cmd(w1, 16, 2);
+
+        rdp.set_key_r(cr as u32, sr as u32, wr as u32);
+
+        GBIResult::Continue
+    }
+
+    pub fn gdp_set_key_gb(
+        rdp: &mut RDP,
+        _rsp: &mut RSP,
+        _gl_context: &glow::Context,
+        _gfx_context: &mut GraphicsContext,
+        command: &mut *mut Gfx,
+    ) -> GBIResult {
+        let w0 = unsafe { (*(*command)).words.w0 };
+        let w1 = unsafe { (*(*command)).words.w1 };
+
+        let cg = get_cmd(w1, 24, 8);
+        let sg = get_cmd(w1, 16, 8);
+        let wg = get_cmd(w0, 12, 12);
+        let cb = get_cmd(w1, 8, 8);
+        let sb = get_cmd(w1, 0, 8);
+        let wb = get_cmd(w0, 0, 12);
+
+        rdp.set_key_gb(
+            cg as u32, sg as u32, wg as u32, cb as u32, sb as u32, wb as u32,
+        );
+
         GBIResult::Continue
     }
 
@@ -1100,7 +1107,12 @@ impl F3DEX2 {
         let b = get_cmd(w1, 8, 8) as u8;
         let a = get_cmd(w1, 0, 8) as u8;
 
-        rdp.env_color = Color::RGBA(r, g, b, a);
+        rdp.env_color = Vec4::new(
+            r as f32 / 255.0,
+            g as f32 / 255.0,
+            b as f32 / 255.0,
+            a as f32 / 255.0,
+        );
         GBIResult::Continue
     }
 
@@ -1111,14 +1123,25 @@ impl F3DEX2 {
         _gfx_context: &mut GraphicsContext,
         command: &mut *mut Gfx,
     ) -> GBIResult {
+        let w0 = unsafe { (*(*command)).words.w0 };
         let w1 = unsafe { (*(*command)).words.w1 };
+
+        let lod_frac = get_cmd(w0, 0, 8) as u8;
+        let lod_min = get_cmd(w0, 8, 5) as u8;
 
         let r = get_cmd(w1, 24, 8) as u8;
         let g = get_cmd(w1, 16, 8) as u8;
         let b = get_cmd(w1, 8, 8) as u8;
         let a = get_cmd(w1, 0, 8) as u8;
 
-        rdp.prim_color = Color::RGBA(r, g, b, a);
+        rdp.prim_lod = Vec2::new(lod_frac as f32 / 256.0, lod_min as f32 / 32.0);
+        rdp.prim_color = Vec4::new(
+            r as f32 / 255.0,
+            g as f32 / 255.0,
+            b as f32 / 255.0,
+            a as f32 / 255.0,
+        );
+
         GBIResult::Continue
     }
 
@@ -1136,7 +1159,12 @@ impl F3DEX2 {
         let b = get_cmd(w1, 8, 8) as u8;
         let a = get_cmd(w1, 0, 8) as u8;
 
-        rdp.blend_color = Color::RGBA(r, g, b, a);
+        rdp.blend_color = Vec4::new(
+            r as f32 / 255.0,
+            g as f32 / 255.0,
+            b as f32 / 255.0,
+            a as f32 / 255.0,
+        );
 
         GBIResult::Continue
     }
@@ -1155,7 +1183,13 @@ impl F3DEX2 {
         let b = get_cmd(w1, 8, 8) as u8;
         let a = get_cmd(w1, 0, 8) as u8;
 
-        rdp.fog_color = Color::RGBA(r, g, b, a);
+        rdp.fog_color = Vec4::new(
+            r as f32 / 255.0,
+            g as f32 / 255.0,
+            b as f32 / 255.0,
+            a as f32 / 255.0,
+        );
+
         GBIResult::Continue
     }
 

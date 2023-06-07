@@ -1,5 +1,6 @@
 use std::any::Any;
 
+use glam::{Vec2, Vec3, Vec4};
 use imgui_glow_renderer::glow::{self, HasContext};
 
 use crate::fast3d::{gbi::defines::G_TX, utils::color::Color};
@@ -17,6 +18,13 @@ pub struct OpenGLGraphicsDevice {
 
     pub fog_color_location: Option<<glow::Context as HasContext>::UniformLocation>,
     pub blend_color_location: Option<<glow::Context as HasContext>::UniformLocation>,
+    pub prim_color_location: Option<<glow::Context as HasContext>::UniformLocation>,
+    pub env_color_location: Option<<glow::Context as HasContext>::UniformLocation>,
+    pub key_center_location: Option<<glow::Context as HasContext>::UniformLocation>,
+    pub key_scale_location: Option<<glow::Context as HasContext>::UniformLocation>,
+    pub prim_lod_frac_location: Option<<glow::Context as HasContext>::UniformLocation>,
+    pub k4_location: Option<<glow::Context as HasContext>::UniformLocation>,
+    pub k5_location: Option<<glow::Context as HasContext>::UniformLocation>,
 }
 
 impl OpenGLGraphicsDevice {
@@ -37,6 +45,13 @@ impl OpenGLGraphicsDevice {
 
             fog_color_location: None,
             blend_color_location: None,
+            prim_color_location: None,
+            env_color_location: None,
+            key_center_location: None,
+            key_scale_location: None,
+            prim_lod_frac_location: None,
+            k4_location: None,
+            k5_location: None,
         }
     }
 
@@ -107,13 +122,6 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
             if program.get_define_bool("USE_TEXTURE0") || program.get_define_bool("USE_TEXTURE1") {
                 let tex_coord = gl.get_attrib_location(native_program, "aTexCoord").unwrap();
                 gl.disable_vertex_attrib_array(tex_coord);
-            }
-
-            for i in 0..program.shader_input_mapping.num_inputs {
-                let input = gl
-                    .get_attrib_location(native_program, &format!("aInput{}", i + 1))
-                    .unwrap();
-                gl.disable_vertex_attrib_array(input);
             }
         }
     }
@@ -222,35 +230,18 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
                 accumulated_offset += coord_size;
             }
 
-            for i in 0..program.shader_input_mapping.num_inputs {
-                let input = gl
-                    .get_attrib_location(native_program, &format!("aInput{}", i + 1))
-                    .unwrap();
-                gl.enable_vertex_attrib_array(input);
-
-                let input_size = if program.get_define_bool("USE_ALPHA") {
-                    4
-                } else {
-                    3
-                };
-
-                gl.vertex_attrib_pointer_f32(
-                    input,
-                    input_size,
-                    glow::FLOAT,
-                    false,
-                    (program.num_floats * FLOAT_SIZE) as i32,
-                    accumulated_offset * FLOAT_SIZE as i32,
-                );
-
-                accumulated_offset += input_size;
-            }
-
             if program.get_define_bool("USE_FOG") {
                 self.fog_color_location = gl.get_uniform_location(native_program, "uFogColor");
             }
 
             self.blend_color_location = gl.get_uniform_location(native_program, "uBlendColor");
+            self.prim_color_location = gl.get_uniform_location(native_program, "uPrimColor");
+            self.env_color_location = gl.get_uniform_location(native_program, "uEnvColor");
+            self.key_center_location = gl.get_uniform_location(native_program, "uKeyCenter");
+            self.key_scale_location = gl.get_uniform_location(native_program, "uKeyScale");
+            self.prim_lod_frac_location = gl.get_uniform_location(native_program, "uPrimLodFrac");
+            self.k4_location = gl.get_uniform_location(native_program, "uK4");
+            self.k5_location = gl.get_uniform_location(native_program, "uK5");
 
             // Set the uniforms
             if program.get_define_bool("USE_ALPHA") {
@@ -430,25 +421,86 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
         }
     }
 
-    fn set_uniforms(&self, gl: &glow::Context, fog_color: &Color, blend_color: &Color) {
+    fn set_uniforms(
+        &self,
+        gl: &glow::Context,
+        fog_color: &Vec4,
+        blend_color: &Vec4,
+        prim_color: &Vec4,
+        env_color: &Vec4,
+        key_center: &Vec3,
+        key_scale: &Vec3,
+        prim_lod: &Vec2,
+        convert_k: &[i32; 6],
+    ) {
         unsafe {
             if let Some(fog_color_location) = self.fog_color_location {
                 gl.uniform_3_f32(
                     Some(&fog_color_location),
-                    fog_color.r as f32 / 255.0,
-                    fog_color.g as f32 / 255.0,
-                    fog_color.b as f32 / 255.0,
+                    fog_color.x,
+                    fog_color.y,
+                    fog_color.z,
                 );
             }
 
             if let Some(blend_color_location) = self.blend_color_location {
                 gl.uniform_4_f32(
                     Some(&blend_color_location),
-                    blend_color.r as f32 / 255.0,
-                    blend_color.g as f32 / 255.0,
-                    blend_color.b as f32 / 255.0,
-                    blend_color.a as f32 / 255.0,
+                    blend_color.x,
+                    blend_color.y,
+                    blend_color.z,
+                    blend_color.w,
                 );
+            }
+
+            if let Some(prim_color_location) = self.prim_color_location {
+                gl.uniform_4_f32(
+                    Some(&prim_color_location),
+                    prim_color.x,
+                    prim_color.y,
+                    prim_color.z,
+                    prim_color.w,
+                );
+            }
+
+            if let Some(env_color_location) = self.env_color_location {
+                gl.uniform_4_f32(
+                    Some(&env_color_location),
+                    env_color.x,
+                    env_color.y,
+                    env_color.z,
+                    env_color.w,
+                );
+            }
+
+            if let Some(key_center_location) = self.key_center_location {
+                gl.uniform_3_f32(
+                    Some(&key_center_location),
+                    key_center.x,
+                    key_center.y,
+                    key_center.z,
+                );
+            }
+
+            if let Some(key_scale_location) = self.key_scale_location {
+                gl.uniform_3_f32(
+                    Some(&key_scale_location),
+                    key_scale.x,
+                    key_scale.y,
+                    key_scale.z,
+                );
+            }
+
+            if let Some(prim_lod_frac_location) = self.prim_lod_frac_location {
+                gl.uniform_1_f32(Some(&prim_lod_frac_location), prim_lod[0]);
+            }
+
+            if let Some(k4_location) = self.k4_location {
+                gl.uniform_1_f32(Some(&k4_location), convert_k[4] as f32 / 255.0);
+            }
+
+            if let Some(k5_location) = self.k5_location {
+                gl.uniform_1_f32(Some(&k5_location), convert_k[5] as f32 / 255.0);
             }
         }
     }

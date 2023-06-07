@@ -2,6 +2,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
+use glam::{Vec2, Vec3, Vec4};
 use imgui_glow_renderer::glow;
 use log::trace;
 use wgpu::{BlendState, CompareFunction};
@@ -237,11 +238,17 @@ pub struct RDP {
     pub buf_vbo_len: usize,
     pub buf_vbo_num_tris: usize,
 
-    pub env_color: Color,
-    pub fog_color: Color,
-    pub prim_color: Color,
-    pub blend_color: Color,
-    pub fill_color: Color,
+    pub env_color: Vec4,
+    pub fog_color: Vec4,
+    pub prim_color: Vec4,
+    pub blend_color: Vec4,
+    pub fill_color: Vec4,
+
+    pub prim_lod: Vec2,
+
+    pub convert_k: [i32; 6],
+    pub key_center: Vec3,
+    pub key_scale: Vec3,
 
     pub depth_image: usize,
     pub color_image: usize,
@@ -275,18 +282,37 @@ impl RDP {
             buf_vbo_len: 0,
             buf_vbo_num_tris: 0,
 
-            env_color: Color::TRANSPARENT,
-            fog_color: Color::TRANSPARENT,
-            prim_color: Color::TRANSPARENT,
-            blend_color: Color::TRANSPARENT,
-            fill_color: Color::TRANSPARENT,
+            env_color: Vec4::ZERO,
+            fog_color: Vec4::ZERO,
+            prim_color: Vec4::ZERO,
+            blend_color: Vec4::ZERO,
+            fill_color: Vec4::ZERO,
+
+            prim_lod: Vec2::ZERO,
+
+            convert_k: [0; 6],
+            key_center: Vec3::ZERO,
+            key_scale: Vec3::ZERO,
 
             depth_image: 0,
             color_image: 0,
         }
     }
 
-    pub fn reset(&mut self) {}
+    pub fn reset(&mut self) {
+        self.combine = CombineParams::ZERO;
+        self.other_mode_l = 0;
+        self.other_mode_h = 0;
+        self.env_color = Vec4::ZERO;
+        self.fog_color = Vec4::ZERO;
+        self.prim_color = Vec4::ZERO;
+        self.blend_color = Vec4::ZERO;
+        self.fill_color = Vec4::ZERO;
+        self.prim_lod = Vec2::ZERO;
+        self.key_center = Vec3::ZERO;
+        self.key_scale = Vec3::ZERO;
+        self.convert_k = [0; 6];
+    }
 
     // Viewport
 
@@ -654,6 +680,31 @@ impl RDP {
             }
             self.viewport_or_scissor_changed = false;
         }
+    }
+
+    // MARK: - Setters
+
+    pub fn set_convert(&mut self, k0: i32, k1: i32, k2: i32, k3: i32, k4: i32, k5: i32) {
+        self.convert_k[0] = k0;
+        self.convert_k[1] = k1;
+        self.convert_k[2] = k2;
+        self.convert_k[3] = k3;
+        self.convert_k[4] = k4;
+        self.convert_k[5] = k5;
+    }
+
+    pub fn set_key_r(&mut self, cr: u32, sr: u32, _wr: u32) {
+        // TODO: Figure out how to use width
+        self.key_center.x = cr as f32 / 255.0;
+        self.key_scale.x = sr as f32 / 255.0;
+    }
+
+    pub fn set_key_gb(&mut self, cg: u32, sg: u32, _wg: u32, cb: u32, sb: u32, _wb: u32) {
+        // TODO: Figure out how to use width
+        self.key_center.y = cg as f32 / 255.0;
+        self.key_center.z = cb as f32 / 255.0;
+        self.key_scale.y = sg as f32 / 255.0;
+        self.key_scale.z = sb as f32 / 255.0;
     }
 
     // MARK: - Helpers

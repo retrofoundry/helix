@@ -1,20 +1,5 @@
 use crate::fast3d::gbi::utils::get_cmd;
 
-#[derive(Debug)]
-pub struct ShaderInputMapping {
-    pub num_inputs: u8,
-    pub mirror_mapping: [[SHADER; 4]; 2],
-    pub input_mapping: [[u8; 4]; 2],
-}
-
-impl ShaderInputMapping {
-    pub const ZERO: Self = Self {
-        num_inputs: 0,
-        mirror_mapping: [[SHADER::ZERO; 4]; 2],
-        input_mapping: [[0; 4]; 2],
-    };
-}
-
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ColorCombinePass {
@@ -100,8 +85,8 @@ impl AlphaCombinePass {
 pub struct CombineParams {
     pub c0: ColorCombinePass,
     pub a0: AlphaCombinePass,
-    c1: ColorCombinePass,
-    a1: AlphaCombinePass,
+    pub c1: ColorCombinePass,
+    pub a1: AlphaCombinePass,
 }
 
 impl CombineParams {
@@ -228,96 +213,6 @@ impl CombineParams {
             || self.a0.uses_texture1()
             || self.a1.uses_texture1()
     }
-
-    pub fn shader_input_mapping(&self) -> ShaderInputMapping {
-        let mut num_inputs = 0;
-        let mut mirror_mapping = [[SHADER::ZERO; 4]; 2];
-        let mut input_mapping = [[0u8; 4]; 2];
-
-        let mut cc_input_number = [0u8; 8];
-        let mut cc_next_input_number = SHADER::INPUT1 as u8;
-
-        let mut ac_input_number = [0u8; 8];
-        let mut ac_next_input_number = SHADER::INPUT1 as u8;
-
-        for i in 0..2 {
-            match i % 2 {
-                0 => {
-                    for j in 0..4 {
-                        let property = self.get_cc(i / 2).get(j);
-                        match property {
-                            CCMUX::ZERO => mirror_mapping[i][j] = SHADER::ZERO,
-                            CCMUX::TEXEL0 => mirror_mapping[i][j] = SHADER::TEXEL0,
-                            CCMUX::TEXEL1 => mirror_mapping[i][j] = SHADER::TEXEL1,
-                            CCMUX::TEXEL0_ALPHA => mirror_mapping[i][j] = SHADER::TEXEL0A,
-                            CCMUX::PRIMITIVE
-                            | CCMUX::SHADE
-                            | CCMUX::ENVIRONMENT
-                            | CCMUX::LOD_FRACTION => {
-                                if cc_input_number[property as usize] == 0 {
-                                    input_mapping[i][(cc_next_input_number - 1) as usize] =
-                                        property as u8;
-                                    cc_input_number[property as usize] = cc_next_input_number;
-
-                                    mirror_mapping[i][j] = SHADER::from(cc_next_input_number);
-
-                                    if mirror_mapping[i][j] >= SHADER::INPUT1
-                                        && mirror_mapping[i][j] <= SHADER::INPUT4
-                                        && mirror_mapping[i][j] as u8 > num_inputs
-                                    {
-                                        num_inputs = cc_next_input_number;
-                                    }
-
-                                    cc_next_input_number += 1;
-                                }
-                            }
-                            _ => {
-                                // panic!("Invalid CCMUX value: {:?}", property)
-                            }
-                        }
-                    }
-                }
-                1 => {
-                    for j in 0..4 {
-                        let property = self.get_ac((i - 1) / 2).get(j);
-                        match property {
-                            ACMUX::ZERO => mirror_mapping[i][j] = SHADER::ZERO,
-                            ACMUX::TEXEL0 => mirror_mapping[i][j] = SHADER::TEXEL0,
-                            ACMUX::TEXEL1 => mirror_mapping[i][j] = SHADER::TEXEL1,
-                            ACMUX::PRIMITIVE | ACMUX::SHADE | ACMUX::ENVIRONMENT => {
-                                if ac_input_number[property as usize] == 0 {
-                                    input_mapping[i][(ac_next_input_number - 1) as usize] =
-                                        property as u8;
-                                    ac_input_number[property as usize] = ac_next_input_number;
-                                    ac_next_input_number += 1;
-
-                                    mirror_mapping[i][j] =
-                                        SHADER::from(ac_input_number[property as usize]);
-
-                                    if mirror_mapping[i][j] >= SHADER::INPUT1
-                                        && mirror_mapping[i][j] <= SHADER::INPUT4
-                                        && mirror_mapping[i][j] as u8 > num_inputs
-                                    {
-                                        num_inputs = ac_input_number[property as usize];
-                                    }
-                                }
-                            }
-                            _ => {
-                                // panic!("Invalid ACMUX value: {:?}", property)
-                            }
-                        }
-                    }
-                }
-                _ => unreachable!(),
-            }
-        }
-
-        ShaderInputMapping {
-            num_inputs,
-            mirror_mapping,
-            input_mapping,
-        }
-    }
 }
 
 #[repr(C)]
@@ -393,34 +288,6 @@ impl ACMUX {
             6 => ACMUX::PRIM_LOD_FRAC__ONE,
             7 => ACMUX::ZERO,
             _ => panic!("Invalid ACMUX value: {}", val),
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd)]
-pub enum SHADER {
-    ZERO,
-    INPUT1,
-    INPUT2,
-    INPUT3,
-    INPUT4,
-    TEXEL0,
-    TEXEL0A,
-    TEXEL1,
-}
-
-impl SHADER {
-    pub fn from(val: u8) -> Self {
-        match val {
-            0 => SHADER::ZERO,
-            1 => SHADER::INPUT1,
-            2 => SHADER::INPUT2,
-            3 => SHADER::INPUT3,
-            4 => SHADER::INPUT4,
-            5 => SHADER::TEXEL0,
-            6 => SHADER::TEXEL0A,
-            7 => SHADER::TEXEL1,
-            _ => panic!("Invalid SHADER value: {}", val),
         }
     }
 }

@@ -4,7 +4,7 @@ use super::{
     gbi::defines::{Light, LookAt},
     utils::color::Color,
 };
-use glam::{Mat4, Vec3A};
+use glam::{Mat4, Vec2, Vec3A, Vec4};
 
 pub const MATRIX_STACK_SIZE: usize = 32;
 pub const MAX_VERTICES: usize = 256;
@@ -31,16 +31,16 @@ impl Position {
 #[repr(C)]
 pub struct StagingVertex {
     pub position: Position,
-    pub uv: [f32; 2],
-    pub color: Color,
+    pub uv: Vec2,
+    pub color: Vec4,
     pub clip_reject: u8,
 }
 
 impl StagingVertex {
     pub const ZERO: Self = Self {
         position: Position::ZERO,
-        uv: [0.0; 2],
-        color: Color::TRANSPARENT,
+        uv: Vec2::ZERO,
+        color: Vec4::ZERO,
         clip_reject: 0,
     };
 }
