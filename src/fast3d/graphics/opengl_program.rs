@@ -18,7 +18,7 @@ pub enum ShaderType {
     Fragment,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OpenGLProgram {
     // Compiled program.
     pub preprocessed_vertex: String,
@@ -97,7 +97,7 @@ impl OpenGLProgram {
         );
     }
 
-    pub fn preprocess_shader(&mut self, shader_type: ShaderType, shader: &str) -> String {
+    pub fn preprocess_shader(&mut self, _shader_type: ShaderType, shader: &str) -> String {
         let defines_string = self
             .defines
             .iter()
@@ -186,15 +186,13 @@ impl OpenGLProgram {
             self.num_floats += 2;
         }
 
-        self.both = format!(
-            r#"
+        self.both = r#"
             precision mediump float;
 
             const vec4 tZero = vec4(0.0);
             const vec4 tHalf = vec4(0.5);
             const vec4 tOne = vec4(1.0);
-            "#,
-        );
+            "#.to_string();
 
         self.vertex = format!(
             r#"

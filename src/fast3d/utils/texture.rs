@@ -4,9 +4,6 @@ use farbe::image::n64::{
 use imgui_glow_renderer::glow;
 use log::trace;
 
-use super::super::graphics::GraphicsContext;
-use std::collections::{HashMap, VecDeque};
-
 pub fn translate_tile_rgba16(tmem: &[u8], tile_width: u32, tile_height: u32) -> Vec<u8> {
     let image = NativeImage::read(tmem, FarbeImageFormat::RGBA16, tile_width, tile_height).unwrap();
     trace!("Decoding RGBA16 image");
@@ -164,116 +161,6 @@ pub enum TextFilt {
     G_TF_POINT = 0x00,
     G_TF_AVERAGE = 0x03,
     G_TF_BILERP = 0x02,
-}
-
-pub struct TextureManager {
-    pub map: HashMap<usize, Texture>,
-    pub lru: VecDeque<usize>,
-    pub capacity: usize,
-}
-
-impl TextureManager {
-    pub fn new(capacity: usize) -> Self {
-        Self {
-            map: HashMap::new(),
-            lru: VecDeque::with_capacity(capacity),
-            capacity,
-        }
-    }
-
-    pub fn lookup(
-        &mut self,
-        gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
-        tmem_index: usize,
-        orig_addr: usize,
-        format: ImageFormat,
-        size: ImageSize,
-    ) -> Option<&mut Texture> {
-        if let Some(value) = self.map.get_mut(&orig_addr) {
-            if value.format == format && value.size == size {
-                gfx_context.api.select_texture(
-                    gl_context,
-                    tmem_index as i32,
-                    value.native_texture.unwrap(),
-                );
-                self.lru.retain(|&k| k != orig_addr);
-                self.lru.push_back(orig_addr);
-                return Some(value);
-            }
-        }
-        None
-    }
-
-    pub fn insert_if_not_found(
-        &mut self,
-        gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
-        tmem_index: usize,
-        orig_addr: usize,
-        format: ImageFormat,
-        size: ImageSize,
-    ) -> &mut Texture {
-        if self.map.len() == self.capacity {
-            if let Some(lru_key) = self.lru.pop_front() {
-                self.map.remove(&lru_key);
-                // TODO: Remove texture from gfx_device
-            }
-        }
-        let native_texture = gfx_context.api.new_texture(gl_context);
-        gfx_context
-            .api
-            .select_texture(gl_context, tmem_index as i32, native_texture);
-        gfx_context
-            .api
-            .set_sampler_parameters(gl_context, tmem_index as i32, false, 0, 0);
-        let value = self.map.entry(orig_addr).or_insert(Texture {
-            texture_addr: orig_addr,
-            format,
-            size,
-            native_texture: Some(native_texture),
-            cms: 0,
-            cmt: 0,
-            linear_filter: false,
-        });
-        self.lru.push_back(orig_addr);
-        value
-    }
-
-    pub fn insert(
-        &mut self,
-        gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
-        tmem_index: usize,
-        orig_addr: usize,
-        format: ImageFormat,
-        size: ImageSize,
-    ) -> &mut Texture {
-        if self.map.len() == self.capacity {
-            if let Some(lru_key) = self.lru.pop_front() {
-                self.map.remove(&lru_key);
-                // TODO: Remove texture from gfx_device
-            }
-        }
-        let native_texture = gfx_context.api.new_texture(gl_context);
-        gfx_context
-            .api
-            .select_texture(gl_context, tmem_index as i32, native_texture);
-        gfx_context
-            .api
-            .set_sampler_parameters(gl_context, tmem_index as i32, false, 0, 0);
-        let value = self.map.entry(orig_addr).or_insert(Texture {
-            texture_addr: orig_addr,
-            format,
-            size,
-            native_texture: Some(native_texture),
-            cms: 0,
-            cmt: 0,
-            linear_filter: false,
-        });
-        self.lru.push_back(orig_addr);
-        value
-    }
 }
 
 pub struct TextureState {

@@ -4,13 +4,15 @@ use imgui::{Context, FontSource, MouseCursor, Ui};
 use imgui_glow_renderer::{glow, AutoRenderer};
 use imgui_winit_support::winit::window::Window;
 
+
 use std::str;
 use std::{ffi::CStr, time::Instant};
 use winit::platform::run_return::EventLoopExtRunReturn;
 
 use crate::fast3d::graphics::opengl_device::OpenGLGraphicsDevice;
+use crate::fast3d::graphics::GraphicsIntermediateDevice;
+use crate::fast3d::rcp::RCP;
 use crate::fast3d::rdp::OutputDimensions;
-use crate::fast3d::{graphics::GraphicsContext, rcp::RCP};
 
 pub struct Gui {
     // window
@@ -33,6 +35,8 @@ pub struct Gui {
 
     // game renderer
     rcp: RCP,
+    intermediate_graphics_device: GraphicsIntermediateDevice,
+    graphics_device: OpenGLGraphicsDevice,
 }
 
 pub struct UIState {
@@ -107,6 +111,9 @@ impl Gui {
         let renderer = imgui_glow_renderer::AutoRenderer::initialize(gl, &mut imgui)
             .expect("Failed to create renderer");
 
+        // Initialize graphics device
+        let graphics_device = OpenGLGraphicsDevice::new(renderer.gl_context());
+
         // Initial UI state
         let last_frame_time = Instant::now();
 
@@ -126,28 +133,10 @@ impl Gui {
             },
             draw_menu_callback: Box::new(draw_menu),
             rcp: RCP::new(),
+            intermediate_graphics_device: GraphicsIntermediateDevice::new(),
+            graphics_device,
         })
     }
-
-    // fn recreate_swapchain(&mut self) -> Result<()> {
-    //     let size = self.window.inner_size();
-    //     self.width = size.width;
-    //     self.height = size.height;
-    //     trace!("Recreating swapchain: {}x{}", size.width, size.height);
-
-    //     let surface_desc = wgpu::SurfaceConfiguration {
-    //         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-    //         format: wgpu::TextureFormat::Bgra8UnormSrgb,
-    //         width: size.width,
-    //         height: size.height,
-    //         present_mode: wgpu::PresentMode::Fifo,
-    //         alpha_mode: wgpu::CompositeAlphaMode::Auto,
-    //         view_formats: vec![wgpu::TextureFormat::Bgra8Unorm],
-    //     };
-
-    //     self.surface.configure(&self.device, &surface_desc);
-    //     Ok(())
-    // }
 
     fn handle_events(&mut self, event_loop_wrapper: &mut EventLoopWrapper) {
         event_loop_wrapper
@@ -245,21 +234,86 @@ impl Gui {
         Ok(())
     }
 
+    fn render_game(&mut self) -> Result<()> {
+        for draw_call in &self.intermediate_graphics_device.draw_calls {
+            assert!(!draw_call.vbo.vbo.is_empty());
+
+            let gl = self.renderer.gl_context();
+
+            self.graphics_device.set_cull_mode(gl, draw_call.cull_mode);
+
+            self.graphics_device
+                .set_depth_stencil_params(gl, draw_call.stencil);
+
+            self.graphics_device
+                .set_blend_state(gl, draw_call.blend_state);
+            self.graphics_device.set_viewport(gl, &draw_call.viewport);
+            self.graphics_device.set_scissor(gl, draw_call.scissor);
+
+            self.graphics_device.load_program(
+                gl,
+                draw_call.other_mode_h,
+                draw_call.other_mode_l,
+                draw_call.combine,
+                draw_call.tile_descriptors,
+            );
+
+            // loop through textures and bind them
+            for (index, hash) in draw_call.textures.iter().enumerate() {
+                if let Some(hash) = hash {
+                    let texture = self
+                        .intermediate_graphics_device
+                        .texture_cache
+                        .get_mut(*hash)
+                        .unwrap();
+                    self.graphics_device.bind_texture(gl, index, texture);
+                }
+            }
+
+            // loop through samplers and bind them
+            for (index, sampler) in draw_call.samplers.iter().enumerate() {
+                if let Some(sampler) = sampler {
+                    self.graphics_device.bind_sampler(gl, index, sampler);
+                }
+            }
+
+            // set uniforms
+            self.graphics_device.set_uniforms(
+                gl,
+                &draw_call.uniforms.fog_color,
+                &draw_call.uniforms.blend_color,
+                &draw_call.uniforms.prim_color,
+                &draw_call.uniforms.env_color,
+                &draw_call.uniforms.key_center,
+                &draw_call.uniforms.key_scale,
+                &draw_call.uniforms.prim_lod,
+                &draw_call.uniforms.convert_k,
+            );
+
+            self.graphics_device
+                .draw_triangles(gl, &draw_call.vbo.vbo, draw_call.vbo.num_tris);
+        }
+
+        Ok(())
+    }
+
     pub fn create_event_loop() -> EventLoopWrapper {
         let event_loop = EventLoop::new();
         EventLoopWrapper { event_loop }
     }
 
-    pub fn draw_lists(&mut self, gfx_context: &mut GraphicsContext, commands: usize) -> Result<()> {
+    pub fn draw_lists(&mut self, commands: usize) -> Result<()> {
         // Prepare the context device
-        gfx_context.api.start_frame(self.renderer.gl_context());
+        self.graphics_device.start_frame(self.renderer.gl_context());
 
         // Run the RCP
         self.rcp
-            .run(self.renderer.gl_context(), gfx_context, commands);
+            .run(&mut self.intermediate_graphics_device, commands);
+        self.render_game()?;
 
         // Finish rendering
-        gfx_context.api.end_frame();
+        self.graphics_device.end_frame();
+        self.intermediate_graphics_device.clear_draw_calls();
 
         // Render ImGui on top of any drawn content
         self.render()?;
@@ -313,22 +367,9 @@ pub extern "C" fn GUIStartFrame(gui: Option<&mut Gui>, event_loop: Option<&mut E
 }
 
 #[no_mangle]
-pub extern "C" fn GUIDrawLists(
-    gui: Option<&mut Gui>,
-    gfx_context: Option<&mut GraphicsContext>,
-    commands: u64,
-) {
+pub extern "C" fn GUIDrawLists(gui: Option<&mut Gui>, commands: u64) {
     let gui = gui.unwrap();
-    let gfx_context = gfx_context.unwrap();
-    gui.draw_lists(gfx_context, commands.try_into().unwrap())
-        .unwrap();
-}
-
-#[no_mangle]
-pub extern "C" fn GUICreateGraphicsContext(gui: Option<&mut Gui>) -> Box<GraphicsContext> {
-    let gui: &mut Gui = gui.unwrap();
-    let opengl_device = OpenGLGraphicsDevice::new(gui.renderer.gl_context());
-    Box::new(GraphicsContext::new(Box::new(opengl_device)))
+    gui.draw_lists(commands.try_into().unwrap()).unwrap();
 }
 
 #[no_mangle]

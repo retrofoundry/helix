@@ -1,31 +1,27 @@
 use std::slice;
 
 use glam::{Mat4, Vec2, Vec3A, Vec4};
-use imgui_glow_renderer::glow;
+
 use log::trace;
 
 use super::defines::{Gfx, Light, Viewport, Vtx, G_FILLRECT, G_MTX, G_TEXRECT, G_TEXRECTFLIP};
-use super::utils::{
-    get_cmd, get_cycle_type_from_other_mode_h, get_textfilter_from_other_mode_h,
-    other_mode_l_uses_alpha, other_mode_l_uses_fog, other_mode_l_uses_texture_edge,
-};
+use super::utils::{get_cmd, get_cycle_type_from_other_mode_h, get_textfilter_from_other_mode_h};
 use super::{
     super::{
         rdp::RDP,
-        rsp::{RSPGeometry, MATRIX_STACK_SIZE, MAX_LIGHTS, RSP},
+        rsp::{RSPGeometry, MATRIX_STACK_SIZE, RSP},
     },
     defines::{G_LOAD, G_MW, G_SET},
 };
 use super::{GBIDefinition, GBIResult, GBI};
 use crate::extensions::matrix::MatrixFrom;
-use crate::fast3d::gbi::defines::{LookAt, G_TX};
+use crate::fast3d::gbi::defines::G_TX;
+use crate::fast3d::graphics::GraphicsIntermediateDevice;
 use crate::fast3d::rdp::MAX_BUFFERED;
-use crate::fast3d::utils::color::Color;
 use crate::fast3d::utils::color_combiner::{ACMUX, CCMUX};
 use crate::{
     extensions::matrix::calculate_normal_dir,
     fast3d::{
-        graphics::GraphicsContext,
         rdp::{
             OtherModeHCycleType, OtherModeH_Layout, Rect, TMEMMapEntry, SCREEN_HEIGHT, SCREEN_WIDTH,
         },
@@ -136,7 +132,7 @@ impl GBIDefinition for F3DEX2 {
         gbi.register(F3DEX2::G_GEOMETRYMODE as usize, F3DEX2::gsp_geometry_mode);
         gbi.register(F3DEX2::G_TRI1 as usize, F3DEX2::gsp_tri1);
         gbi.register(F3DEX2::G_TRI2 as usize, F3DEX2::gsp_tri2);
-        gbi.register(F3DEX2::G_ENDDL as usize, |_, _, _, _, _| GBIResult::Return);
+        gbi.register(F3DEX2::G_ENDDL as usize, |_, _, _, _| GBIResult::Return);
 
         gbi.register(
             F3DEX2::G_SETOTHERMODE_L as usize,
@@ -174,8 +170,7 @@ impl F3DEX2 {
     pub fn gsp_matrix(
         _rdp: &mut RDP,
         rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -237,8 +232,7 @@ impl F3DEX2 {
     pub fn gsp_pop_matrix(
         _rdp: &mut RDP,
         rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };
@@ -268,8 +262,7 @@ impl F3DEX2 {
     pub fn gsp_movemem(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -306,8 +299,7 @@ impl F3DEX2 {
     pub fn gsp_moveword(
         _rdp: &mut RDP,
         rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -349,8 +341,7 @@ impl F3DEX2 {
     pub fn gsp_texture(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -375,8 +366,7 @@ impl F3DEX2 {
     pub fn gsp_vertex(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -535,8 +525,7 @@ impl F3DEX2 {
     pub fn gsp_geometry_mode(
         _rdp: &mut RDP,
         rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -554,8 +543,7 @@ impl F3DEX2 {
     pub fn gsp_tri1_raw(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        gl_context: &glow::Context,
-        gfx_context: &mut GraphicsContext,
+        gfx_device: &mut GraphicsIntermediateDevice,
         vertex_id1: usize,
         vertex_id2: usize,
         vertex_id3: usize,
@@ -571,45 +559,40 @@ impl F3DEX2 {
             return GBIResult::Continue;
         }
 
-        rdp.update_render_state(gl_context, gfx_context, rsp.geometry_mode);
+        rdp.update_render_state(gfx_device, rsp.geometry_mode);
 
-        // TODO: Produce draw calls for RDP to process later?
-        let shader_hash = rdp.lookup_or_create_program(gl_context, gfx_context);
-
+        let shader_hash = rdp.shader_program_hash();
         if shader_hash != rdp.rendering_state.shader_program_hash {
-            rdp.flush(gl_context, gfx_context);
+            rdp.flush(gfx_device);
 
-            if let Some(old_program) = rdp
-                .shader_cache
-                .get(&rdp.rendering_state.shader_program_hash)
-            {
-                gfx_context.api.unload_program(gl_context, old_program);
-            }
+            gfx_device.set_program_params(
+                rdp.other_mode_h,
+                rdp.other_mode_l,
+                rdp.combine,
+                rdp.tile_descriptors,
+            );
 
-            let new_program = rdp.shader_cache.get(&shader_hash).unwrap();
-            gfx_context.api.load_program(gl_context, new_program);
             rdp.rendering_state.shader_program_hash = shader_hash;
         }
 
-        rdp.flush_textures(gl_context, gfx_context);
+        rdp.flush_textures(gfx_device);
 
-        gfx_context.api.set_uniforms(
-            gl_context,
-            &rdp.fog_color,
-            &rdp.blend_color,
-            &rdp.prim_color,
-            &rdp.env_color,
-            &rdp.key_center,
-            &rdp.key_scale,
-            &rdp.prim_lod,
-            &rdp.convert_k,
+        gfx_device.set_uniforms(
+            rdp.fog_color,
+            rdp.blend_color,
+            rdp.prim_color,
+            rdp.env_color,
+            rdp.key_center,
+            rdp.key_scale,
+            rdp.prim_lod,
+            rdp.convert_k,
         );
 
         let current_tile = rdp.tile_descriptors[rdp.texture_state.tile as usize];
         let tex_width = current_tile.get_width();
         let tex_height = current_tile.get_height();
 
-        let z_is_from_0_to_1 = gfx_context.api.z_is_from_0_to_1();
+        let z_is_from_0_to_1 = gfx_device.is_z_from_0_to_1();
 
         let use_texture = rdp.combine.uses_texture0() || rdp.combine.uses_texture1();
 
@@ -646,7 +629,7 @@ impl F3DEX2 {
 
         rdp.buf_vbo_num_tris += 1;
         if rdp.buf_vbo_num_tris == MAX_BUFFERED {
-            rdp.flush(gl_context, gfx_context);
+            rdp.flush(gfx_device);
         }
 
         GBIResult::Continue
@@ -655,8 +638,7 @@ impl F3DEX2 {
     pub fn gsp_tri1(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        gl_context: &glow::Context,
-        gfx_context: &mut GraphicsContext,
+        gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -665,22 +647,13 @@ impl F3DEX2 {
         let vertex_id2 = get_cmd(w0, 8, 8) / 2;
         let vertex_id3 = get_cmd(w0, 0, 8) / 2;
 
-        F3DEX2::gsp_tri1_raw(
-            rdp,
-            rsp,
-            gl_context,
-            gfx_context,
-            vertex_id1,
-            vertex_id2,
-            vertex_id3,
-        )
+        F3DEX2::gsp_tri1_raw(rdp, rsp, gfx_device, vertex_id1, vertex_id2, vertex_id3)
     }
 
     pub fn gsp_tri2(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        gl_context: &glow::Context,
-        gfx_context: &mut GraphicsContext,
+        gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -690,35 +663,18 @@ impl F3DEX2 {
         let vertex_id2 = get_cmd(w0, 8, 8) / 2;
         let vertex_id3 = get_cmd(w0, 0, 8) / 2;
 
-        F3DEX2::gsp_tri1_raw(
-            rdp,
-            rsp,
-            gl_context,
-            gfx_context,
-            vertex_id1,
-            vertex_id2,
-            vertex_id3,
-        );
+        F3DEX2::gsp_tri1_raw(rdp, rsp, gfx_device, vertex_id1, vertex_id2, vertex_id3);
 
         let vertex_id1 = get_cmd(w1, 16, 8) / 2;
         let vertex_id2 = get_cmd(w1, 8, 8) / 2;
         let vertex_id3 = get_cmd(w1, 0, 8) / 2;
-        F3DEX2::gsp_tri1_raw(
-            rdp,
-            rsp,
-            gl_context,
-            gfx_context,
-            vertex_id1,
-            vertex_id2,
-            vertex_id3,
-        )
+        F3DEX2::gsp_tri1_raw(rdp, rsp, gfx_device, vertex_id1, vertex_id2, vertex_id3)
     }
 
     pub fn sub_dl(
         _rdp: &mut RDP,
         rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -741,8 +697,7 @@ impl F3DEX2 {
     pub fn gdp_set_other_mode_l(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -758,8 +713,7 @@ impl F3DEX2 {
     pub fn gdp_set_other_mode_h(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -786,8 +740,7 @@ impl F3DEX2 {
     pub fn gdp_set_scissor(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -816,8 +769,7 @@ impl F3DEX2 {
     pub fn gdp_set_convert(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -840,8 +792,7 @@ impl F3DEX2 {
     pub fn gdp_set_key_r(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };
@@ -858,8 +809,7 @@ impl F3DEX2 {
     pub fn gdp_set_key_gb(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -882,8 +832,7 @@ impl F3DEX2 {
     pub fn gdp_set_combine(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -897,8 +846,7 @@ impl F3DEX2 {
     pub fn gdp_set_tile(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -939,8 +887,7 @@ impl F3DEX2 {
     pub fn gdp_set_tile_size(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -967,8 +914,7 @@ impl F3DEX2 {
     pub fn gdp_set_texture_image(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -992,8 +938,7 @@ impl F3DEX2 {
     pub fn gdp_load_tlut(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };
@@ -1023,8 +968,7 @@ impl F3DEX2 {
     pub fn gdp_load_block(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -1056,8 +1000,7 @@ impl F3DEX2 {
     pub fn gdp_load_tile(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -1096,8 +1039,7 @@ impl F3DEX2 {
     pub fn gdp_set_env_color(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };
@@ -1119,8 +1061,7 @@ impl F3DEX2 {
     pub fn gdp_set_prim_color(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -1148,8 +1089,7 @@ impl F3DEX2 {
     pub fn gdp_set_blend_color(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };
@@ -1172,8 +1112,7 @@ impl F3DEX2 {
     pub fn gdp_set_fog_color(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };
@@ -1196,8 +1135,7 @@ impl F3DEX2 {
     pub fn gdp_set_fill_color(
         rdp: &mut RDP,
         _rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };
@@ -1210,8 +1148,7 @@ impl F3DEX2 {
     pub fn gdp_set_depth_image(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w1 = unsafe { (*(*command)).words.w1 };
@@ -1223,8 +1160,7 @@ impl F3DEX2 {
     pub fn gdp_set_color_image(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        _gl_context: &glow::Context,
-        _gfx_context: &mut GraphicsContext,
+        _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -1241,8 +1177,7 @@ impl F3DEX2 {
     pub fn draw_rectangle(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        gl_context: &glow::Context,
-        gfx_context: &mut GraphicsContext,
+        gfx_device: &mut GraphicsIntermediateDevice,
         ulx: i32,
         uly: i32,
         lrx: i32,
@@ -1315,8 +1250,7 @@ impl F3DEX2 {
         F3DEX2::gsp_tri1_raw(
             rdp,
             rsp,
-            gl_context,
-            gfx_context,
+            gfx_device,
             MAX_VERTICES,
             MAX_VERTICES + 1,
             MAX_VERTICES + 3,
@@ -1324,8 +1258,7 @@ impl F3DEX2 {
         F3DEX2::gsp_tri1_raw(
             rdp,
             rsp,
-            gl_context,
-            gfx_context,
+            gfx_device,
             MAX_VERTICES + 1,
             MAX_VERTICES + 2,
             MAX_VERTICES + 3,
@@ -1343,8 +1276,7 @@ impl F3DEX2 {
     pub fn gdp_texture_rectangle_raw(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        gl_context: &glow::Context,
-        gfx_context: &mut GraphicsContext,
+        gfx_device: &mut GraphicsIntermediateDevice,
         ulx: i32,
         uly: i32,
         mut lrx: i32,
@@ -1404,7 +1336,7 @@ impl F3DEX2 {
         ur.uv[0] = if !flipped { lrs as f32 } else { uls as f32 };
         ur.uv[1] = if !flipped { ult as f32 } else { lrt as f32 };
 
-        F3DEX2::draw_rectangle(rdp, rsp, gl_context, gfx_context, ulx, uly, lrx, lry);
+        F3DEX2::draw_rectangle(rdp, rsp, gfx_device, ulx, uly, lrx, lry);
         rdp.combine = saved_combine_mode;
 
         GBIResult::Continue
@@ -1413,8 +1345,7 @@ impl F3DEX2 {
     pub fn gdp_texture_rectangle(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        gl_context: &glow::Context,
-        gfx_context: &mut GraphicsContext,
+        gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -1447,8 +1378,7 @@ impl F3DEX2 {
         F3DEX2::gdp_texture_rectangle_raw(
             rdp,
             rsp,
-            gl_context,
-            gfx_context,
+            gfx_device,
             ulx as i32,
             uly as i32,
             lrx as i32,
@@ -1465,8 +1395,7 @@ impl F3DEX2 {
     pub fn gdp_fill_rectangle_raw(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        gl_context: &glow::Context,
-        gfx_context: &mut GraphicsContext,
+        gfx_device: &mut GraphicsIntermediateDevice,
         ulx: i32,
         uly: i32,
         mut lrx: i32,
@@ -1494,7 +1423,7 @@ impl F3DEX2 {
         let saved_combine_mode = rdp.combine;
         let rhs = (CCMUX::SHADE as usize & 0b111) << 15 | (ACMUX::SHADE as usize & 0b111) << 9;
         rdp.combine = CombineParams::decode(0, rhs);
-        F3DEX2::draw_rectangle(rdp, rsp, gl_context, gfx_context, ulx, uly, lrx, lry);
+        F3DEX2::draw_rectangle(rdp, rsp, gfx_device, ulx, uly, lrx, lry);
         rdp.combine = saved_combine_mode;
 
         GBIResult::Continue
@@ -1503,8 +1432,7 @@ impl F3DEX2 {
     pub fn gdp_fill_rectangle(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        gl_context: &glow::Context,
-        gfx_context: &mut GraphicsContext,
+        gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -1516,14 +1444,7 @@ impl F3DEX2 {
         let lry = get_cmd(w0, 0, 12);
 
         F3DEX2::gdp_fill_rectangle_raw(
-            rdp,
-            rsp,
-            gl_context,
-            gfx_context,
-            ulx as i32,
-            uly as i32,
-            lrx as i32,
-            lry as i32,
+            rdp, rsp, gfx_device, ulx as i32, uly as i32, lrx as i32, lry as i32,
         )
     }
 }

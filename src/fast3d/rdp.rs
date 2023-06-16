@@ -3,12 +3,12 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 use glam::{Vec2, Vec3, Vec4};
-use imgui_glow_renderer::glow;
 use log::trace;
 use wgpu::{BlendState, CompareFunction};
 
 use crate::fast3d::gbi::utils::{other_mode_l_uses_alpha, other_mode_l_uses_texture_edge};
 
+use super::graphics::GraphicsIntermediateDevice;
 use super::{
     gbi::{
         defines::Viewport,
@@ -16,7 +16,6 @@ use super::{
             get_cycle_type_from_other_mode_h, get_textfilter_from_other_mode_h, translate_cull_mode,
         },
     },
-    graphics::GraphicsContext,
     rsp::RSPGeometry,
     utils::{
         color::Color,
@@ -25,19 +24,17 @@ use super::{
             translate_tile_ci4, translate_tile_ci8, translate_tile_i4, translate_tile_i8,
             translate_tile_ia16, translate_tile_ia4, translate_tile_ia8, translate_tile_rgba16,
             translate_tile_rgba32, translate_tlut, ImageFormat, ImageSize, TextFilt, Texture,
-            TextureImageState, TextureLUT, TextureManager, TextureState,
+            TextureImageState, TextureLUT, TextureState,
         },
         tile::TileDescriptor,
     },
 };
 
-use crate::fast3d::graphics::opengl_program::OpenGLProgram;
 use farbe::image::n64::ImageSize as FarbeImageSize;
 
 pub const SCREEN_WIDTH: f32 = 320.0;
 pub const SCREEN_HEIGHT: f32 = 240.0;
 const MAX_VBO_SIZE: usize = 256;
-const TEXTURE_CACHE_MAX_SIZE: usize = 500;
 const MAX_TEXTURE_SIZE: usize = 4096;
 pub const NUM_TILE_DESCRIPTORS: usize = 8;
 pub const MAX_BUFFERED: usize = 256;
@@ -216,15 +213,11 @@ pub struct RDP {
     pub output_dimensions: OutputDimensions,
     pub rendering_state: RenderingState,
 
-    pub texture_manager: TextureManager,
-
     pub texture_state: TextureState,
     pub texture_image_state: TextureImageState, // coming via GBI (texture to load)
     pub tile_descriptors: [TileDescriptor; NUM_TILE_DESCRIPTORS],
     pub tmem_map: HashMap<u16, TMEMMapEntry>, // tmem address -> texture image state address
     pub textures_changed: [bool; 2],
-
-    pub shader_cache: HashMap<u64, OpenGLProgram>,
 
     pub viewport: Rect,
     pub scissor: Rect,
@@ -260,15 +253,11 @@ impl RDP {
             output_dimensions: OutputDimensions::ZERO,
             rendering_state: RenderingState::EMPTY,
 
-            texture_manager: TextureManager::new(TEXTURE_CACHE_MAX_SIZE),
-
             texture_state: TextureState::EMPTY,
             texture_image_state: TextureImageState::EMPTY,
             tile_descriptors: [TileDescriptor::EMPTY; 8],
             tmem_map: HashMap::new(),
             textures_changed: [false; 2],
-
-            shader_cache: HashMap::new(),
 
             viewport: Rect::ZERO,
             scissor: Rect::ZERO,
@@ -342,42 +331,9 @@ impl RDP {
 
     // Textures
 
-    pub fn lookup_texture(
-        &mut self,
-        gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
-        tmem_index: usize,
-        fmt: ImageFormat,
-        siz: ImageSize,
-    ) -> bool {
-        if let Some(value) = self.texture_manager.lookup(
-            gl_context,
-            gfx_context,
-            tmem_index,
-            self.texture_image_state.address,
-            fmt,
-            siz,
-        ) {
-            self.rendering_state.textures[tmem_index] = *value;
-            true
-        } else {
-            let value = self.texture_manager.insert(
-                gl_context,
-                gfx_context,
-                tmem_index,
-                self.texture_image_state.address,
-                fmt,
-                siz,
-            );
-            self.rendering_state.textures[tmem_index] = *value;
-            false
-        }
-    }
-
     pub fn import_tile_texture(
         &mut self,
-        gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
+        gfx_device: &mut GraphicsIntermediateDevice,
         tmem_index: usize,
     ) {
         let tile = self.tile_descriptors[self.texture_state.tile as usize];
@@ -386,12 +342,17 @@ impl RDP {
         let width = tile.get_width() as u32;
         let height = tile.get_height() as u32;
 
-        if self.lookup_texture(gl_context, gfx_context, tmem_index, tile.format, tile.size) {
-            return;
-        }
-
         let tmap_entry = self.tmem_map.get(&tile.tmem).unwrap();
         let texture_address = tmap_entry.address;
+
+        if let Some(hash) =
+            gfx_device
+                .texture_cache
+                .contains(texture_address, tile.format, tile.size)
+        {
+            gfx_device.set_texture(tmem_index, hash);
+            return;
+        }
 
         // TODO: figure out how to find the size of bytes in the texture
         let texture_data = unsafe {
@@ -450,10 +411,15 @@ impl RDP {
             }
         };
 
-        let texture = texture.as_ptr() as *const u8;
-        gfx_context
-            .api
-            .upload_texture(gl_context, texture, width as i32, height as i32);
+        let hash = gfx_device.texture_cache.insert(
+            texture_address,
+            tile.format,
+            tile.size,
+            width,
+            height,
+            texture,
+        );
+        gfx_device.set_texture(tmem_index, hash);
     }
 
     pub fn uses_texture1(&self) -> bool {
@@ -461,7 +427,7 @@ impl RDP {
             && self.combine.uses_texture1()
     }
 
-    pub fn flush_textures(&mut self, gl_context: &glow::Context, gfx_context: &GraphicsContext) {
+    pub fn flush_textures(&mut self, gfx_device: &mut GraphicsIntermediateDevice) {
         // if textures are not on, then we have no textures to flush
         // if !self.texture_state.on {
         //     return;
@@ -483,8 +449,10 @@ impl RDP {
             for i in 0..2 {
                 if i == 0 || self.uses_texture1() {
                     if self.textures_changed[i as usize] {
-                        self.flush(gl_context, gfx_context);
-                        self.import_tile_texture(gl_context, gfx_context, i as usize);
+                        self.flush(gfx_device);
+                        gfx_device.clear_textures(i as usize);
+
+                        self.import_tile_texture(gfx_device, i as usize);
                         self.textures_changed[i as usize] = false;
                     }
 
@@ -497,9 +465,8 @@ impl RDP {
                         || tile_descriptor.cm_s != texture.cms
                         || tile_descriptor.cm_t != texture.cmt
                     {
-                        gfx_context.api.set_sampler_parameters(
-                            gl_context,
-                            i as i32,
+                        gfx_device.set_sampler_parameters(
+                            i as usize,
                             linear_filter,
                             tile_descriptor.cm_s as u32,
                             tile_descriptor.cm_t as u32,
@@ -513,14 +480,15 @@ impl RDP {
         }
     }
 
-    pub fn flush(&mut self, gl_context: &glow::Context, gfx_context: &GraphicsContext) {
+    pub fn flush(&mut self, gfx_device: &mut GraphicsIntermediateDevice) {
         if self.buf_vbo_len > 0 {
-            gfx_context.api.draw_triangles(
-                gl_context,
-                &self.buf_vbo as *const f32,
-                self.buf_vbo_len,
-                self.buf_vbo_num_tris,
-            );
+            let vbo = unsafe {
+                std::slice::from_raw_parts(
+                    (&self.buf_vbo as *const f32) as *const u8,
+                    self.buf_vbo_len * 4,
+                )
+            };
+            gfx_device.set_vbo(vbo.to_vec(), self.buf_vbo_num_tris);
             self.buf_vbo_len = 0;
             self.buf_vbo_num_tris = 0;
         }
@@ -539,44 +507,24 @@ impl RDP {
         hasher.finish()
     }
 
-    pub fn lookup_or_create_program(
-        &mut self,
-        gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
-    ) -> u64 {
-        let hash = self.shader_program_hash();
-        if let Some(_program) = self.shader_cache.get(&hash) {
-            return hash;
-        }
-
-        let mut program = OpenGLProgram::new(
-            self.other_mode_h,
-            self.other_mode_l,
-            self.combine,
-            self.tile_descriptors,
-        );
-        program.init();
-        program.preprocess();
-
-        gfx_context.api.compile_program(gl_context, &mut program);
-
-        self.shader_cache.insert(hash, program);
-
-        hash
-    }
-
     // MARK: - Blend
 
-    fn translate_blend_mode(
+    fn process_depth_params(
         &mut self,
-        gl_context: &glow::Context,
-        gfx_context: &GraphicsContext,
+        gfx_device: &mut GraphicsIntermediateDevice,
+        geometry_mode: u32,
         render_mode: u32,
     ) {
+        let depth_test = geometry_mode & RSPGeometry::G_ZBUFFER as u32 != 0;
+        if depth_test != self.rendering_state.depth_test {
+            self.flush(gfx_device);
+            self.rendering_state.depth_test = depth_test;
+        }
+
         let zmode: u32 = self.other_mode_l >> (OtherModeLayoutL::ZMODE as u32) & 0x03;
 
         // handle depth compare
-        if self.other_mode_l & (1 << OtherModeLayoutL::Z_CMP as u32) != 0 {
+        let depth_compare = if self.other_mode_l & (1 << OtherModeLayoutL::Z_CMP as u32) != 0 {
             let depth_compare = match zmode {
                 x if x == ZMode::ZMODE_OPA as u32 => CompareFunction::Less,
                 x if x == ZMode::ZMODE_INTER as u32 => CompareFunction::Less, // TODO: Understand this
@@ -586,95 +534,88 @@ impl RDP {
             };
 
             if depth_compare != self.rendering_state.depth_compare {
-                self.flush(gl_context, gfx_context);
-                gfx_context.api.set_depth_compare(gl_context, depth_compare);
+                self.flush(gfx_device);
                 self.rendering_state.depth_compare = depth_compare;
             }
-        } else if self.rendering_state.depth_compare != CompareFunction::Always {
-            self.flush(gl_context, gfx_context);
-            gfx_context
-                .api
-                .set_depth_compare(gl_context, CompareFunction::Always);
-            self.rendering_state.depth_compare = CompareFunction::Always;
-        }
+
+            depth_compare
+        } else {
+            if self.rendering_state.depth_compare != CompareFunction::Always {
+                self.flush(gfx_device);
+                self.rendering_state.depth_compare = CompareFunction::Always;
+            }
+
+            CompareFunction::Always
+        };
 
         // handle depth write
         let depth_write = render_mode & (1 << OtherModeLayoutL::Z_UPD as u32) != 0;
         if depth_write != self.rendering_state.depth_write {
-            self.flush(gl_context, gfx_context);
-            gfx_context.api.set_depth_write(gl_context, depth_write);
+            self.flush(gfx_device);
             self.rendering_state.depth_write = depth_write;
         }
 
         // handle polygon offset (slope scale depth bias)
         let polygon_offset = zmode == ZMode::ZMODE_DEC as u32;
         if polygon_offset != self.rendering_state.polygon_offset {
-            self.flush(gl_context, gfx_context);
-            gfx_context
-                .api
-                .set_polygon_offset(gl_context, polygon_offset);
+            self.flush(gfx_device);
             self.rendering_state.polygon_offset = polygon_offset;
         }
+
+        gfx_device.set_depth_stencil_params(depth_test, depth_write, depth_compare, polygon_offset);
+    }
+
+    pub fn update_render_state(
+        &mut self,
+        gfx_device: &mut GraphicsIntermediateDevice,
+        geometry_mode: u32,
+    ) {
+        let cull_mode = translate_cull_mode(geometry_mode);
+        if cull_mode != self.rendering_state.cull_mode {
+            self.flush(gfx_device);
+            gfx_device.set_cull_mode(cull_mode);
+            self.rendering_state.cull_mode = cull_mode;
+        }
+
+        self.process_depth_params(gfx_device, geometry_mode, self.other_mode_l);
 
         // handle alpha blending
         let do_blend = other_mode_l_uses_alpha(self.other_mode_l)
             || other_mode_l_uses_texture_edge(self.other_mode_l);
 
         if do_blend != self.rendering_state.blend_enabled {
-            let blend_state = BlendState::ALPHA_BLENDING;
+            let blend_state = if do_blend {
+                Some(BlendState::ALPHA_BLENDING)
+            } else {
+                None
+            };
 
-            self.flush(gl_context, gfx_context);
-            gfx_context
-                .api
-                .set_blend_state(gl_context, do_blend, blend_state);
+            self.flush(gfx_device);
+            gfx_device.set_blend_state(blend_state);
             self.rendering_state.blend_enabled = do_blend;
         }
-    }
 
-    pub fn update_render_state(
-        &mut self,
-        gl_context: &glow::Context,
-        gfx_context: &mut GraphicsContext,
-        geometry_mode: u32,
-    ) {
-        let depth_test = geometry_mode & RSPGeometry::G_ZBUFFER as u32 != 0;
-        if depth_test != self.rendering_state.depth_test {
-            self.flush(gl_context, gfx_context);
-            gfx_context.api.set_depth_test(gl_context, depth_test);
-            self.rendering_state.depth_test = depth_test;
-        }
-
-        let cull_mode = translate_cull_mode(geometry_mode);
-        if cull_mode != self.rendering_state.cull_mode {
-            self.flush(gl_context, gfx_context);
-            gfx_context.api.set_cull_mode(gl_context, cull_mode);
-            self.rendering_state.cull_mode = cull_mode;
-        }
-
-        self.translate_blend_mode(gl_context, gfx_context, self.other_mode_l);
-
+        // handle viewport and scissor
         if self.viewport_or_scissor_changed {
             let viewport = self.viewport;
             if viewport != self.rendering_state.viewport {
-                self.flush(gl_context, gfx_context);
-                gfx_context.api.set_viewport(
-                    gl_context,
-                    viewport.x as i32,
-                    viewport.y as i32,
-                    viewport.width as i32,
-                    viewport.height as i32,
+                self.flush(gfx_device);
+                gfx_device.set_viewport(
+                    viewport.x as f32,
+                    viewport.y as f32,
+                    viewport.width as f32,
+                    viewport.height as f32,
                 );
                 self.rendering_state.viewport = viewport;
             }
             let scissor = self.scissor;
             if scissor != self.rendering_state.scissor {
-                self.flush(gl_context, gfx_context);
-                gfx_context.api.set_scissor(
-                    gl_context,
-                    scissor.x as i32,
-                    scissor.y as i32,
-                    scissor.width as i32,
-                    scissor.height as i32,
+                self.flush(gfx_device);
+                gfx_device.set_scissor(
+                    scissor.x as u32,
+                    scissor.y as u32,
+                    scissor.width as u32,
+                    scissor.height as u32,
                 );
                 self.rendering_state.scissor = scissor;
             }

@@ -1,7 +1,6 @@
 #include <helix/internal.h>
 
 static void *_event_loop;
-static void *_gfx_context;
 static void *_gui;
 static void *_audio_player;
 
@@ -30,7 +29,6 @@ void HLXAudioPlayBuffer(const uint8_t* buf, size_t len) {
 // Window & Graphics
 void HLXDisplaySetup(const char* title, void (*draw_menu)()) {
     _gui = GUICreate(title, _event_loop, draw_menu);
-    _gfx_context = GUICreateGraphicsContext(_gui);
 }
 
 void HLXDisplayStartFrame() {
@@ -38,7 +36,7 @@ void HLXDisplayStartFrame() {
 }
 
 void HLXDisplayProcessDrawLists(u64* commands) {
-    GUIDrawLists(_gui, _gfx_context, commands);
+    GUIDrawLists(_gui, commands);
 }
 
 void HLXDisplayEndFrame() {

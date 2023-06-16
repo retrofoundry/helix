@@ -1,45 +1,64 @@
-use std::any::Any;
+use std::{
+    collections::{hash_map::DefaultHasher, HashMap},
+    hash::{Hash, Hasher},
+    num::NonZeroU32,
+};
 
 use glam::{Vec2, Vec3, Vec4};
 use imgui_glow_renderer::glow::{self, HasContext};
 
-use crate::fast3d::{gbi::defines::G_TX, utils::color::Color};
 
-use super::{opengl_program::OpenGLProgram, GraphicsAPI};
+use crate::fast3d::{
+    gbi::defines::G_TX,
+    rdp::NUM_TILE_DESCRIPTORS,
+    utils::{color_combiner::CombineParams, tile::TileDescriptor},
+};
+
+use super::{
+    opengl_program::OpenGLProgram, GraphicsIntermediateSampler, GraphicsIntermediateStencil,
+    GraphicsIntermediateTexture,
+};
 
 const FLOAT_SIZE: usize = std::mem::size_of::<f32>();
 
 pub struct OpenGLGraphicsDevice {
-    pub vbo: <glow::Context as HasContext>::Buffer,
-    pub vao: <glow::Context as HasContext>::VertexArray,
+    _vbo: <glow::Context as HasContext>::Buffer,
+    _vao: <glow::Context as HasContext>::VertexArray,
 
-    pub frame_count: i32,
-    pub current_height: i32,
+    shader_cache: HashMap<u64, OpenGLProgram>,
+    current_shader: u64,
 
-    pub fog_color_location: Option<<glow::Context as HasContext>::UniformLocation>,
-    pub blend_color_location: Option<<glow::Context as HasContext>::UniformLocation>,
-    pub prim_color_location: Option<<glow::Context as HasContext>::UniformLocation>,
-    pub env_color_location: Option<<glow::Context as HasContext>::UniformLocation>,
-    pub key_center_location: Option<<glow::Context as HasContext>::UniformLocation>,
-    pub key_scale_location: Option<<glow::Context as HasContext>::UniformLocation>,
-    pub prim_lod_frac_location: Option<<glow::Context as HasContext>::UniformLocation>,
-    pub k4_location: Option<<glow::Context as HasContext>::UniformLocation>,
-    pub k5_location: Option<<glow::Context as HasContext>::UniformLocation>,
+    frame_count: i32,
+    current_height: i32,
+
+    fog_color_location: Option<<glow::Context as HasContext>::UniformLocation>,
+    blend_color_location: Option<<glow::Context as HasContext>::UniformLocation>,
+    prim_color_location: Option<<glow::Context as HasContext>::UniformLocation>,
+    env_color_location: Option<<glow::Context as HasContext>::UniformLocation>,
+    key_center_location: Option<<glow::Context as HasContext>::UniformLocation>,
+    key_scale_location: Option<<glow::Context as HasContext>::UniformLocation>,
+    prim_lod_frac_location: Option<<glow::Context as HasContext>::UniformLocation>,
+    k4_location: Option<<glow::Context as HasContext>::UniformLocation>,
+    k5_location: Option<<glow::Context as HasContext>::UniformLocation>,
 }
 
 impl OpenGLGraphicsDevice {
     pub fn new(gl: &glow::Context) -> Self {
-        let vbo = unsafe { gl.create_buffer().unwrap() };
-        let vao = unsafe { gl.create_vertex_array().unwrap() };
+        let _vbo = unsafe { gl.create_buffer().unwrap() };
+        let _vao = unsafe { gl.create_vertex_array().unwrap() };
 
         unsafe {
-            gl.bind_buffer(glow::ARRAY_BUFFER, Some(vbo));
-            gl.bind_vertex_array(Some(vao));
+            gl.bind_buffer(glow::ARRAY_BUFFER, Some(_vbo));
+            gl.bind_vertex_array(Some(_vao));
         }
 
         Self {
-            vbo,
-            vao,
+            _vbo,
+            _vao,
+
+            shader_cache: HashMap::new(),
+            current_shader: 0,
+
             frame_count: 0,
             current_height: 0,
 
@@ -55,7 +74,7 @@ impl OpenGLGraphicsDevice {
         }
     }
 
-    fn gfx_cm_to_opengl(val: u32) -> i32 {
+    pub fn gfx_cm_to_opengl(val: u32) -> i32 {
         if val & G_TX::CLAMP as u32 != 0 {
             return glow::CLAMP_TO_EDGE as i32;
         }
@@ -67,7 +86,7 @@ impl OpenGLGraphicsDevice {
         glow::REPEAT as i32
     }
 
-    fn gfx_blend_operation_to_gl(operation: wgpu::BlendOperation) -> u32 {
+    pub fn gfx_blend_operation_to_gl(operation: wgpu::BlendOperation) -> u32 {
         match operation {
             wgpu::BlendOperation::Add => glow::FUNC_ADD,
             wgpu::BlendOperation::Subtract => glow::FUNC_SUBTRACT,
@@ -77,7 +96,7 @@ impl OpenGLGraphicsDevice {
         }
     }
 
-    fn gfx_blend_factor_to_gl(factor: wgpu::BlendFactor) -> u32 {
+    pub fn gfx_blend_factor_to_gl(factor: wgpu::BlendFactor) -> u32 {
         match factor {
             wgpu::BlendFactor::Zero => glow::ZERO,
             wgpu::BlendFactor::One => glow::ONE,
@@ -92,37 +111,6 @@ impl OpenGLGraphicsDevice {
             wgpu::BlendFactor::SrcAlphaSaturated => glow::SRC_ALPHA_SATURATE,
             wgpu::BlendFactor::Constant => glow::CONSTANT_COLOR,
             wgpu::BlendFactor::OneMinusConstant => glow::ONE_MINUS_CONSTANT_COLOR,
-        }
-    }
-}
-
-impl GraphicsAPI for OpenGLGraphicsDevice {
-    fn as_any_ref(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-
-    fn z_is_from_0_to_1(&self) -> bool {
-        false
-    }
-
-    fn unload_program(&self, gl: &glow::Context, program: &OpenGLProgram) {
-        unsafe {
-            let native_program = program.compiled_program.unwrap();
-
-            let vtx_pos = gl.get_attrib_location(native_program, "aVtxPos").unwrap();
-            gl.disable_vertex_attrib_array(vtx_pos);
-
-            let vtx_color = gl.get_attrib_location(native_program, "aVtxColor").unwrap();
-            gl.disable_vertex_attrib_array(vtx_color);
-
-            if program.get_define_bool("USE_TEXTURE0") || program.get_define_bool("USE_TEXTURE1") {
-                let tex_coord = gl.get_attrib_location(native_program, "aTexCoord").unwrap();
-                gl.disable_vertex_attrib_array(tex_coord);
-            }
         }
     }
 
@@ -176,7 +164,24 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
         }
     }
 
-    fn load_program(&mut self, gl: &glow::Context, program: &OpenGLProgram) {
+    fn unload_program(&self, gl: &glow::Context, program: &OpenGLProgram) {
+        unsafe {
+            let native_program = program.compiled_program.unwrap();
+
+            let vtx_pos = gl.get_attrib_location(native_program, "aVtxPos").unwrap();
+            gl.disable_vertex_attrib_array(vtx_pos);
+
+            let vtx_color = gl.get_attrib_location(native_program, "aVtxColor").unwrap();
+            gl.disable_vertex_attrib_array(vtx_color);
+
+            if program.get_define_bool("USE_TEXTURE0") || program.get_define_bool("USE_TEXTURE1") {
+                let tex_coord = gl.get_attrib_location(native_program, "aTexCoord").unwrap();
+                gl.disable_vertex_attrib_array(tex_coord);
+            }
+        }
+    }
+
+    fn use_program(&mut self, gl: &glow::Context, program: &OpenGLProgram) {
         unsafe {
             let native_program = program.compiled_program;
             gl.use_program(native_program);
@@ -226,8 +231,6 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
                     (program.num_floats * FLOAT_SIZE) as i32,
                     accumulated_offset * FLOAT_SIZE as i32,
                 );
-
-                accumulated_offset += coord_size;
             }
 
             if program.get_define_bool("USE_FOG") {
@@ -244,95 +247,19 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
             self.k5_location = gl.get_uniform_location(native_program, "uK5");
 
             // Set the uniforms
-            if program.get_define_bool("USE_ALPHA") {
-                if program.get_define_bool("ALPHA_COMPARE_DITHER") {
-                    if let Some(frame_count_location) =
-                        gl.get_uniform_location(native_program, "uFrameCount")
-                    {
-                        gl.uniform_1_i32(Some(&frame_count_location), self.frame_count);
-                    }
-                    if let Some(frame_height_location) =
-                        gl.get_uniform_location(native_program, "uFrameHeight")
-                    {
-                        gl.uniform_1_i32(Some(&frame_height_location), self.current_height);
-                    }
+            if program.get_define_bool("USE_ALPHA") && program.get_define_bool("ALPHA_COMPARE_DITHER") {
+                if let Some(frame_count_location) =
+                    gl.get_uniform_location(native_program, "uFrameCount")
+                {
+                    gl.uniform_1_i32(Some(&frame_count_location), self.frame_count);
+                }
+                if let Some(frame_height_location) =
+                    gl.get_uniform_location(native_program, "uFrameHeight")
+                {
+                    gl.uniform_1_i32(Some(&frame_height_location), self.current_height);
                 }
             }
         };
-    }
-
-    fn new_texture(&self, gl: &glow::Context) -> glow::NativeTexture {
-        unsafe { gl.create_texture().unwrap() }
-    }
-
-    fn select_texture(&self, gl: &glow::Context, tile: i32, texture: glow::NativeTexture) {
-        unsafe {
-            gl.active_texture(glow::TEXTURE0 + tile as u32);
-            gl.bind_texture(glow::TEXTURE_2D, Some(texture));
-        }
-    }
-
-    fn upload_texture(&self, gl: &glow::Context, data: *const u8, width: i32, height: i32) {
-        unsafe {
-            gl.tex_image_2d(
-                glow::TEXTURE_2D,
-                0,
-                glow::RGBA as i32,
-                width,
-                height,
-                0,
-                glow::RGBA,
-                glow::UNSIGNED_BYTE,
-                Some(std::slice::from_raw_parts(
-                    data,
-                    (width * height * 4) as usize,
-                )),
-            );
-        }
-    }
-
-    fn set_sampler_parameters(&self, gl: &glow::Context, tile: i32, linear: bool, s: u32, t: u32) {
-        unsafe {
-            gl.active_texture(glow::TEXTURE0 + tile as u32);
-            gl.tex_parameter_i32(
-                glow::TEXTURE_2D,
-                glow::TEXTURE_MIN_FILTER,
-                if linear {
-                    glow::LINEAR as i32
-                } else {
-                    glow::NEAREST as i32
-                },
-            );
-            gl.tex_parameter_i32(
-                glow::TEXTURE_2D,
-                glow::TEXTURE_MAG_FILTER,
-                if linear {
-                    glow::LINEAR as i32
-                } else {
-                    glow::NEAREST as i32
-                },
-            );
-            gl.tex_parameter_i32(
-                glow::TEXTURE_2D,
-                glow::TEXTURE_WRAP_S,
-                Self::gfx_cm_to_opengl(s),
-            );
-            gl.tex_parameter_i32(
-                glow::TEXTURE_2D,
-                glow::TEXTURE_WRAP_T,
-                Self::gfx_cm_to_opengl(t),
-            );
-        }
-    }
-
-    fn set_depth_test(&self, gl: &glow::Context, enable: bool) {
-        unsafe {
-            if enable {
-                gl.enable(glow::DEPTH_TEST);
-            } else {
-                gl.disable(glow::DEPTH_TEST);
-            }
-        }
     }
 
     fn set_depth_compare(&self, gl: &glow::Context, compare: wgpu::CompareFunction) {
@@ -349,63 +276,224 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
             }
         }
     }
+}
 
-    fn set_depth_write(&self, gl: &glow::Context, enable: bool) {
+impl OpenGLGraphicsDevice {
+    pub fn load_program(
+        &mut self,
+        gl: &glow::Context,
+        other_mode_h: u32,
+        other_mode_l: u32,
+        combine: CombineParams,
+        tile_descriptors: [TileDescriptor; NUM_TILE_DESCRIPTORS],
+    ) {
+        // calculate the hash of the shader
+        let mut hasher = DefaultHasher::new();
+
+        other_mode_h.hash(&mut hasher);
+        other_mode_l.hash(&mut hasher);
+        combine.hash(&mut hasher);
+        tile_descriptors.hash(&mut hasher);
+
+        let shader_hash = hasher.finish();
+
+        // check if the shader is already loaded
+        if self.current_shader == shader_hash {
+            return;
+        }
+
+        // unload the current shader
+        if self.current_shader != 0 {
+            let current_shader = self.shader_cache.get(&self.current_shader).unwrap();
+            self.current_shader = 0;
+            self.unload_program(gl, current_shader);
+        }
+
+        // check if the shader is in the cache
+        let shader = self.shader_cache.get(&shader_hash).cloned();
+        if let Some(shader) = shader {
+            self.current_shader = shader_hash;
+            self.use_program(gl, &shader);
+            return;
+        }
+
+        // create the shader and add it to the cache
+        let mut program = OpenGLProgram::new(other_mode_h, other_mode_l, combine, tile_descriptors);
+        program.init();
+        program.preprocess();
+
+        self.compile_program(gl, &mut program);
+        self.current_shader = shader_hash;
+        self.use_program(gl, &program);
+        self.shader_cache.insert(shader_hash, program);
+    }
+
+    pub fn bind_texture(
+        &self,
+        gl: &glow::Context,
+        tile: usize,
+        texture: &mut GraphicsIntermediateTexture,
+    ) {
+        // check if we've already uploaded this texture to the GPU
+        if let Some(texture_id) = texture.device_id {
+            // trace!("Texture found in GPU cache");
+            let native_texture = glow::NativeTexture(NonZeroU32::new(texture_id).unwrap());
+
+            unsafe {
+                gl.active_texture(glow::TEXTURE0 + tile as u32);
+                gl.bind_texture(glow::TEXTURE_2D, Some(native_texture));
+            }
+
+            return;
+        }
+
+        // Upload the texture to the GPU
         unsafe {
-            gl.depth_mask(enable);
+            let native_texture = gl.create_texture().unwrap();
+
+            gl.active_texture(glow::TEXTURE0 + tile as u32);
+            gl.bind_texture(glow::TEXTURE_2D, Some(native_texture));
+
+            gl.tex_image_2d(
+                glow::TEXTURE_2D,
+                0,
+                glow::RGBA as i32,
+                texture.width as i32,
+                texture.height as i32,
+                0,
+                glow::RGBA,
+                glow::UNSIGNED_BYTE,
+                Some(std::slice::from_raw_parts(
+                    texture.data.as_ptr() as *const u8,
+                    (texture.width * texture.height * 4) as usize,
+                )),
+            );
+
+            // Update cached entry with the GPU texture ID
+            texture.device_id = Some(native_texture.0.into());
         }
     }
 
-    fn set_polygon_offset(&self, gl: &glow::Context, enable: bool) {
+    pub fn bind_sampler(
+        &self,
+        gl: &glow::Context,
+        tile: usize,
+        sampler: &GraphicsIntermediateSampler,
+    ) {
         unsafe {
-            if enable {
-                gl.polygon_offset(-2.0, 2.0);
-                gl.enable(glow::POLYGON_OFFSET_FILL);
+            gl.active_texture(glow::TEXTURE0 + tile as u32);
+            gl.tex_parameter_i32(
+                glow::TEXTURE_2D,
+                glow::TEXTURE_MIN_FILTER,
+                if sampler.linear_filter {
+                    glow::LINEAR as i32
+                } else {
+                    glow::NEAREST as i32
+                },
+            );
+            gl.tex_parameter_i32(
+                glow::TEXTURE_2D,
+                glow::TEXTURE_MAG_FILTER,
+                if sampler.linear_filter {
+                    glow::LINEAR as i32
+                } else {
+                    glow::NEAREST as i32
+                },
+            );
+            gl.tex_parameter_i32(
+                glow::TEXTURE_2D,
+                glow::TEXTURE_WRAP_S,
+                Self::gfx_cm_to_opengl(sampler.clamp_s),
+            );
+            gl.tex_parameter_i32(
+                glow::TEXTURE_2D,
+                glow::TEXTURE_WRAP_T,
+                Self::gfx_cm_to_opengl(sampler.clamp_t),
+            );
+        }
+    }
+
+    pub fn set_depth_stencil_params(
+        &self,
+        gl: &glow::Context,
+        params: Option<GraphicsIntermediateStencil>,
+    ) {
+        unsafe {
+            if let Some(params) = params {
+                gl.enable(glow::DEPTH_TEST);
+                gl.depth_mask(params.depth_write_enabled);
+
+                match params.depth_compare {
+                    wgpu::CompareFunction::Never => gl.depth_func(glow::NEVER),
+                    wgpu::CompareFunction::Less => gl.depth_func(glow::LESS),
+                    wgpu::CompareFunction::Equal => gl.depth_func(glow::EQUAL),
+                    wgpu::CompareFunction::LessEqual => gl.depth_func(glow::LEQUAL),
+                    wgpu::CompareFunction::Greater => gl.depth_func(glow::GREATER),
+                    wgpu::CompareFunction::NotEqual => gl.depth_func(glow::NOTEQUAL),
+                    wgpu::CompareFunction::GreaterEqual => gl.depth_func(glow::GEQUAL),
+                    wgpu::CompareFunction::Always => gl.depth_func(glow::ALWAYS),
+                }
+
+                if params.polygon_offset {
+                    gl.polygon_offset(-2.0, 2.0);
+                    gl.enable(glow::POLYGON_OFFSET_FILL);
+                } else {
+                    gl.polygon_offset(0.0, 0.0);
+                    gl.disable(glow::POLYGON_OFFSET_FILL);
+                }
             } else {
-                gl.polygon_offset(0.0, 0.0);
-                gl.disable(glow::POLYGON_OFFSET_FILL);
+                gl.disable(glow::DEPTH_TEST);
             }
         }
     }
 
-    fn set_viewport(&mut self, gl: &glow::Context, x: i32, y: i32, width: i32, height: i32) {
+    pub fn set_viewport(&mut self, gl: &glow::Context, viewport: &Vec4) {
         unsafe {
-            gl.viewport(x, y, width, height);
+            gl.viewport(
+                viewport.x as i32,
+                viewport.y as i32,
+                viewport.z as i32,
+                viewport.w as i32,
+            );
         }
 
-        self.current_height = height;
+        self.current_height = viewport.w as i32;
     }
 
-    fn set_scissor(&self, gl: &glow::Context, x: i32, y: i32, width: i32, height: i32) {
+    pub fn set_scissor(&self, gl: &glow::Context, scissor: [u32; 4]) {
         unsafe {
-            gl.scissor(x, y, width, height);
+            gl.scissor(
+                scissor[0] as i32,
+                scissor[1] as i32,
+                scissor[2] as i32,
+                scissor[3] as i32,
+            );
         }
     }
 
-    fn set_blend_state(&self, gl: &glow::Context, enabled: bool, blend_state: wgpu::BlendState) {
+    pub fn set_blend_state(&self, gl: &glow::Context, blend_state: Option<wgpu::BlendState>) {
         unsafe {
-            if !enabled {
+            if let Some(blend_state) = blend_state {
+                gl.enable(glow::BLEND);
+
+                gl.blend_equation_separate(
+                    Self::gfx_blend_operation_to_gl(blend_state.color.operation),
+                    Self::gfx_blend_operation_to_gl(blend_state.alpha.operation),
+                );
+
+                gl.blend_func_separate(
+                    Self::gfx_blend_factor_to_gl(blend_state.color.src_factor),
+                    Self::gfx_blend_factor_to_gl(blend_state.color.dst_factor),
+                    Self::gfx_blend_factor_to_gl(blend_state.alpha.src_factor),
+                    Self::gfx_blend_factor_to_gl(blend_state.alpha.dst_factor),
+                );
+            } else {
                 gl.disable(glow::BLEND);
-                return;
             }
-
-            gl.enable(glow::BLEND);
-
-            gl.blend_equation_separate(
-                Self::gfx_blend_operation_to_gl(blend_state.color.operation),
-                Self::gfx_blend_operation_to_gl(blend_state.alpha.operation),
-            );
-
-            gl.blend_func_separate(
-                Self::gfx_blend_factor_to_gl(blend_state.color.src_factor),
-                Self::gfx_blend_factor_to_gl(blend_state.color.dst_factor),
-                Self::gfx_blend_factor_to_gl(blend_state.alpha.src_factor),
-                Self::gfx_blend_factor_to_gl(blend_state.alpha.dst_factor),
-            );
         }
     }
 
-    fn set_cull_mode(&self, gl: &glow::Context, cull_mode: Option<wgpu::Face>) {
+    pub fn set_cull_mode(&self, gl: &glow::Context, cull_mode: Option<wgpu::Face>) {
         unsafe {
             match cull_mode {
                 Some(wgpu::Face::Front) => {
@@ -421,7 +509,7 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
         }
     }
 
-    fn set_uniforms(
+    pub fn set_uniforms(
         &self,
         gl: &glow::Context,
         fog_color: &Vec4,
@@ -505,25 +593,18 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
         }
     }
 
-    fn draw_triangles(
-        &self,
-        gl: &glow::Context,
-        buf_vbo: *const f32,
-        buf_vbo_len: usize,
-        buf_vbo_num_tris: usize,
-    ) {
+    pub fn draw_triangles(&self, gl: &glow::Context, buf_vbo: &[u8], buf_vbo_num_tris: usize) {
         unsafe {
-            let data = std::slice::from_raw_parts(buf_vbo as *const u8, buf_vbo_len * FLOAT_SIZE);
-            gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, data, glow::STREAM_DRAW);
+            gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, buf_vbo, glow::STREAM_DRAW);
             gl.draw_arrays(glow::TRIANGLES, 0, buf_vbo_num_tris as i32 * 3);
         }
     }
 
-    fn init(&self) {}
+    pub fn init(&self) {}
 
-    fn on_resize(&self) {}
+    pub fn on_resize(&self) {}
 
-    fn start_frame(&mut self, gl: &glow::Context) {
+    pub fn start_frame(&mut self, gl: &glow::Context) {
         self.frame_count += 1;
 
         unsafe {
@@ -535,7 +616,7 @@ impl GraphicsAPI for OpenGLGraphicsDevice {
         }
     }
 
-    fn end_frame(&self) {}
+    pub fn end_frame(&self) {}
 
-    fn finish_render(&self) {}
+    pub fn finish_render(&self) {}
 }

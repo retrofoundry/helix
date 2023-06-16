@@ -1,8 +1,7 @@
 use crate::fast3d::gbi::defines::DirLight;
 
 use super::{
-    gbi::defines::{Light, LookAt},
-    utils::color::Color,
+    gbi::defines::{Light},
 };
 use glam::{Mat4, Vec2, Vec3A, Vec4};
 
@@ -181,7 +180,7 @@ impl RSP {
         let light_ptr = data as *const Light;
         let light = unsafe { &*light_ptr };
 
-        self.lights[index as usize] = *light;
+        self.lights[index] = *light;
         self.lights_valid = false;
     }
 
