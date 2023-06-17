@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-helix = { path = "../..", features = ["speech", "network", "dummy_renderer"] }
+helix = { path = "../..", features = ["speech", "network"] }

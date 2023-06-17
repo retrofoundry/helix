@@ -192,7 +192,8 @@ impl OpenGLProgram {
             const vec4 tZero = vec4(0.0);
             const vec4 tHalf = vec4(0.5);
             const vec4 tOne = vec4(1.0);
-            "#.to_string();
+            "#
+        .to_string();
 
         self.vertex = format!(
             r#"

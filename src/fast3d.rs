@@ -3,4 +3,4 @@ pub mod graphics;
 pub mod rcp;
 pub mod rdp;
 mod rsp;
-mod utils;
+pub mod utils;

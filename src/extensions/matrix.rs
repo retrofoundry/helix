@@ -1,4 +1,3 @@
-
 use glam::{Mat4, Vec3A, Vec4Swizzles};
 
 pub trait MatrixFrom {

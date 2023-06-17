@@ -3,8 +3,6 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-
-
 use crate::fast3d::graphics::GraphicsIntermediateTexture;
 
 use super::texture::{ImageFormat, ImageSize};

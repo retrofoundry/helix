@@ -7,17 +7,16 @@ use std::{
 use glam::{Vec2, Vec3, Vec4};
 use imgui_glow_renderer::glow::{self, HasContext};
 
-
 use crate::fast3d::{
     gbi::defines::G_TX,
+    graphics::{
+        GraphicsIntermediateSampler, GraphicsIntermediateStencil, GraphicsIntermediateTexture,
+    },
     rdp::NUM_TILE_DESCRIPTORS,
     utils::{color_combiner::CombineParams, tile::TileDescriptor},
 };
 
-use super::{
-    opengl_program::OpenGLProgram, GraphicsIntermediateSampler, GraphicsIntermediateStencil,
-    GraphicsIntermediateTexture,
-};
+use super::opengl_program::OpenGLProgram;
 
 const FLOAT_SIZE: usize = std::mem::size_of::<f32>();
 
@@ -247,7 +246,9 @@ impl OpenGLGraphicsDevice {
             self.k5_location = gl.get_uniform_location(native_program, "uK5");
 
             // Set the uniforms
-            if program.get_define_bool("USE_ALPHA") && program.get_define_bool("ALPHA_COMPARE_DITHER") {
+            if program.get_define_bool("USE_ALPHA")
+                && program.get_define_bool("ALPHA_COMPARE_DITHER")
+            {
                 if let Some(frame_count_location) =
                     gl.get_uniform_location(native_program, "uFrameCount")
                 {

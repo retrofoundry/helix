@@ -1,6 +1,3 @@
-pub mod opengl_device;
-pub mod opengl_program;
-
 use super::{
     rdp::NUM_TILE_DESCRIPTORS,
     utils::{
