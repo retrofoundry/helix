@@ -8,7 +8,7 @@ name = "helix"
 crate-type = ["lib", "staticlib"]
 
 [features]
-default = ["f3dex2", "opengl"]
+default = ["f3dex2", "wgpu"]
 
 # Graphics Features
 f3dex2 = []
@@ -33,7 +33,7 @@ device_query = {  git = "https://github.com/dcvz/device_query.git", branch = "fe
 env_logger = "0.10.0"
 farbe = "0.2.0"
 gilrs = { version = "0.10.2", features = ["serde", "serde-serialize"] }
-glam = { git = "https://github.com/bitshifter/glam-rs.git", branch = "neon", features = ["approx"] }
+glam = { git = "https://github.com/bitshifter/glam-rs.git", branch = "neon", features = ["approx", "bytemuck"] }
 imgui = { version = "0.11.0", features = ["docking"] }
 imgui-wgpu = { git = "https://github.com/retrofoundry/imgui-wgpu-rs.git", branch = "helix", optional = true }
 imgui-winit-support = "0.11.0"

@@ -477,7 +477,7 @@ impl OpenGLProgram {
 
                 #if defined(USE_ALPHA)
                     #if defined(ALPHA_COMPARE_DITHER)
-                        texel.a < floor(random(vec3(floor(gl_FragCoord.xy * (240.0 / float(uFrameHeight))), float(uFrameCount))) + 0.5) discard;
+                        if (texel.a < floor(random(vec3(floor(gl_FragCoord.xy * (240.0 / float(uFrameHeight))), float(uFrameCount))) + 0.5)) discard;
                     #endif
                     
                     #if defined(ALPHA_COMPARE_THRESHOLD)

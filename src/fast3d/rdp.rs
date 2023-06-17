@@ -9,6 +9,7 @@ use wgpu::{BlendState, CompareFunction};
 use crate::fast3d::gbi::utils::{other_mode_l_uses_alpha, other_mode_l_uses_texture_edge};
 
 use super::graphics::GraphicsIntermediateDevice;
+use super::utils::texture::Texture;
 use super::{
     gbi::{
         defines::Viewport,
@@ -23,7 +24,7 @@ use super::{
         texture::{
             translate_tile_ci4, translate_tile_ci8, translate_tile_i4, translate_tile_i8,
             translate_tile_ia16, translate_tile_ia4, translate_tile_ia8, translate_tile_rgba16,
-            translate_tile_rgba32, translate_tlut, ImageFormat, ImageSize, TextFilt, Texture,
+            translate_tile_rgba32, translate_tlut, ImageFormat, ImageSize, TextFilt,
             TextureImageState, TextureLUT, TextureState,
         },
         tile::TileDescriptor,

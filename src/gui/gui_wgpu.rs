@@ -17,9 +17,11 @@ use std::{
 };
 use winit::{dpi::LogicalSize, platform::run_return::EventLoopExtRunReturn};
 
-use crate::fast3d::graphics::wgpu_device::WgpuDevice;
+use crate::fast3d::graphics::GraphicsIntermediateDevice;
+use crate::fast3d::rcp::RCP;
 use crate::fast3d::rdp::OutputDimensions;
-use crate::fast3d::{graphics::GraphicsContext, rcp::RCP};
+
+use super::renderer::wgpu_device::WgpuGraphicsDevice;
 
 pub struct Gui {
     // window
@@ -47,6 +49,8 @@ pub struct Gui {
 
     // game renderer
     rcp: RCP,
+    intermediate_graphics_device: GraphicsIntermediateDevice,
+    graphics_device: WgpuGraphicsDevice,
 }
 
 pub struct UIState {
@@ -169,6 +173,9 @@ impl Gui {
         let game_texture = Texture::new(&device, &renderer, game_texture_config);
         let game_texture_id = renderer.textures.insert(game_texture);
 
+        // Create graphics device
+        let graphics_device = WgpuGraphicsDevice::new(&device);
+
         // Initial UI state
         let last_frame_time = Instant::now();
         let last_cursor = None;
@@ -192,6 +199,8 @@ impl Gui {
             },
             draw_menu_callback: Box::new(draw_menu),
             rcp: RCP::new(),
+            intermediate_graphics_device: GraphicsIntermediateDevice::new(),
+            graphics_device,
         })
     }
 
@@ -282,12 +291,7 @@ impl Gui {
         EventLoopWrapper { event_loop }
     }
 
-    pub fn draw_lists(
-        &mut self,
-        gfx_context: &mut GraphicsContext,
-        frame: SurfaceTexture,
-        commands: usize,
-    ) -> Result<()> {
+    pub fn draw_lists(&mut self, frame: SurfaceTexture, commands: usize) -> Result<()> {
         // Start frame
         let ui = self.imgui.new_frame();
 
@@ -328,34 +332,78 @@ impl Gui {
                     label: Some("Game Command Encoder"),
                 });
 
-        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Game Render Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: 0.1,
-                        g: 0.2,
-                        b: 0.3,
-                        a: 1.0,
-                    }),
-                    store: true,
-                },
-            })],
-            depth_stencil_attachment: None,
-        });
-
         // Prepare the context device
-        gfx_context.api.start_frame();
+        self.graphics_device.start_frame();
 
         // Run the RCP
         self.rcp
-            .run(&self.device, &self.queue, &mut rpass, gfx_context, commands);
+            .run(&mut self.intermediate_graphics_device, commands);
+
+        for draw_call in &self.intermediate_graphics_device.draw_calls {
+            assert!(!draw_call.vbo.vbo.is_empty());
+
+            self.graphics_device.set_viewport(draw_call.viewport);
+
+            self.graphics_device.set_scissor(draw_call.scissor);
+
+            self.graphics_device.load_program(
+                &self.device,
+                draw_call.other_mode_h,
+                draw_call.other_mode_l,
+                draw_call.combine,
+                draw_call.tile_descriptors,
+            );
+
+            // loop through textures and bind them
+            for (index, hash) in draw_call.textures.iter().enumerate() {
+                if let Some(hash) = hash {
+                    let texture = self
+                        .intermediate_graphics_device
+                        .texture_cache
+                        .get_mut(*hash)
+                        .unwrap();
+                    self.graphics_device
+                        .bind_texture(&self.device, &self.queue, index, texture);
+                }
+            }
+
+            // loop through samplers and bind them
+            for (index, sampler) in draw_call.samplers.iter().enumerate() {
+                if let Some(sampler) = sampler {
+                    self.graphics_device
+                        .bind_sampler(&self.device, index, sampler);
+                }
+            }
+
+            // set uniforms
+            self.graphics_device.set_uniforms(
+                &self.device,
+                &self.queue,
+                &draw_call.uniforms.fog_color,
+                &draw_call.uniforms.blend_color,
+                &draw_call.uniforms.prim_color,
+                &draw_call.uniforms.env_color,
+                &draw_call.uniforms.key_center,
+                &draw_call.uniforms.key_scale,
+                &draw_call.uniforms.prim_lod,
+                &draw_call.uniforms.convert_k,
+            );
+
+            self.graphics_device.draw_triangles(
+                &self.device,
+                &mut encoder,
+                &view,
+                self.surface_config.format,
+                draw_call.blend_state,
+                draw_call.cull_mode,
+                draw_call.stencil,
+                &draw_call.vbo.vbo,
+                draw_call.vbo.num_tris,
+            )
+        }
 
         // Finish rendering
-        gfx_context.api.end_frame();
-        drop(rpass);
+        self.graphics_device.end_frame();
 
         // Finish game encoding and submit
         self.queue.submit(Some(encoder.finish()));
@@ -450,23 +498,14 @@ pub extern "C" fn GUIStartFrame(
 #[no_mangle]
 pub extern "C" fn GUIDrawLists(
     gui: Option<&mut Gui>,
-    gfx_context: Option<&mut GraphicsContext>,
     current_frame: Box<Option<SurfaceTexture>>,
     commands: u64,
 ) {
     let gui = gui.unwrap();
-    let gfx_context = gfx_context.unwrap();
     let current_frame = current_frame.unwrap();
 
-    gui.draw_lists(gfx_context, current_frame, commands.try_into().unwrap())
+    gui.draw_lists(current_frame, commands.try_into().unwrap())
         .unwrap();
-}
-
-#[no_mangle]
-pub extern "C" fn GUICreateGraphicsContext(gui: Option<&mut Gui>) -> Box<GraphicsContext> {
-    let gui: &mut Gui = gui.unwrap();
-    let wgpu_device = WgpuDevice::new(gui.surface_config.format);
-    Box::new(GraphicsContext::new(Box::new(wgpu_device)))
 }
 
 #[no_mangle]

@@ -1,7 +1,6 @@
 use farbe::image::n64::{
     ImageFormat as FarbeImageFormat, ImageSize as FarbeImageSize, NativeImage, TLUT,
 };
-use imgui_glow_renderer::glow;
 use log::trace;
 
 pub fn translate_tile_rgba16(tmem: &[u8], tile_width: u32, tile_height: u32) -> Vec<u8> {
@@ -217,14 +216,8 @@ impl TextureImageState {
     }
 }
 
-#[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct Texture {
-    pub texture_addr: usize,
-    pub format: ImageFormat,
-    pub size: ImageSize,
-
-    pub native_texture: Option<glow::NativeTexture>,
     pub cms: u8,
     pub cmt: u8,
 
@@ -233,12 +226,9 @@ pub struct Texture {
 
 impl Texture {
     pub const EMPTY: Self = Self {
-        texture_addr: 0,
-        format: ImageFormat::G_IM_FMT_YUV,
-        size: ImageSize::G_IM_SIZ_16b,
-        native_texture: None,
         cms: 0,
         cmt: 0,
+
         linear_filter: false,
     };
 }
