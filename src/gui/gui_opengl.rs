@@ -17,8 +17,6 @@ use super::renderer::opengl_device::OpenGLGraphicsDevice;
 
 pub struct Gui {
     // window
-    width: u32,
-    height: u32,
     pub window: ContextWrapper<PossiblyCurrent, Window>,
 
     // render
@@ -116,8 +114,6 @@ impl Gui {
         let last_frame_time = Instant::now();
 
         Ok(Self {
-            width,
-            height,
             window,
             renderer,
             platform,
@@ -351,7 +347,7 @@ pub extern "C" fn GUIStartFrame(gui: Option<&mut Gui>, event_loop: Option<&mut E
 }
 
 #[no_mangle]
-pub extern "C" fn GUIDrawLists(gui: Option<&mut Gui>, commands: u64) {
+pub extern "C" fn GUIDrawLists(gui: Option<&mut Gui>, _frame: libc::c_void, commands: u64) {
     let gui = gui.unwrap();
     gui.draw_lists(commands.try_into().unwrap()).unwrap();
 }

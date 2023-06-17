@@ -9,7 +9,7 @@ use wgpu::{BlendState, CompareFunction};
 use crate::fast3d::gbi::utils::{other_mode_l_uses_alpha, other_mode_l_uses_texture_edge};
 
 use super::graphics::GraphicsIntermediateDevice;
-use super::utils::texture::Texture;
+use super::utils::texture::RenderingStateTexture;
 use super::{
     gbi::{
         defines::Viewport,
@@ -93,7 +93,7 @@ pub struct RenderingState {
     pub viewport: Rect,
     pub scissor: Rect,
     pub shader_program_hash: u64,
-    pub textures: [Texture; 2],
+    pub textures: [RenderingStateTexture; 2],
     pub cull_mode: Option<wgpu::Face>,
     pub blend_color: Color,
 }
@@ -109,7 +109,7 @@ impl RenderingState {
         viewport: Rect::ZERO,
         scissor: Rect::ZERO,
         shader_program_hash: 0,
-        textures: [Texture::EMPTY; 2],
+        textures: [RenderingStateTexture::EMPTY; 2],
         cull_mode: None,
         blend_color: Color::TRANSPARENT,
     };
@@ -483,12 +483,7 @@ impl RDP {
 
     pub fn flush(&mut self, gfx_device: &mut GraphicsIntermediateDevice) {
         if self.buf_vbo_len > 0 {
-            let vbo = unsafe {
-                std::slice::from_raw_parts(
-                    (&self.buf_vbo as *const f32) as *const u8,
-                    self.buf_vbo_len * 4,
-                )
-            };
+            let vbo = bytemuck::cast_slice(&self.buf_vbo[..self.buf_vbo_len]);
             gfx_device.set_vbo(vbo.to_vec(), self.buf_vbo_num_tris);
             self.buf_vbo_len = 0;
             self.buf_vbo_num_tris = 0;

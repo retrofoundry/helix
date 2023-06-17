@@ -345,7 +345,7 @@ impl WgpuProgram {
             r#"
             struct BlendParamsUniforms {{
                 blend_color: vec4<f32>,
-                fog_color: vec3<f33>,
+                fog_color: vec3<f32>,
             }};
             
             struct CombineParamsUniforms {{
@@ -390,7 +390,7 @@ impl WgpuProgram {
 
             fn textureSampleN64Bilerp(tex: texture_2d<f32>, samplr: sampler, uv: vec2<f32>) -> vec4<f32> {{
                 var tex_size = vec2<f32>(textureDimensions(tex, 0));
-                var offset = fract(uv * texSize - 0.5);
+                var offset = fract(uv * tex_size - 0.5);
             
                 var offset_sign = sign(offset);
                 var offset_abs = abs(offset);
@@ -399,7 +399,7 @@ impl WgpuProgram {
                 var s1 = textureSample(tex, samplr, uv - offset_sign * vec2<f32>(1.0, 0.0) / tex_size);
                 var s2 = textureSample(tex, samplr, uv - offset_sign * vec2<f32>(0.0, 1.0) / tex_size);
             
-                return s0 + offset_abs.x * (s1 - s0) + offsetAbs.y * (s2 - s0);
+                return s0 + offset_abs.x * (s1 - s0) + offset_abs.y * (s2 - s0);
             }}
 
             fn combineColorCycle0(comb_color: vec4<f32>, shade_color: vec4<f32>, tex0: vec4<f32>, tex1: vec4<f32>, noise: f32) -> vec3<f32> {{
@@ -430,10 +430,10 @@ impl WgpuProgram {
                 random_seed = urand(random_seed);
                 var noise = rand(random_seed);
 
-                 var texel = vec4<f32>(
-                     combineColorCycle0(tHalf, in.color tex_val0, tex_val1, noise),
-                     combineAlphaCycle0(tHalf, in.color, tex_val0, tex_val1, noise)
-                 );
+                var texel = vec4<f32>(
+                    combineColorCycle0(tHalf, in.color, tex_val0, tex_val1, noise),
+                    combineAlphaCycle0(tHalf, in.color, tex_val0, tex_val1, noise)
+                );
 
                 {second_pass_combine}
 
@@ -445,6 +445,8 @@ impl WgpuProgram {
                 {alpha_visualizer}
 
                 {blend_fog}
+
+                return texel;
             }}
             "#,
             tex0_bindings = self.on_define(

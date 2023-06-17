@@ -4,7 +4,6 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use glam::Vec4Swizzles;
 use wgpu::{util::DeviceExt, BindGroupLayout};
 
 use crate::fast3d::{
@@ -58,7 +57,7 @@ impl WgpuGraphicsDevice {
     pub fn new(device: &wgpu::Device) -> Self {
         // Setup vertex buffer
         let vertex_buf = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Blend Uniform Buffer"),
+            label: Some("Vertex Buffer"),
             size: 256 * 32 * 3 * 4 * 50,
             usage: wgpu::BufferUsages::VERTEX,
             mapped_at_creation: false,
@@ -161,7 +160,7 @@ impl WgpuGraphicsDevice {
         device: &wgpu::Device,
         program: &WgpuProgram,
     ) -> BindGroupLayout {
-        return {
+        {
             let mut group_layout_entries: Vec<wgpu::BindGroupLayoutEntry> = Vec::new();
 
             for i in 0..2 {
@@ -188,14 +187,11 @@ impl WgpuGraphicsDevice {
                 }
             }
 
-            let bind_group_layout =
-                device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                    label: Some("Textures/Samplers Group Layout"),
-                    entries: &group_layout_entries,
-                });
-
-            bind_group_layout
-        };
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Textures/Samplers Group Layout"),
+                entries: &group_layout_entries,
+            })
+        }
     }
 
     fn create_uniform_bind_group(&self, device: &wgpu::Device) -> wgpu::BindGroup {
@@ -343,7 +339,7 @@ impl WgpuGraphicsDevice {
     ) {
         // check if we've already uploaded this texture to the GPU
         if let Some(texture_id) = texture.device_id {
-            self.active_texture = tile as usize;
+            self.active_texture = tile;
             self.current_texture_ids[tile] = texture_id as usize;
 
             return;
@@ -391,7 +387,7 @@ impl WgpuGraphicsDevice {
         let texture_id = self.textures.len() as u32 - 1;
 
         texture.device_id = Some(texture_id);
-        self.active_texture = tile as usize;
+        self.active_texture = tile;
         self.current_texture_ids[tile] = texture_id as usize;
     }
 
@@ -401,34 +397,32 @@ impl WgpuGraphicsDevice {
         tile: usize,
         sampler: &GraphicsIntermediateSampler,
     ) {
-        let texture_data = self
-            .textures
-            .get_mut(self.current_texture_ids[tile])
-            .unwrap();
-
-        texture_data.sampler = Some(device.create_sampler(&wgpu::SamplerDescriptor {
-            label: None,
-            address_mode_u: Self::gfx_cm_to_wgpu(sampler.clamp_s),
-            address_mode_v: Self::gfx_cm_to_wgpu(sampler.clamp_t),
-            address_mode_w: wgpu::AddressMode::Repeat,
-            mag_filter: if sampler.linear_filter {
-                wgpu::FilterMode::Linear
-            } else {
-                wgpu::FilterMode::Nearest
-            },
-            min_filter: if sampler.linear_filter {
-                wgpu::FilterMode::Linear
-            } else {
-                wgpu::FilterMode::Nearest
-            },
-            ..Default::default()
-        }));
+        if let Some(texture_data) = self.textures.get_mut(self.current_texture_ids[tile]) {
+            texture_data.sampler = Some(device.create_sampler(&wgpu::SamplerDescriptor {
+                label: None,
+                address_mode_u: Self::gfx_cm_to_wgpu(sampler.clamp_s),
+                address_mode_v: Self::gfx_cm_to_wgpu(sampler.clamp_t),
+                address_mode_w: wgpu::AddressMode::Repeat,
+                mag_filter: if sampler.linear_filter {
+                    wgpu::FilterMode::Linear
+                } else {
+                    wgpu::FilterMode::Nearest
+                },
+                min_filter: if sampler.linear_filter {
+                    wgpu::FilterMode::Linear
+                } else {
+                    wgpu::FilterMode::Nearest
+                },
+                ..Default::default()
+            }));
+        }
     }
 
     pub fn set_uniforms(
         &mut self,
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        _queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
         fog_color: &glam::Vec4,
         blend_color: &glam::Vec4,
         prim_color: &glam::Vec4,
@@ -438,19 +432,14 @@ impl WgpuGraphicsDevice {
         prim_lod: &glam::Vec2,
         convert_k: &[i32; 6],
     ) {
-        // Encode the buffer copy operation
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Uniform Encoder"),
-        });
-
         // Update the Blend uniforms
-        let blend_color_sans_alpha = glam::Vec3::new(blend_color.x, blend_color.y, blend_color.z);
-        let blend_color_bytes = bytemuck::bytes_of(&blend_color_sans_alpha);
-        let fog_color_bytes = bytemuck::bytes_of(fog_color);
+        let blend_color_bytes = bytemuck::bytes_of(blend_color);
+        let fog_color_sans_alpha = glam::Vec3::new(fog_color.x, fog_color.y, fog_color.z);
+        let fog_color_bytes = bytemuck::bytes_of(&fog_color_sans_alpha);
         let blend_uniform_data_bytes: Vec<u8> = [blend_color_bytes, fog_color_bytes].concat();
 
         let staging_blend_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Staging Buffer"),
+            label: Some("Staging Blend Buffer"),
             contents: &blend_uniform_data_bytes,
             usage: wgpu::BufferUsages::COPY_SRC,
         });
@@ -468,7 +457,7 @@ impl WgpuGraphicsDevice {
         let env_color_bytes = bytemuck::bytes_of(env_color);
         let key_center_bytes = bytemuck::bytes_of(key_center);
         let key_scale_bytes = bytemuck::bytes_of(key_scale);
-        let prim_lod_bytes = bytemuck::bytes_of(prim_lod);
+        let prim_lod_bytes = bytemuck::bytes_of(&prim_lod.x);
         let convert_k4_bytes = bytemuck::bytes_of(&convert_k[4]);
         let convert_k5_bytes = bytemuck::bytes_of(&convert_k[5]);
 
@@ -484,7 +473,7 @@ impl WgpuGraphicsDevice {
         .concat();
 
         let staging_combine_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Staging Buffer"),
+            label: Some("Staging Combine Buffer"),
             contents: &combine_uniform_data_bytes,
             usage: wgpu::BufferUsages::COPY_SRC,
         });
@@ -502,15 +491,12 @@ impl WgpuGraphicsDevice {
         let frame_height_bytes = bytemuck::bytes_of(&self.current_height);
 
         let staging_frame_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Staging Buffer"),
+            label: Some("Staging Frame Buffer"),
             contents: &[frame_count_bytes, frame_height_bytes].concat(),
             usage: wgpu::BufferUsages::COPY_SRC,
         });
 
         encoder.copy_buffer_to_buffer(&staging_frame_buffer, 0, &self.frame_uniform_buf, 0, 8);
-
-        // Submit the command buffer
-        queue.submit(Some(encoder.finish()));
     }
 
     pub fn draw_triangles(
@@ -592,7 +578,7 @@ impl WgpuGraphicsDevice {
 
         // Setup Pipeline Descriptor
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: None,
+            label: Some("Render Pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: program.compiled_program.as_ref().unwrap(),
@@ -613,6 +599,20 @@ impl WgpuGraphicsDevice {
             multiview: None,
         });
 
+        let staging_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Vertex Staging Buffer"),
+            contents: buf_vbo,
+            usage: wgpu::BufferUsages::COPY_SRC,
+        });
+
+        encoder.copy_buffer_to_buffer(
+            &staging_vertex_buffer,
+            0,
+            &self.vertex_buf,
+            0,
+            buf_vbo.len() as u64,
+        );
+
         // Create rpass
         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Game Render Pass"),
@@ -632,31 +632,26 @@ impl WgpuGraphicsDevice {
             depth_stencil_attachment: None,
         });
 
-        // Encode the buffer copy operation
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Uniform Encoder"),
-        });
-
-        let staging_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Staging Buffer"),
-            contents: buf_vbo,
-            usage: wgpu::BufferUsages::COPY_SRC,
-        });
-
-        encoder.copy_buffer_to_buffer(
-            &staging_vertex_buffer,
-            0,
-            &self.vertex_buf,
-            0,
-            buf_vbo.len() as u64,
-        );
-
         // Draw triangles
         rpass.push_debug_group("Prepare data for draw.");
         rpass.set_pipeline(&pipeline);
         rpass.set_bind_group(0, &uniform_bind_group, &[]);
         rpass.set_bind_group(1, &textures_bind_group, &[]);
         rpass.set_vertex_buffer(0, self.vertex_buf.slice(..));
+        rpass.set_viewport(
+            self.viewport.x,
+            self.viewport.y,
+            self.viewport.z,
+            self.viewport.w,
+            0.0,
+            1.0,
+        );
+        rpass.set_scissor_rect(
+            self.scissor[0],
+            self.scissor[1],
+            self.scissor[2],
+            self.scissor[3],
+        );
         rpass.pop_debug_group();
         rpass.insert_debug_marker("Draw!");
         rpass.draw(0..buf_vbo_num_tris as u32, 0..1);

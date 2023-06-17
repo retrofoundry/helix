@@ -364,10 +364,7 @@ impl OpenGLGraphicsDevice {
                 0,
                 glow::RGBA,
                 glow::UNSIGNED_BYTE,
-                Some(std::slice::from_raw_parts(
-                    texture.data.as_ptr() as *const u8,
-                    (texture.width * texture.height * 4) as usize,
-                )),
+                Some(bytemuck::cast_slice(&texture.data)),
             );
 
             // Update cached entry with the GPU texture ID

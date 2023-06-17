@@ -1,13 +1,13 @@
 use anyhow::Result;
 use imgui::{Context, FontSource, MouseCursor, Ui};
-use imgui_wgpu::{Renderer, RendererConfig, Texture, TextureConfig};
+use imgui_wgpu::{Renderer, RendererConfig};
 use imgui_winit_support::winit::{
     event::{Event, WindowEvent},
     event_loop::EventLoop,
     window::{Window, WindowBuilder},
 };
 use log::trace;
-use wgpu::{Extent3d, SurfaceConfiguration, SurfaceTexture};
+use wgpu::{SurfaceConfiguration, SurfaceTexture};
 
 use std::{
     ffi::CStr,
@@ -25,13 +25,10 @@ use super::renderer::wgpu_device::WgpuGraphicsDevice;
 
 pub struct Gui {
     // window
-    width: u32,
-    height: u32,
     pub window: Window,
 
     // render
     surface: wgpu::Surface,
-    adapter: wgpu::Adapter,
     device: wgpu::Device,
     queue: wgpu::Queue,
     surface_config: SurfaceConfiguration,
@@ -56,7 +53,6 @@ pub struct Gui {
 pub struct UIState {
     last_frame_time: Instant,
     last_cursor: Option<MouseCursor>,
-    last_game_tex_size: [f32; 2],
 }
 
 pub struct EventLoopWrapper {
@@ -155,23 +151,7 @@ impl Gui {
             ..Default::default()
         };
 
-        let mut renderer = Renderer::new(&mut imgui, &device, &queue, renderer_config);
-
-        // Setup game texture
-        let game_tex_size = [640.0, 480.0];
-        let game_texture_config = TextureConfig {
-            size: Extent3d {
-                width: game_tex_size[0] as u32,
-                height: game_tex_size[1] as u32,
-                ..Default::default()
-            },
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            label: Some("Game Texture"),
-            ..Default::default()
-        };
-
-        let game_texture = Texture::new(&device, &renderer, game_texture_config);
-        let game_texture_id = renderer.textures.insert(game_texture);
+        let renderer = Renderer::new(&mut imgui, &device, &queue, renderer_config);
 
         // Create graphics device
         let graphics_device = WgpuGraphicsDevice::new(&device);
@@ -181,11 +161,8 @@ impl Gui {
         let last_cursor = None;
 
         Ok(Self {
-            width: size.width,
-            height: size.height,
             window,
             surface,
-            adapter,
             device,
             queue,
             surface_config,
@@ -195,7 +172,6 @@ impl Gui {
             ui_state: UIState {
                 last_frame_time,
                 last_cursor,
-                last_game_tex_size: game_tex_size,
             },
             draw_menu_callback: Box::new(draw_menu),
             rcp: RCP::new(),
@@ -379,6 +355,7 @@ impl Gui {
             self.graphics_device.set_uniforms(
                 &self.device,
                 &self.queue,
+                &mut encoder,
                 &draw_call.uniforms.fog_color,
                 &draw_call.uniforms.blend_color,
                 &draw_call.uniforms.prim_color,
