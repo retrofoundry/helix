@@ -6,10 +6,13 @@ use crate::fast3d::gbi::utils::{
     other_mode_l_uses_alpha, other_mode_l_uses_fog, other_mode_l_uses_texture_edge,
 };
 
+use crate::fast3d::utils::{
+    color_combiner::{CombineParams, ACMUX, CCMUX},
+    texture::TextFilt,
+    tile_descriptor::TileDescriptor,
+};
+
 use crate::fast3d::rdp::{OtherModeHCycleType, NUM_TILE_DESCRIPTORS};
-use crate::fast3d::utils::color_combiner::{CombineParams, ACMUX, CCMUX};
-use crate::fast3d::utils::texture::TextFilt;
-use crate::fast3d::utils::tile::TileDescriptor;
 use std::collections::HashMap;
 
 #[derive(PartialEq, Eq)]

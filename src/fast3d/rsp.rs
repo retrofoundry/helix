@@ -1,7 +1,7 @@
 use crate::fast3d::gbi::defines::DirLight;
 
-use super::gbi::defines::Light;
-use glam::{Mat4, Vec2, Vec3A, Vec4};
+use super::{gbi::defines::Light, utils::color::Color};
+use glam::{Mat4, Vec2, Vec3A};
 
 pub const MATRIX_STACK_SIZE: usize = 32;
 pub const MAX_VERTICES: usize = 256;
@@ -29,7 +29,7 @@ impl Position {
 pub struct StagingVertex {
     pub position: Position,
     pub uv: Vec2,
-    pub color: Vec4,
+    pub color: Color,
     pub clip_reject: u8,
 }
 
@@ -37,7 +37,7 @@ impl StagingVertex {
     pub const ZERO: Self = Self {
         position: Position::ZERO,
         uv: Vec2::ZERO,
-        color: Vec4::ZERO,
+        color: Color::TRANSPARENT,
         clip_reject: 0,
     };
 }

@@ -12,7 +12,7 @@ use crate::fast3d::{
     utils::{
         color_combiner::{CombineParams, ACMUX, CCMUX},
         texture::TextFilt,
-        tile::TileDescriptor,
+        tile_descriptor::TileDescriptor,
     },
 };
 

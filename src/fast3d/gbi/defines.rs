@@ -1,5 +1,3 @@
-use crate::fast3d::utils::color::Color;
-
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct GWords {
@@ -80,6 +78,15 @@ impl LookAt {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Color_t {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
+}
+
+#[repr(C)]
 #[derive(Clone, Copy)]
 pub union Vtx {
     pub vertex: Vtx_t,
@@ -96,7 +103,7 @@ pub struct Vtx_t {
     pub position: [i16; 3], // in object space
     flag: u16, // unused
     pub texture_coords: [i16; 2],
-    pub color: Color,
+    pub color: Color_t,
 }
 
 #[repr(C)]

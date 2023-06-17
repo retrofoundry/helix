@@ -4,7 +4,7 @@ use super::{
         color_combiner::CombineParams,
         texture::{ImageFormat, ImageSize},
         texture_cache::TextureCache,
-        tile::TileDescriptor,
+        tile_descriptor::TileDescriptor,
     },
 };
 

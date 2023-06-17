@@ -9,6 +9,7 @@ use wgpu::{BlendState, CompareFunction};
 use crate::fast3d::gbi::utils::{other_mode_l_uses_alpha, other_mode_l_uses_texture_edge};
 
 use super::graphics::GraphicsIntermediateDevice;
+use super::utils::color::Color;
 use super::utils::texture::RenderingStateTexture;
 use super::{
     gbi::{
@@ -19,7 +20,6 @@ use super::{
     },
     rsp::RSPGeometry,
     utils::{
-        color::Color,
         color_combiner::CombineParams,
         texture::{
             translate_tile_ci4, translate_tile_ci8, translate_tile_i4, translate_tile_i8,
@@ -27,7 +27,7 @@ use super::{
             translate_tile_rgba32, translate_tlut, ImageFormat, ImageSize, TextFilt,
             TextureImageState, TextureLUT, TextureState,
         },
-        tile::TileDescriptor,
+        tile_descriptor::TileDescriptor,
     },
 };
 
@@ -236,7 +236,7 @@ pub struct RDP {
     pub fog_color: Vec4,
     pub prim_color: Vec4,
     pub blend_color: Vec4,
-    pub fill_color: Vec4,
+    pub fill_color: Color,
 
     pub prim_lod: Vec2,
 
@@ -276,7 +276,7 @@ impl RDP {
             fog_color: Vec4::ZERO,
             prim_color: Vec4::ZERO,
             blend_color: Vec4::ZERO,
-            fill_color: Vec4::ZERO,
+            fill_color: Color::TRANSPARENT,
 
             prim_lod: Vec2::ZERO,
 
@@ -297,7 +297,7 @@ impl RDP {
         self.fog_color = Vec4::ZERO;
         self.prim_color = Vec4::ZERO;
         self.blend_color = Vec4::ZERO;
-        self.fill_color = Vec4::ZERO;
+        self.fill_color = Color::TRANSPARENT;
         self.prim_lod = Vec2::ZERO;
         self.key_center = Vec3::ZERO;
         self.key_scale = Vec3::ZERO;

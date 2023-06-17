@@ -12,7 +12,7 @@ use crate::fast3d::{
         GraphicsIntermediateSampler, GraphicsIntermediateStencil, GraphicsIntermediateTexture,
     },
     rdp::NUM_TILE_DESCRIPTORS,
-    utils::{color_combiner::CombineParams, tile::TileDescriptor},
+    utils::{color_combiner::CombineParams, tile_descriptor::TileDescriptor},
 };
 
 use super::wgpu_program::WgpuProgram;

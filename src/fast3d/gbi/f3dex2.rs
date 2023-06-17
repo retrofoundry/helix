@@ -18,7 +18,6 @@ use crate::extensions::matrix::MatrixFrom;
 use crate::fast3d::gbi::defines::G_TX;
 use crate::fast3d::graphics::GraphicsIntermediateDevice;
 use crate::fast3d::rdp::MAX_BUFFERED;
-use crate::fast3d::utils::color_combiner::{ACMUX, CCMUX};
 use crate::{
     extensions::matrix::calculate_normal_dir,
     fast3d::{
@@ -28,7 +27,7 @@ use crate::{
         rsp::MAX_VERTICES,
         utils::{
             color::R5G5B5A1,
-            color_combiner::CombineParams,
+            color_combiner::{CombineParams, ACMUX, CCMUX},
             texture::{ImageSize, TextFilt, TextureImageState, TextureState},
         },
     },
@@ -471,9 +470,9 @@ impl F3DEX2 {
                     }
                 }
 
-                staging_vertex.color.x = if r > 255.0 { 255.0 } else { r } / 255.0;
-                staging_vertex.color.y = if g > 255.0 { 255.0 } else { g } / 255.0;
-                staging_vertex.color.z = if b > 255.0 { 255.0 } else { b } / 255.0;
+                staging_vertex.color.r = if r > 255.0 { 255.0 } else { r } / 255.0;
+                staging_vertex.color.g = if g > 255.0 { 255.0 } else { g } / 255.0;
+                staging_vertex.color.b = if b > 255.0 { 255.0 } else { b } / 255.0;
 
                 if rsp.geometry_mode & RSPGeometry::G_TEXTURE_GEN as u32 > 0 {
                     let dotx = vertex_normal.normal[0] as f32 * rsp.lookat_coeffs[0][0]
@@ -488,9 +487,9 @@ impl F3DEX2 {
                     V = ((doty / 127.0 + 1.0) / 4.0) as i16 * rdp.texture_state.scale_t as i16;
                 }
             } else {
-                staging_vertex.color.x = vertex.color.r as f32 / 255.0;
-                staging_vertex.color.y = vertex.color.g as f32 / 255.0;
-                staging_vertex.color.z = vertex.color.b as f32 / 255.0;
+                staging_vertex.color.r = vertex.color.r as f32 / 255.0;
+                staging_vertex.color.g = vertex.color.g as f32 / 255.0;
+                staging_vertex.color.b = vertex.color.b as f32 / 255.0;
             }
 
             staging_vertex.uv[0] = U as f32;
@@ -511,9 +510,9 @@ impl F3DEX2 {
                 let fog = if fog < 0.0 { 0.0 } else { fog };
                 let fog = if fog > 255.0 { 255.0 } else { fog };
 
-                staging_vertex.color.w = fog / 255.0;
+                staging_vertex.color.a = fog / 255.0;
             } else {
-                staging_vertex.color.w = vertex.color.a as f32 / 255.0;
+                staging_vertex.color.a = vertex.color.a as f32 / 255.0;
             }
 
             write_index += 1;
@@ -608,10 +607,10 @@ impl F3DEX2 {
             rdp.add_to_buf_vbo(z);
             rdp.add_to_buf_vbo(w);
 
-            rdp.add_to_buf_vbo(vertex_array[i].color.x);
-            rdp.add_to_buf_vbo(vertex_array[i].color.y);
-            rdp.add_to_buf_vbo(vertex_array[i].color.z);
-            rdp.add_to_buf_vbo(vertex_array[i].color.w);
+            rdp.add_to_buf_vbo(vertex_array[i].color.r);
+            rdp.add_to_buf_vbo(vertex_array[i].color.g);
+            rdp.add_to_buf_vbo(vertex_array[i].color.b);
+            rdp.add_to_buf_vbo(vertex_array[i].color.a);
 
             if use_texture {
                 let mut u = (vertex_array[i].uv[0] - (current_tile.uls as f32) * 8.0) / 32.0;
