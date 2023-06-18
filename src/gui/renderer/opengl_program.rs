@@ -110,7 +110,7 @@ impl OpenGLProgram {
 
         format!(
             r#"
-            #version 330 core
+            #version 140
             {}
             {}
             "#,

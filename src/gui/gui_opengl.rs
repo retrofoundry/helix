@@ -60,7 +60,7 @@ impl Gui {
             .with_inner_size(glutin::dpi::LogicalSize::new(width, height));
 
         let window = glutin::ContextBuilder::new()
-            .with_gl(GlRequest::Specific(Api::OpenGl, (3, 3)))
+            .with_gl(GlRequest::Latest)
             .with_vsync(true)
             .build_windowed(window, &event_loop_wrapper.event_loop)
             .expect("could not create window");
