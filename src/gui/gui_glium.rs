@@ -196,10 +196,6 @@ impl<'render> Gui<'render> {
             (self.draw_menu_callback)(ui);
         });
 
-        // Demo window for now
-        let mut opened = true;
-        ui.show_metrics_window(&mut opened);
-
         // Setup for drawing
         let gl_window = self.display.gl_window();
 
