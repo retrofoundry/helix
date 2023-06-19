@@ -9,6 +9,10 @@ pub mod network;
 #[cfg(feature = "speech")]
 pub mod speech;
 
+// Check for invalid feature combinations
+#[cfg(all(feature = "opengl", feature = "wgpu"))]
+compile_error!("Cannot enable both OpenGL and WGPU rendering");
+
 pub fn init() {
     let mut builder = Builder::from_default_env();
 
