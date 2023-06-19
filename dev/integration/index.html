@@ -425,21 +425,72 @@
 
 <h1 id="integration">Integration<a class="headerlink" href="#integration" title="Permanent link">&para;</a></h1>
 <h2 id="cc-project">C/C++ Project<a class="headerlink" href="#cc-project" title="Permanent link">&para;</a></h2>
-<p>If you&rsquo;re working on a C or C++ project the recommended way of integrating Helix into your project is using CMake. You can easily build and link this library by using <a href="https://github.com/dcvz/corrosion/tree/helix">Corrosion</a>, a tool that integrate Rust libraries into C/C++ projects. You&rsquo;ll want to:</p>
+<p>If you&rsquo;re working on a C or C++ project the recommended way of integrating Helix into your project is using CMake. You can easily build and link this library by using <a href="https://github.com/corrosion-rs/corrosion">Corrosion</a>, a tool that integrate Rust libraries into C/C++ projects. You&rsquo;ll want to:</p>
 <ol>
 <li>Add this library as a submodule (or copy it) into your project</li>
 <li>Enable Corrosion using FetchContent (see their README)</li>
 <li>Include the features you want to be built using <code>FEATURES</code>. <strong>audio</strong> is always included.</li>
 <li>Link against the helix library</li>
 <li>Include the include folder of helix so your program can see the available methods</li>
+<li>Include the cpp folder into your compilation (this is our C++ API wrapper providing a nicer API for the C language)</li>
 </ol>
 <p><strong>NOTE: If you get a build error that certain header methods are not implemented, you&rsquo;re likely not building with that feature enabled.</strong></p>
 <p>Example:
-<div class="highlight"><pre><span></span><code><span class="n">corrosion_import_crate</span><span class="p">(</span><span class="n">MANIFEST_PATH</span><span class="w"> </span><span class="n">$</span><span class="p">{</span><span class="n">CMAKE_CURRENT_SOURCE_DIR</span><span class="p">}</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">helix</span><span class="o">/</span><span class="n">Cargo</span><span class="p">.</span><span class="n">toml</span><span class="w"> </span><span class="n">FEATURES</span><span class="w"> </span><span class="n">network</span><span class="p">)</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">corrosion_import_crate</span><span class="p">(</span><span class="n">MANIFEST_PATH</span><span class="w"> </span><span class="n">$</span><span class="p">{</span><span class="n">CMAKE_CURRENT_SOURCE_DIR</span><span class="p">}</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">helix</span><span class="o">/</span><span class="n">Cargo</span><span class="p">.</span><span class="n">toml</span><span class="w"> </span><span class="n">FEATURES</span><span class="w"> </span><span class="n">f3dex2e</span><span class="w"> </span><span class="n">network</span><span class="p">)</span><span class="w"></span>
 <span class="cp"># methods in these headers will work:</span>
 <span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;helix/network.h&gt;</span><span class="c1">, &lt;helix/audio.h&gt;</span><span class="cp"></span>
 <span class="cp"># methods in these headers won&#39;t work:</span>
 <span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;helix/speech.h&gt;</span><span class="cp"></span>
+</code></pre></div></p>
+<p>Advanced Example:
+<div class="highlight"><pre><span></span><code><span class="c">#==============================================================================#</span>
+<span class="c"># Helix Integration                                                            #</span>
+<span class="c">#==============================================================================#</span>
+
+<span class="nb">add_subdirectory</span><span class="p">(</span><span class="s">./corrosion</span><span class="p">)</span>
+
+<span class="nb">corrosion_import_crate</span><span class="p">(</span><span class="s">MANIFEST_PATH</span><span class="w"> </span><span class="s">./helix/Cargo.toml</span><span class="w"> </span><span class="s">FEATURES</span><span class="w"> </span><span class="s">f3dex2e</span><span class="p">)</span>
+
+<span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">sm64.</span><span class="o">${</span><span class="nv">VERSION</span><span class="o">}</span><span class="w"> </span><span class="s">PRIVATE</span><span class="w"> </span><span class="s">helix</span><span class="p">)</span>
+<span class="nb">target_include_directories</span><span class="p">(</span><span class="s">sm64.</span><span class="o">${</span><span class="nv">VERSION</span><span class="o">}</span><span class="w"> </span><span class="s">PRIVATE</span><span class="w"> </span><span class="s">./helix/include</span><span class="p">)</span>
+
+<span class="nb">if</span><span class="p">(</span><span class="s">APPLE</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="s2">&quot;-framework OpenGL&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="s2">&quot;-framework Foundation&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="s2">&quot;-framework CoreFoundation -framework AVFoundation -framework CoreAudio -framework AudioToolbox&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="s2">&quot;-framework Metal -framework QuartzCore&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="s2">&quot;-framework IOKit&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="s2">&quot;-framework ApplicationServices&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="s2">&quot;-framework AppKit&quot;</span><span class="p">)</span>
+
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="s2">&quot;-lc++&quot;</span><span class="p">)</span>
+<span class="nb">elseif</span><span class="p">(</span><span class="s">WIN32</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="s">OpenGL32</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="s">D3DCompiler</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="s">imm32</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="s">winmm</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="s">uxtheme</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="s">dwmapi</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">if</span><span class="p">(</span><span class="s">MINGW</span><span class="p">)</span>
+<span class="w">      </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="s2">&quot;-lstdc++&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">endif</span><span class="p">()</span>
+<span class="nb">else</span><span class="p">()</span>
+<span class="w">    </span><span class="nb">find_package</span><span class="p">(</span><span class="s">X11</span><span class="w"> </span><span class="s">REQUIRED</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">find_package</span><span class="p">(</span><span class="s">libUsb</span><span class="w"> </span><span class="s">REQUIRED</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">find_package</span><span class="p">(</span><span class="s">ALSA</span><span class="w"> </span><span class="s">REQUIRED</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">find_package</span><span class="p">(</span><span class="s">PulseAudio</span><span class="w"> </span><span class="s">REQUIRED</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">find_package</span><span class="p">(</span><span class="s">Freetype</span><span class="w"> </span><span class="s">REQUIRED</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">find_package</span><span class="p">(</span><span class="s">udev</span><span class="w"> </span><span class="s">REQUIRED</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="o">${</span><span class="nv">ALSA_LIBRARY</span><span class="o">}</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="o">${</span><span class="nv">OPENGL_glx_LIBRARY</span><span class="o">}</span><span class="w"> </span><span class="o">${</span><span class="nv">OPENGL_opengl_LIBRARY</span><span class="o">}</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="o">${</span><span class="nv">X11_LIBRARIES</span><span class="o">}</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="o">${</span><span class="nv">UDEV_LIBRARY</span><span class="o">}</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="o">${</span><span class="nv">FREETYPE_LIBRARIES</span><span class="o">}</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="s">Fontconfig::Fontconfig</span><span class="p">)</span>
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="s">libUsb::libUsb</span><span class="p">)</span>
+
+<span class="w">    </span><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">helix</span><span class="w"> </span><span class="s">INTERFACE</span><span class="w"> </span><span class="s2">&quot;-lstdc++&quot;</span><span class="p">)</span>
+<span class="nb">endif</span><span class="p">()</span>
 </code></pre></div></p>
 <h2 id="rust-project">Rust Project<a class="headerlink" href="#rust-project" title="Permanent link">&para;</a></h2>
 <p>If you&rsquo;re working on a Rust project, you can add Helix via <code>cargo add helix</code>.</p>

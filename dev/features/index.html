@@ -408,56 +408,51 @@
 </code></pre></div>
 <p>The following API is provided:</p>
 <div class="highlight"><pre><span></span><code><span class="cm">/**</span>
-<span class="cm"> * Creates and sets up the event loop, returning a pointer to the instance or nullptr if creation failed</span>
+<span class="cm"> * Creates and sets up the window, passes in a function that is to be called to draw the menu bar</span>
 <span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">GUICreateEventLoop</span><span class="p">();</span><span class="w"></span>
-<span class="c1">// Rust: let event_loop = Gui::create_event_loop();</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">HLXDisplaySetup</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">title</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">draw_menu</span><span class="p">)());</span><span class="w"></span>
 
 <span class="cm">/**</span>
-<span class="cm"> * Creates the window and sets up the GUI, returning a pointer to the instance or nullptr if creation failed.</span>
-<span class="cm"> * It takes two callbacks, one for drawing the menu and one for drawing the main screen and are called every frame.</span>
-<span class="cm"> * ImGui is used for drawing, so you&#39;re free to use any ImGui functions in your callbacks.</span>
+<span class="cm"> * Used to start a frame and prepare for drawing</span>
 <span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">GUICreate</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">title</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">event_loop</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">draw_menu_callback</span><span class="p">)(),</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">draw_main_callback</span><span class="p">)());</span><span class="w"></span>
-<span class="c1">// Rust: let mut gui = GUI::new(&quot;My Title&quot;, &amp;event_loop, draw_menu_callback, draw_main_callback).unwrap();</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">HLXDisplayStartFrame</span><span class="p">();</span><span class="w"></span>
 
 <span class="cm">/**</span>
-<span class="cm"> * Starts the rendering loop and returns when the window is closed.</span>
+<span class="cm"> * N64 Gfx commands are passed in to be drawn to the screen</span>
 <span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">GUIStart</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">event_loop</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">gui</span><span class="p">);</span><span class="w"></span>
-<span class="c1">// Rust: gui.start();</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">HLXDisplayProcessDrawLists</span><span class="p">(</span><span class="n">u64</span><span class="o">*</span><span class="w"> </span><span class="n">commands</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/**</span>
+<span class="cm"> * Marks the end of the frame</span>
+<span class="cm">**/</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">HLXDisplayEndFrame</span><span class="p">();</span><span class="w"></span>
+
+<span class="cm">/**</span>
+<span class="cm"> * Can be used to get the display&#39;s aspect ratio</span>
+<span class="cm">**/</span><span class="w"></span>
+<span class="kt">float</span><span class="w"> </span><span class="nf">HLXDisplayGetAspectRatio</span><span class="p">();</span><span class="w"></span>
 </code></pre></div>
 <h2 id="audio">Audio<a class="headerlink" href="#audio" title="Permanent link">&para;</a></h2>
 <p>Helix provides functionality for audio playback. Audio playback is simple and Helix provides the following API:</p>
 <div class="highlight"><pre><span></span><code><span class="cm">/**</span>
 <span class="cm"> * Creates and sets up the audio player, returning a pointer to the instance or nullptr if creation failed</span>
 <span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">HLXAudioPlayerCreate</span><span class="p">(</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">sampleRate</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">channels</span><span class="p">);</span><span class="w"></span>
-<span class="c1">// Rust: let mut audio_Player = AudiPlayer::new().unwrap();</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">HLXAudioSetup</span><span class="p">(</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">sampleRate</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">channels</span><span class="p">);</span><span class="w"></span>
 
 <span class="cm">/**</span>
-<span class="cm"> * Frees the audio player instance.</span>
+<span class="cm"> * Returns the number of samples currently buffered</span>
 <span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="w"> </span><span class="nf">HLXAudioPlayerFree</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">player</span><span class="p">);</span><span class="w"></span>
-<span class="c1">// Rust: no dedicated method, instance drop will deallocate it</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="nf">HLXAudioGetBufferredSampleCount</span><span class="p">();</span><span class="w"></span>
 
 <span class="cm">/**</span>
-<span class="cm"> * Returns the amount of data currently in buffer.</span>
+<span class="cm"> * Returns the size of the available buffer</span>
 <span class="cm">**/</span><span class="w"></span>
-<span class="kt">int32_t</span><span class="w"> </span><span class="nf">HLXAudioPlayerGetBuffered</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">player</span><span class="p">);</span><span class="w"></span>
-<span class="c1">// Rust: audio_player.buffered() -&gt; i32</span>
-
-<span class="cm">/**</span>
-<span class="cm"> * Returns the amount of data we want the buffer to contain.</span>
-<span class="cm">**/</span><span class="w"></span>
-<span class="kt">int32_t</span><span class="w"> </span><span class="nf">HLXAudioPlayerGetDesiredBuffered</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">player</span><span class="p">);</span><span class="w"></span>
-<span class="c1">// Rust: audio_player.desired_buffer() -&gt; i32</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="nf">HLXAudioGetBufferSize</span><span class="p">();</span><span class="w"></span>
 
 <span class="cm">/**</span>
 <span class="cm"> * Plays the audio from the given buffer - resampling if necessary for audio output device.</span>
 <span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="w"> </span><span class="nf">HLXAudioPlayerPlayBuffer</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">player</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="o">*</span><span class="w"> </span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">len</span><span class="p">);</span><span class="w"></span>
-<span class="c1">// Rust: audio_player.play_buffer(buf: &amp;[u8])</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">HLXAudioPlayBuffer</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="o">*</span><span class="w"> </span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">len</span><span class="p">);</span><span class="w"></span>
 </code></pre></div>
 <h2 id="speech">Speech<a class="headerlink" href="#speech" title="Permanent link">&para;</a></h2>
 <p>Helix provides an API for text-to-speech (TTS):</p>
