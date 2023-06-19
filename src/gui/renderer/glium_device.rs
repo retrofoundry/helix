@@ -1,7 +1,4 @@
-use std::{
-    borrow::Cow,
-    collections::HashMap,
-};
+use std::{borrow::Cow, collections::HashMap};
 
 use glam::Vec4Swizzles;
 use glium::{
@@ -22,6 +19,7 @@ use crate::fast3d::{
     gbi::defines::G_TX,
     graphics::{
         GraphicsIntermediateSampler, GraphicsIntermediateStencil, GraphicsIntermediateTexture,
+        GraphicsIntermediateUniforms,
     },
     utils::color_combiner::CombineParams,
 };
@@ -332,14 +330,7 @@ impl<'draw> GliumGraphicsDevice<'draw> {
         display: &Display,
         target: &mut Frame,
         vbo: &[u8],
-        fog_color: &glam::Vec4,
-        blend_color: &glam::Vec4,
-        prim_color: &glam::Vec4,
-        env_color: &glam::Vec4,
-        key_center: &glam::Vec3,
-        key_scale: &glam::Vec3,
-        prim_lod: &glam::Vec2,
-        convert_k: &[i32; 6],
+        uniforms: &GraphicsIntermediateUniforms,
     ) {
         // Grab current program
         let program = self.shader_cache.get(&self.current_shader).unwrap();
@@ -385,24 +376,42 @@ impl<'draw> GliumGraphicsDevice<'draw> {
         .unwrap();
 
         // Setup uniforms
-        let mut uniforms = vec![
-            ("uBlendColor", UniformValue::Vec4(blend_color.to_array())),
-            ("uPrimColor", UniformValue::Vec4(prim_color.to_array())),
-            ("uEnvColor", UniformValue::Vec4(env_color.to_array())),
-            ("uKeyCenter", UniformValue::Vec3(key_center.to_array())),
-            ("uKeyScale", UniformValue::Vec3(key_scale.to_array())),
-            ("uPrimLOD", UniformValue::Float(prim_lod.x)),
-            ("uK4", UniformValue::Float(convert_k[4] as f32 / 255.0)),
-            ("uK5", UniformValue::Float(convert_k[5] as f32 / 255.0)),
+        let mut shader_uniforms = vec![
+            (
+                "uBlendColor",
+                UniformValue::Vec4(uniforms.blend.blend_color.to_array()),
+            ),
+            (
+                "uPrimColor",
+                UniformValue::Vec4(uniforms.combine.prim_color.to_array()),
+            ),
+            (
+                "uEnvColor",
+                UniformValue::Vec4(uniforms.combine.env_color.to_array()),
+            ),
+            (
+                "uKeyCenter",
+                UniformValue::Vec3(uniforms.combine.key_center.to_array()),
+            ),
+            (
+                "uKeyScale",
+                UniformValue::Vec3(uniforms.combine.key_scale.to_array()),
+            ),
+            ("uPrimLOD", UniformValue::Float(uniforms.combine.prim_lod.x)),
+            ("uK4", UniformValue::Float(uniforms.combine.convert_k4)),
+            ("uK5", UniformValue::Float(uniforms.combine.convert_k5)),
         ];
 
         if program.get_define_bool("USE_FOG") {
-            uniforms.push(("uFogColor", UniformValue::Vec3(fog_color.xyz().to_array())));
+            shader_uniforms.push((
+                "uFogColor",
+                UniformValue::Vec3(uniforms.blend.fog_color.xyz().to_array()),
+            ));
         }
 
         if program.get_define_bool("USE_TEXTURE0") {
             let texture = self.textures.get(self.current_texture_ids[0]).unwrap();
-            uniforms.push((
+            shader_uniforms.push((
                 "uTex0",
                 UniformValue::Texture2d(&texture.texture, texture.sampler),
             ));
@@ -410,15 +419,15 @@ impl<'draw> GliumGraphicsDevice<'draw> {
 
         if program.get_define_bool("USE_TEXTURE1") {
             let texture = self.textures.get(self.current_texture_ids[1]).unwrap();
-            uniforms.push((
+            shader_uniforms.push((
                 "uTex1",
                 UniformValue::Texture2d(&texture.texture, texture.sampler),
             ));
         }
 
         if program.get_define_bool("USE_ALPHA") && program.get_define_bool("ALPHA_COMPARE_DITHER") {
-            uniforms.push(("uFrameCount", UniformValue::SignedInt(self.frame_count)));
-            uniforms.push(("uFrameHeight", UniformValue::SignedInt(self.current_height)));
+            shader_uniforms.push(("uFrameCount", UniformValue::SignedInt(self.frame_count)));
+            shader_uniforms.push(("uFrameHeight", UniformValue::SignedInt(self.current_height)));
         }
 
         // Draw triangles
@@ -427,7 +436,9 @@ impl<'draw> GliumGraphicsDevice<'draw> {
                 &vertex_buffer,
                 NoIndices(PrimitiveType::TrianglesList),
                 program.compiled_program.as_ref().unwrap(),
-                &UniformVec { uniforms },
+                &UniformVec {
+                    uniforms: shader_uniforms,
+                },
                 &self.draw_params,
             )
             .unwrap();

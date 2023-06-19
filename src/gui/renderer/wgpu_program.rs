@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use wgpu::ShaderModule;
+use wgpu::{
+    BindGroupLayout, ShaderModule, VertexAttribute, VertexBufferLayout, VertexFormat,
+    VertexStepMode,
+};
 
 use crate::fast3d::{
     gbi::utils::{
@@ -8,11 +11,10 @@ use crate::fast3d::{
         other_mode_l_alpha_compare_dither, other_mode_l_alpha_compare_threshold,
         other_mode_l_uses_alpha, other_mode_l_uses_fog, other_mode_l_uses_texture_edge,
     },
-    rdp::{OtherModeHCycleType, NUM_TILE_DESCRIPTORS},
+    rdp::OtherModeHCycleType,
     utils::{
         color_combiner::{CombineParams, ACMUX, CCMUX},
         texture::TextFilt,
-        tile_descriptor::TileDescriptor,
     },
 };
 
@@ -32,7 +34,6 @@ pub struct WgpuProgram {
     other_mode_l: u32,
     combine: CombineParams,
 
-    pub vertex_size: usize,
     pub num_floats: usize,
 }
 
@@ -108,7 +109,6 @@ impl WgpuProgram {
             other_mode_l,
             combine,
 
-            vertex_size: 0,
             num_floats: 0,
         }
     }
@@ -151,11 +151,9 @@ impl WgpuProgram {
 
         self.set_define_bool("COLOR_ALPHA_SAME".to_string(), self.combine.cc_ac_same(0));
 
-        self.vertex_size = 32;
         self.num_floats = 8;
 
         if self.get_define_bool("USE_TEXTURE0") || self.get_define_bool("USE_TEXTURE1") {
-            self.vertex_size += 8;
             self.num_floats += 2;
         }
 
@@ -518,6 +516,85 @@ impl WgpuProgram {
                 "texel = vec4<f32>(mix(texel.rgb, blend_uniforms.fog_color.rgb, in.color.a), texel.a);"
             ),
         )
+    }
+
+    // MARK: - Pipeline Helpers
+
+    pub fn vertex_description(&self) -> VertexBufferLayout<'static> {
+        VertexBufferLayout {
+            array_stride: (self.num_floats * ::std::mem::size_of::<f32>()) as u64,
+            step_mode: VertexStepMode::Vertex,
+            // TODO: Is there a better way to construct this?
+            attributes: if self.get_define_bool("USE_TEXTURE0")
+                || self.get_define_bool("USE_TEXTURE1")
+            {
+                &[
+                    VertexAttribute {
+                        format: VertexFormat::Float32x4,
+                        offset: 0, // position
+                        shader_location: 0,
+                    },
+                    VertexAttribute {
+                        format: VertexFormat::Float32x4,
+                        offset: std::mem::size_of::<[f32; 4]>() as u64, // color
+                        shader_location: 1,
+                    },
+                    wgpu::VertexAttribute {
+                        format: VertexFormat::Float32x2,
+                        offset: std::mem::size_of::<[f32; 8]>() as u64, // texcoord
+                        shader_location: 2,
+                    },
+                ]
+            } else {
+                &[
+                    VertexAttribute {
+                        format: VertexFormat::Float32x4,
+                        offset: 0, // position
+                        shader_location: 0,
+                    },
+                    VertexAttribute {
+                        format: VertexFormat::Float32x4,
+                        offset: std::mem::size_of::<[f32; 4]>() as u64, // color
+                        shader_location: 1,
+                    },
+                ]
+            },
+        }
+    }
+
+    pub fn create_texture_bind_group_layout(&self, device: &wgpu::Device) -> BindGroupLayout {
+        {
+            let mut group_layout_entries: Vec<wgpu::BindGroupLayoutEntry> = Vec::new();
+
+            for i in 0..2 {
+                let texture_index = format!("USE_TEXTURE{}", i);
+                if self.get_define_bool(&texture_index) {
+                    group_layout_entries.push(wgpu::BindGroupLayoutEntry {
+                        binding: i * 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                        },
+                        count: None,
+                    });
+
+                    group_layout_entries.push(wgpu::BindGroupLayoutEntry {
+                        binding: (i * 2 + 1),
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        // TODO: Is this the appropriate setting?
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    });
+                }
+            }
+
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Textures/Samplers Group Layout"),
+                entries: &group_layout_entries,
+            })
+        }
     }
 
     // MARK: - Helpers

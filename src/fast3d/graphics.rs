@@ -1,4 +1,7 @@
-use std::{collections::hash_map::DefaultHasher, hash::{Hash, Hasher}};
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
 
 use super::{
     rdp::NUM_TILE_DESCRIPTORS,
@@ -60,28 +63,52 @@ pub struct GraphicsIntermediateStencil {
     pub polygon_offset: bool,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct GraphicsIntermediateUniforms {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GraphicsIntermediateUniformsBlend {
     pub fog_color: glam::Vec4,
     pub blend_color: glam::Vec4,
+}
+
+impl GraphicsIntermediateUniformsBlend {
+    pub const EMPTY: Self = GraphicsIntermediateUniformsBlend {
+        fog_color: glam::Vec4::ZERO,
+        blend_color: glam::Vec4::ZERO,
+    };
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GraphicsIntermediateUniformsCombine {
     pub prim_color: glam::Vec4,
     pub env_color: glam::Vec4,
     pub key_center: glam::Vec3,
     pub key_scale: glam::Vec3,
     pub prim_lod: glam::Vec2,
-    pub convert_k: [i32; 6],
+    pub convert_k4: f32,
+    pub convert_k5: f32,
 }
 
-impl GraphicsIntermediateUniforms {
-    pub const EMPTY: Self = GraphicsIntermediateUniforms {
-        fog_color: glam::Vec4::ZERO,
-        blend_color: glam::Vec4::ZERO,
+impl GraphicsIntermediateUniformsCombine {
+    pub const EMPTY: Self = GraphicsIntermediateUniformsCombine {
         prim_color: glam::Vec4::ZERO,
         env_color: glam::Vec4::ZERO,
         key_center: glam::Vec3::ZERO,
         key_scale: glam::Vec3::ZERO,
         prim_lod: glam::Vec2::ZERO,
-        convert_k: [0; 6],
+        convert_k4: 0.0,
+        convert_k5: 0.0,
+    };
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct GraphicsIntermediateUniforms {
+    pub blend: GraphicsIntermediateUniformsBlend,
+    pub combine: GraphicsIntermediateUniformsCombine,
+}
+
+impl GraphicsIntermediateUniforms {
+    pub const EMPTY: Self = GraphicsIntermediateUniforms {
+        blend: GraphicsIntermediateUniformsBlend::EMPTY,
+        combine: GraphicsIntermediateUniformsCombine::EMPTY,
     };
 }
 
@@ -290,14 +317,19 @@ impl GraphicsIntermediateDevice {
     ) {
         let draw_call = self.current_draw_call();
         draw_call.uniforms = GraphicsIntermediateUniforms {
-            fog_color,
-            blend_color,
-            prim_color,
-            env_color,
-            key_center,
-            key_scale,
-            prim_lod,
-            convert_k,
+            blend: GraphicsIntermediateUniformsBlend {
+                fog_color,
+                blend_color,
+            },
+            combine: GraphicsIntermediateUniformsCombine {
+                prim_color,
+                env_color,
+                key_center,
+                key_scale,
+                prim_lod,
+                convert_k4: convert_k[4] as f32 / 255.0,
+                convert_k5: convert_k[5] as f32 / 255.0,
+            },
         };
     }
 

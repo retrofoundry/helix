@@ -4,6 +4,7 @@ use glium::Frame;
 use glutin::{event_loop::EventLoop, GlRequest};
 use imgui::{Context, FontSource, Ui};
 use imgui_glium_renderer::Renderer;
+
 use winit::event::{Event, WindowEvent};
 
 use std::str;
@@ -257,14 +258,7 @@ impl<'render> Gui<'render> {
                 &self.display,
                 target,
                 &draw_call.vbo.vbo,
-                &draw_call.uniforms.fog_color,
-                &draw_call.uniforms.blend_color,
-                &draw_call.uniforms.prim_color,
-                &draw_call.uniforms.env_color,
-                &draw_call.uniforms.key_center,
-                &draw_call.uniforms.key_scale,
-                &draw_call.uniforms.prim_lod,
-                &draw_call.uniforms.convert_k,
+                &draw_call.uniforms,
             );
         }
 

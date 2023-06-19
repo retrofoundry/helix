@@ -6,8 +6,11 @@ use imgui_winit_support::winit::{
     event_loop::EventLoop,
     window::{Window, WindowBuilder},
 };
-use log::trace;
-use wgpu::{SurfaceConfiguration, SurfaceTexture};
+use log::{trace, warn};
+use wgpu::{
+    Device, SurfaceConfiguration, SurfaceTexture, TextureDescriptor, TextureFormat, TextureUsages,
+    TextureView,
+};
 
 use std::{
     ffi::CStr,
@@ -34,6 +37,7 @@ pub struct Gui {
     surface_config: SurfaceConfiguration,
     renderer: Renderer,
     platform: imgui_winit_support::WinitPlatform,
+    depth_texture: wgpu::TextureView,
 
     // imgui
     imgui: Context,
@@ -115,6 +119,9 @@ impl Gui {
 
         surface.configure(&device, &surface_config);
 
+        // Create the depth texture
+        let depth_texture = Self::create_depth_texture(&device, &surface_config, "depth_texture");
+
         // Setup ImGui
         let mut imgui = Context::create();
         imgui.io_mut().config_flags |=
@@ -168,6 +175,7 @@ impl Gui {
             surface_config,
             renderer,
             platform,
+            depth_texture,
             imgui,
             ui_state: UIState {
                 last_frame_time,
@@ -178,6 +186,33 @@ impl Gui {
             intermediate_graphics_device: GraphicsIntermediateDevice::new(),
             graphics_device,
         })
+    }
+
+    fn create_depth_texture(
+        device: &Device,
+        config: &SurfaceConfiguration,
+        label: &str,
+    ) -> TextureView {
+        let size = wgpu::Extent3d {
+            // 2.
+            width: config.width,
+            height: config.height,
+            depth_or_array_layers: 1,
+        };
+        let desc = TextureDescriptor {
+            label: Some(label),
+            size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: TextureFormat::Depth32Float,
+            usage: TextureUsages::RENDER_ATTACHMENT // 3.
+                | TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        };
+        let texture = device.create_texture(&desc);
+
+        texture.create_view(&wgpu::TextureViewDescriptor::default())
     }
 
     fn handle_events(&mut self, event_loop_wrapper: &mut EventLoopWrapper) {
@@ -205,6 +240,11 @@ impl Gui {
                         self.surface_config.width = size.width.max(1);
                         self.surface_config.height = size.height.max(1);
                         self.surface.configure(&self.device, &self.surface_config);
+                        self.depth_texture = Self::create_depth_texture(
+                            &self.device,
+                            &self.surface_config,
+                            "depth_texture",
+                        );
                     }
                     Event::WindowEvent {
                         event: WindowEvent::CloseRequested,
@@ -281,109 +321,121 @@ impl Gui {
         ui.show_metrics_window(&mut opened);
 
         // Set RDP output dimensions
-        let available_draw_size = ui.content_region_avail();
-        trace!("Available draw size: {:?}", available_draw_size);
-        let scale = &ui.io().display_framebuffer_scale;
-        let scaled_size = [
-            available_draw_size[0] * scale[0],
-            available_draw_size[1] * scale[1],
-        ];
-        trace!("Scaled size: {:?}", scaled_size);
-        let output_dimensions = OutputDimensions {
-            width: scaled_size[0] as u32,
-            height: scaled_size[1] as u32,
-            aspect_ratio: available_draw_size[0] / available_draw_size[1],
+        // let available_draw_size = ui.content_region_avail();
+        // warn!("Available draw size: {:?}", available_draw_size);
+        // let scale = &ui.io().display_framebuffer_scale;
+        // let scaled_size = [
+        //     available_draw_size[0] * scale[0],
+        //     available_draw_size[1] * scale[1],
+        // ];
+        // warn!("Scaled size: {:?}", scaled_size);
+        // let output_dimensions = OutputDimensions {
+        //     width: scaled_size[0] as u32,
+        //     height: scaled_size[1] as u32,
+        //     aspect_ratio: available_draw_size[0] / available_draw_size[1],
+        // };
+        // self.rcp.rdp.output_dimensions = output_dimensions;
+
+        let size = self.window.inner_size();
+        let dimensions = OutputDimensions {
+            width: size.width,
+            height: size.height,
+            aspect_ratio: size.width as f32 / size.height as f32,
         };
-        self.rcp.rdp.output_dimensions = output_dimensions;
+        self.rcp.rdp.output_dimensions = dimensions;
 
         // Texture we'll be drawing game and ImGui to
         let view = frame
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        // Setup encoder and rpass that RDP will use
-        let mut encoder: wgpu::CommandEncoder =
-            self.device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Game Command Encoder"),
-                });
+        {
+            // Prepare the context device
+            self.graphics_device.start_frame();
 
-        // Prepare the context device
-        self.graphics_device.start_frame();
+            // Run the RCP
+            self.rcp
+                .run(&mut self.intermediate_graphics_device, commands);
 
-        // Run the RCP
-        self.rcp
-            .run(&mut self.intermediate_graphics_device, commands);
+            // Setup encoder that the RDP will use
+            let mut encoder: wgpu::CommandEncoder =
+                self.device
+                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                        label: Some("Game Draw Command Encoder"),
+                    });
 
-        for draw_call in &self.intermediate_graphics_device.draw_calls {
-            assert!(!draw_call.vbo.vbo.is_empty());
-
-            self.graphics_device.set_viewport(draw_call.viewport);
-
-            self.graphics_device.set_scissor(draw_call.scissor);
-
-            self.graphics_device.load_program(
-                &self.device,
-                draw_call.other_mode_h,
-                draw_call.other_mode_l,
-                draw_call.combine,
-                draw_call.tile_descriptors,
+            // Draw the RCP output
+            warn!(
+                "Number of draw calls: {}",
+                self.intermediate_graphics_device.draw_calls.len()
             );
+            for draw_call in &self.intermediate_graphics_device.draw_calls {
+                assert!(!draw_call.vbo.vbo.is_empty());
 
-            // loop through textures and bind them
-            for (index, hash) in draw_call.textures.iter().enumerate() {
-                if let Some(hash) = hash {
-                    let texture = self
-                        .intermediate_graphics_device
-                        .texture_cache
-                        .get_mut(*hash)
-                        .unwrap();
-                    self.graphics_device
-                        .bind_texture(&self.device, &self.queue, index, texture);
+                self.graphics_device.load_program(
+                    &self.device,
+                    draw_call.shader_hash,
+                    draw_call.other_mode_h,
+                    draw_call.other_mode_l,
+                    draw_call.combine,
+                );
+
+                // loop through textures and bind them
+                for (index, hash) in draw_call.textures.iter().enumerate() {
+                    if let Some(hash) = hash {
+                        let texture = self
+                            .intermediate_graphics_device
+                            .texture_cache
+                            .get_mut(*hash)
+                            .unwrap();
+                        self.graphics_device.bind_texture(
+                            &self.device,
+                            &self.queue,
+                            index,
+                            texture,
+                        );
+                    }
                 }
+
+                // loop through samplers and bind them
+                for (index, sampler) in draw_call.samplers.iter().enumerate() {
+                    if let Some(sampler) = sampler {
+                        self.graphics_device
+                            .bind_sampler(&self.device, index, sampler);
+                    }
+                }
+
+                // set uniforms
+                self.graphics_device.set_uniforms(
+                    &self.device,
+                    &self.queue,
+                    &mut encoder,
+                    &draw_call.uniforms,
+                );
+
+                self.graphics_device.draw_triangles(
+                    &self.device,
+                    &mut encoder,
+                    &view,
+                    &self.depth_texture,
+                    self.surface_config.format,
+                    &draw_call.viewport,
+                    draw_call.scissor,
+                    draw_call.blend_state,
+                    draw_call.cull_mode,
+                    draw_call.stencil,
+                    &draw_call.vbo.vbo,
+                    draw_call.vbo.num_tris,
+                )
             }
 
-            // loop through samplers and bind them
-            for (index, sampler) in draw_call.samplers.iter().enumerate() {
-                if let Some(sampler) = sampler {
-                    self.graphics_device
-                        .bind_sampler(&self.device, index, sampler);
-                }
-            }
+            // Finish rendering
+            self.graphics_device.end_frame();
+            self.intermediate_graphics_device.clear_draw_calls();
 
-            // set uniforms
-            self.graphics_device.set_uniforms(
-                &self.device,
-                &self.queue,
-                &mut encoder,
-                &draw_call.uniforms.fog_color,
-                &draw_call.uniforms.blend_color,
-                &draw_call.uniforms.prim_color,
-                &draw_call.uniforms.env_color,
-                &draw_call.uniforms.key_center,
-                &draw_call.uniforms.key_scale,
-                &draw_call.uniforms.prim_lod,
-                &draw_call.uniforms.convert_k,
-            );
-
-            self.graphics_device.draw_triangles(
-                &self.device,
-                &mut encoder,
-                &view,
-                self.surface_config.format,
-                draw_call.blend_state,
-                draw_call.cull_mode,
-                draw_call.stencil,
-                &draw_call.vbo.vbo,
-                draw_call.vbo.num_tris,
-            )
+            // Finish game encoding and submit
+            self.queue.submit(Some(encoder.finish()));
         }
-
-        // Finish rendering
-        self.graphics_device.end_frame();
-
-        // Finish game encoding and submit
-        self.queue.submit(Some(encoder.finish()));
 
         // Draw ImGui to view
         let mut encoder: wgpu::CommandEncoder =
@@ -488,7 +540,7 @@ pub extern "C" fn GUIDrawLists(
 #[no_mangle]
 pub extern "C" fn GUIEndFrame(gui: Option<&mut Gui>) {
     let gui = gui.unwrap();
-    gui.end_frame();
+    gui.end_frame().unwrap();
 }
 
 #[no_mangle]
