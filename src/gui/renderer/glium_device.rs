@@ -183,12 +183,11 @@ impl<'draw> GliumGraphicsDevice<'draw> {
             PolygonOffset {
                 factor: if params.polygon_offset { -2.0 } else { 0.0 },
                 units: if params.polygon_offset { 2.0 } else { 0.0 },
+                fill: true,
                 ..Default::default()
             }
         } else {
             PolygonOffset {
-                factor: 0.0,
-                units: 0.0,
                 ..Default::default()
             }
         };
