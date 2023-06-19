@@ -31,7 +31,6 @@ pub struct WgpuProgram {
     other_mode_h: u32,
     other_mode_l: u32,
     combine: CombineParams,
-    tile_descriptors: [TileDescriptor; NUM_TILE_DESCRIPTORS],
 
     pub vertex_size: usize,
     pub num_floats: usize,
@@ -95,12 +94,7 @@ impl WgpuProgram {
 
     // MARK: - Defaults
 
-    pub fn new(
-        other_mode_h: u32,
-        other_mode_l: u32,
-        combine: CombineParams,
-        tile_descriptors: [TileDescriptor; NUM_TILE_DESCRIPTORS],
-    ) -> Self {
+    pub fn new(other_mode_h: u32, other_mode_l: u32, combine: CombineParams) -> Self {
         Self {
             processed_shader: "".to_string(),
             compiled_program: None,
@@ -113,7 +107,6 @@ impl WgpuProgram {
             other_mode_h,
             other_mode_l,
             combine,
-            tile_descriptors,
 
             vertex_size: 0,
             num_floats: 0,

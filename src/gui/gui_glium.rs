@@ -1,26 +1,30 @@
-use anyhow::{Ok, Result};
-use glutin::{event_loop::EventLoop, Api, ContextWrapper, GlRequest, PossiblyCurrent};
+use anyhow::Result;
+
+use glium::Frame;
+use glutin::{event_loop::EventLoop, GlRequest};
 use imgui::{Context, FontSource, Ui};
-use imgui_glow_renderer::{glow, AutoRenderer};
-use imgui_winit_support::winit::window::Window;
+use imgui_glium_renderer::Renderer;
+use winit::event::{Event, WindowEvent};
 
 use std::str;
 use std::time::Duration;
-use std::{ffi::CStr, time::Instant};
+use std::{ffi::CStr, result::Result::Ok, time::Instant};
 use winit::platform::run_return::EventLoopExtRunReturn;
 
 use crate::fast3d::graphics::GraphicsIntermediateDevice;
 use crate::fast3d::rcp::RCP;
 use crate::fast3d::rdp::OutputDimensions;
 
-use super::renderer::opengl_device::OpenGLGraphicsDevice;
+use super::renderer::glium_device::GliumGraphicsDevice;
 
-pub struct Gui {
+// use super::renderer::opengl_device::OpenGLGraphicsDevice;
+
+pub struct Gui<'render> {
     // window
-    pub window: ContextWrapper<PossiblyCurrent, Window>,
+    pub display: glium::Display,
 
     // render
-    renderer: AutoRenderer,
+    renderer: Renderer,
     platform: imgui_winit_support::WinitPlatform,
 
     // imgui
@@ -35,7 +39,7 @@ pub struct Gui {
     // game renderer
     rcp: RCP,
     intermediate_graphics_device: GraphicsIntermediateDevice,
-    graphics_device: OpenGLGraphicsDevice,
+    graphics_device: GliumGraphicsDevice<'render>,
 }
 
 pub struct UIState {
@@ -46,7 +50,7 @@ pub struct EventLoopWrapper {
     event_loop: EventLoop<()>,
 }
 
-impl Gui {
+impl<'render> Gui<'render> {
     pub fn new<D>(title: &str, event_loop_wrapper: &EventLoopWrapper, draw_menu: D) -> Result<Self>
     where
         D: Fn(&Ui) + 'static,
@@ -55,21 +59,17 @@ impl Gui {
 
         // Create the window
 
-        let window = glutin::window::WindowBuilder::new()
+        let build = glutin::window::WindowBuilder::new()
             .with_title(title)
             .with_inner_size(glutin::dpi::LogicalSize::new(width, height));
 
-        let window = glutin::ContextBuilder::new()
+        let context = glutin::ContextBuilder::new()
+            .with_depth_buffer(24)
+            .with_double_buffer(Some(true))
             .with_gl(GlRequest::Latest)
-            .with_vsync(true)
-            .build_windowed(window, &event_loop_wrapper.event_loop)
-            .expect("could not create window");
+            .with_vsync(true);
 
-        let window = unsafe {
-            window
-                .make_current()
-                .expect("could not make window context current")
-        };
+        let display = glium::Display::new(build, context, &event_loop_wrapper.event_loop)?;
 
         // Setup ImGui
         let mut imgui = Context::create();
@@ -78,7 +78,7 @@ impl Gui {
         let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
         platform.attach_window(
             imgui.io_mut(),
-            window.window(),
+            display.gl_window().window(),
             imgui_winit_support::HiDpiMode::Default,
         );
 
@@ -86,9 +86,9 @@ impl Gui {
         imgui.set_ini_filename(None);
 
         // Setup fonts
-        // let hidpi_factor = window.window().scale_factor();
-        let font_size = (13.0 * platform.hidpi_factor()) as f32;
-        imgui.io_mut().font_global_scale = (1.0 / platform.hidpi_factor()) as f32;
+        let hidpi_factor = platform.hidpi_factor();
+        let font_size = (13.0 * hidpi_factor) as f32;
+        imgui.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
 
         imgui.fonts().add_font(&[FontSource::DefaultFontData {
             config: Some(imgui::FontConfig {
@@ -99,22 +99,14 @@ impl Gui {
             }),
         }]);
 
-        // Initialize gl
-        let gl =
-            unsafe { glow::Context::from_loader_function(|s| window.get_proc_address(s).cast()) };
-
         // Setup Renderer
-        let renderer = imgui_glow_renderer::AutoRenderer::initialize(gl, &mut imgui)
-            .expect("Failed to create renderer");
-
-        // Initialize graphics device
-        let graphics_device = OpenGLGraphicsDevice::new(renderer.gl_context());
+        let renderer = imgui_glium_renderer::Renderer::init(&mut imgui, &display)?;
 
         // Initial UI state
         let last_frame_time = Instant::now();
 
         Ok(Self {
-            window,
+            display,
             renderer,
             platform,
             imgui,
@@ -122,33 +114,34 @@ impl Gui {
             draw_menu_callback: Box::new(draw_menu),
             rcp: RCP::new(),
             intermediate_graphics_device: GraphicsIntermediateDevice::new(),
-            graphics_device,
+            graphics_device: GliumGraphicsDevice::new(),
         })
     }
 
     fn handle_events(&mut self, event_loop_wrapper: &mut EventLoopWrapper) {
         event_loop_wrapper
             .event_loop
-            .run_return(|event, _, control_flow| {
-                match event {
-                    glutin::event::Event::MainEventsCleared => control_flow.set_exit(),
-                    glutin::event::Event::WindowEvent {
-                        event: glutin::event::WindowEvent::CloseRequested,
-                        ..
-                    } => {
-                        std::process::exit(0);
-                    }
-                    glutin::event::Event::WindowEvent {
-                        event: glutin::event::WindowEvent::Resized(size),
-                        ..
-                    } => {
-                        self.window.resize(size);
-                    }
-                    _ => (),
+            .run_return(|event, _, control_flow| match event {
+                Event::MainEventsCleared => control_flow.set_exit(),
+                Event::WindowEvent {
+                    event: WindowEvent::CloseRequested,
+                    ..
+                } => {
+                    std::process::exit(0);
                 }
+                Event::WindowEvent {
+                    event: WindowEvent::Resized(size),
+                    ..
+                } => {
+                    let gl_window = self.display.gl_window();
+                    gl_window.resize(size);
+                }
+                event => {
+                    let gl_window = self.display.gl_window();
 
-                self.platform
-                    .handle_event(self.imgui.io_mut(), self.window.window(), &event);
+                    self.platform
+                        .handle_event(self.imgui.io_mut(), gl_window.window(), &event);
+                }
             });
     }
 
@@ -164,7 +157,7 @@ impl Gui {
         }
     }
 
-    pub fn start_frame(&mut self, event_loop_wrapper: &mut EventLoopWrapper) -> Result<()> {
+    pub fn start_frame(&mut self, event_loop_wrapper: &mut EventLoopWrapper) -> Result<Frame> {
         // Handle events
         self.handle_events(event_loop_wrapper);
 
@@ -176,7 +169,7 @@ impl Gui {
         self.ui_state.last_frame_time = now;
 
         // Grab current window size and store them
-        let size = self.window.window().inner_size();
+        let size = self.display.gl_window().window().inner_size();
         let dimensions = OutputDimensions {
             width: size.width,
             height: size.height,
@@ -185,13 +178,17 @@ impl Gui {
         self.rcp.rdp.output_dimensions = dimensions;
 
         // Get the ImGui context and begin drawing the frame
+        let gl_window = self.display.gl_window();
         self.platform
-            .prepare_frame(self.imgui.io_mut(), self.window.window())?;
+            .prepare_frame(self.imgui.io_mut(), gl_window.window())?;
 
-        Ok(())
+        // Setup for drawing
+        let target = self.display.draw();
+
+        Ok(target)
     }
 
-    fn render(&mut self) -> Result<()> {
+    fn render(&mut self, target: &mut Frame) -> Result<()> {
         // Begin drawing UI
         let ui = self.imgui.new_frame();
         ui.main_menu_bar(|| {
@@ -202,39 +199,37 @@ impl Gui {
         let mut opened = true;
         ui.show_metrics_window(&mut opened);
 
-        self.platform.prepare_render(ui, self.window.window());
-        let draw_data = self.imgui.render();
+        // Setup for drawing
+        let gl_window = self.display.gl_window();
 
         // Render ImGui on top of any drawn content
-        self.renderer
-            .render(draw_data)
-            .expect("error rendering imgui");
+        self.platform.prepare_render(ui, gl_window.window());
+        let draw_data = self.imgui.render();
+
+        self.renderer.render(target, draw_data)?;
 
         Ok(())
     }
 
-    fn render_game(&mut self) -> Result<()> {
+    fn render_game(&mut self, target: &mut Frame) -> Result<()> {
         for draw_call in &self.intermediate_graphics_device.draw_calls {
             assert!(!draw_call.vbo.vbo.is_empty());
 
-            let gl = self.renderer.gl_context();
-
-            self.graphics_device.set_cull_mode(gl, draw_call.cull_mode);
+            self.graphics_device.set_cull_mode(draw_call.cull_mode);
 
             self.graphics_device
-                .set_depth_stencil_params(gl, draw_call.stencil);
+                .set_depth_stencil_params(draw_call.stencil);
 
-            self.graphics_device
-                .set_blend_state(gl, draw_call.blend_state);
-            self.graphics_device.set_viewport(gl, &draw_call.viewport);
-            self.graphics_device.set_scissor(gl, draw_call.scissor);
+            self.graphics_device.set_blend_state(draw_call.blend_state);
+            self.graphics_device.set_viewport(&draw_call.viewport);
+            self.graphics_device.set_scissor(draw_call.scissor);
 
             self.graphics_device.load_program(
-                gl,
+                &self.display,
+                draw_call.shader_hash,
                 draw_call.other_mode_h,
                 draw_call.other_mode_l,
                 draw_call.combine,
-                draw_call.tile_descriptors,
             );
 
             // loop through textures and bind them
@@ -245,20 +240,23 @@ impl Gui {
                         .texture_cache
                         .get_mut(*hash)
                         .unwrap();
-                    self.graphics_device.bind_texture(gl, index, texture);
+                    self.graphics_device
+                        .bind_texture(&self.display, index, texture);
                 }
             }
 
             // loop through samplers and bind them
             for (index, sampler) in draw_call.samplers.iter().enumerate() {
                 if let Some(sampler) = sampler {
-                    self.graphics_device.bind_sampler(gl, index, sampler);
+                    self.graphics_device.bind_sampler(index, sampler);
                 }
             }
 
-            // set uniforms
-            self.graphics_device.set_uniforms(
-                gl,
+            // draw triangles
+            self.graphics_device.draw_triangles(
+                &self.display,
+                target,
+                &draw_call.vbo.vbo,
                 &draw_call.uniforms.fog_color,
                 &draw_call.uniforms.blend_color,
                 &draw_call.uniforms.prim_color,
@@ -268,9 +266,6 @@ impl Gui {
                 &draw_call.uniforms.prim_lod,
                 &draw_call.uniforms.convert_k,
             );
-
-            self.graphics_device
-                .draw_triangles(gl, &draw_call.vbo.vbo, draw_call.vbo.num_tris);
         }
 
         Ok(())
@@ -281,24 +276,24 @@ impl Gui {
         EventLoopWrapper { event_loop }
     }
 
-    pub fn draw_lists(&mut self, commands: usize) -> Result<()> {
+    pub fn draw_lists(&mut self, mut frame: Frame, commands: usize) -> Result<()> {
         // Prepare the context device
-        self.graphics_device.start_frame(self.renderer.gl_context());
+        self.graphics_device.start_frame(&mut frame);
 
         // Run the RCP
         self.rcp
             .run(&mut self.intermediate_graphics_device, commands);
-        self.render_game()?;
+        self.render_game(&mut frame)?;
 
         // Finish rendering
         self.graphics_device.end_frame();
         self.intermediate_graphics_device.clear_draw_calls();
 
         // Render ImGui on top of any drawn content
-        self.render()?;
+        self.render(&mut frame)?;
 
         // Swap buffers
-        self.window.swap_buffers()?;
+        frame.finish()?;
 
         Ok(())
     }
@@ -340,22 +335,30 @@ pub unsafe extern "C" fn GUICreate(
 }
 
 #[no_mangle]
-pub extern "C" fn GUIStartFrame(gui: Option<&mut Gui>, event_loop: Option<&mut EventLoopWrapper>) {
+pub extern "C" fn GUIStartFrame(
+    gui: Option<&mut Gui>,
+    event_loop: Option<&mut EventLoopWrapper>,
+) -> Box<Option<Frame>> {
     let gui = gui.unwrap();
     let event_loop = event_loop.unwrap();
-    gui.start_frame(event_loop);
+    match gui.start_frame(event_loop) {
+        Ok(frame) => Box::new(Some(frame)),
+        Err(_) => Box::new(None),
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn GUIDrawLists(gui: Option<&mut Gui>, _frame: libc::c_void, commands: u64) {
+pub extern "C" fn GUIDrawLists(gui: Option<&mut Gui>, frame: Option<Box<Frame>>, commands: u64) {
     let gui = gui.unwrap();
-    gui.draw_lists(commands.try_into().unwrap()).unwrap();
+    let frame = frame.unwrap();
+    gui.draw_lists(*frame, commands.try_into().unwrap())
+        .unwrap();
 }
 
 #[no_mangle]
 pub extern "C" fn GUIEndFrame(gui: Option<&mut Gui>) {
     let gui = gui.unwrap();
-    gui.end_frame();
+    gui.end_frame().unwrap();
 }
 
 #[no_mangle]

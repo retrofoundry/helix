@@ -498,7 +498,6 @@ impl RDP {
         self.other_mode_h.hash(&mut hasher);
         self.other_mode_l.hash(&mut hasher);
         self.combine.hash(&mut hasher);
-        self.tile_descriptors.hash(&mut hasher);
 
         hasher.finish()
     }

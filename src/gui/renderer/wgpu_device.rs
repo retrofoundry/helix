@@ -146,15 +146,6 @@ impl WgpuGraphicsDevice {
         }
     }
 
-    fn compile_program(&self, device: &wgpu::Device, program: &mut WgpuProgram) {
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: None,
-            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&program.processed_shader)),
-        });
-
-        program.compiled_program = Some(shader);
-    }
-
     fn create_texture_bind_group_layout(
         &self,
         device: &wgpu::Device,
@@ -292,7 +283,6 @@ impl WgpuGraphicsDevice {
         other_mode_h: u32,
         other_mode_l: u32,
         combine: CombineParams,
-        tile_descriptors: [TileDescriptor; NUM_TILE_DESCRIPTORS],
     ) {
         // calculate the hash of the shader
         let mut hasher = DefaultHasher::new();
@@ -300,7 +290,6 @@ impl WgpuGraphicsDevice {
         other_mode_h.hash(&mut hasher);
         other_mode_l.hash(&mut hasher);
         combine.hash(&mut hasher);
-        tile_descriptors.hash(&mut hasher);
 
         let shader_hash = hasher.finish();
 
@@ -325,7 +314,12 @@ impl WgpuGraphicsDevice {
         program.init();
         program.preprocess();
 
-        self.compile_program(device, &mut program);
+        program.compiled_program =
+            Some(device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: None,
+                source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&program.processed_shader)),
+            }));
+
         self.current_shader = shader_hash;
         self.shader_cache.insert(shader_hash, program);
     }

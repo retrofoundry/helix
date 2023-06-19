@@ -1,3 +1,5 @@
+use std::{collections::hash_map::DefaultHasher, hash::{Hash, Hasher}};
+
 use super::{
     rdp::NUM_TILE_DESCRIPTORS,
     utils::{
@@ -103,6 +105,7 @@ pub struct GraphicsDrawCall {
     pub other_mode_l: u32,
     pub combine: CombineParams,
     pub tile_descriptors: [TileDescriptor; NUM_TILE_DESCRIPTORS],
+    pub shader_hash: u64,
 
     // Textures
     pub textures: [Option<u64>; 2],
@@ -138,6 +141,7 @@ impl GraphicsDrawCall {
         other_mode_l: 0,
         combine: CombineParams::ZERO,
         tile_descriptors: [TileDescriptor::EMPTY; NUM_TILE_DESCRIPTORS],
+        shader_hash: 0,
         textures: [None; 2],
         samplers: [None; 2],
         stencil: None,
@@ -148,6 +152,17 @@ impl GraphicsDrawCall {
         uniforms: GraphicsIntermediateUniforms::EMPTY,
         vbo: GraphicsIntermediateVBO::EMPTY,
     };
+
+    pub fn finalize(&mut self) {
+        // compute the shader hash and store it
+        let mut hasher = DefaultHasher::new();
+
+        self.other_mode_h.hash(&mut hasher);
+        self.other_mode_l.hash(&mut hasher);
+        self.combine.hash(&mut hasher);
+
+        self.shader_hash = hasher.finish();
+    }
 }
 
 pub struct GraphicsIntermediateDevice {
@@ -289,6 +304,7 @@ impl GraphicsIntermediateDevice {
     pub fn set_vbo(&mut self, vbo: Vec<u8>, num_tris: usize) {
         let draw_call = self.current_draw_call();
         draw_call.vbo = GraphicsIntermediateVBO { vbo, num_tris };
+        draw_call.finalize();
 
         // start a new draw call that's a copy of the current one
         // we do this cause atm we only set properties on changes

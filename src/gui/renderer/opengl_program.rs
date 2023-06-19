@@ -1,5 +1,3 @@
-use imgui_glow_renderer::glow;
-
 use crate::fast3d::gbi::utils::{
     get_cycle_type_from_other_mode_h, get_textfilter_from_other_mode_h,
     other_mode_l_alpha_compare_dither, other_mode_l_alpha_compare_threshold,
@@ -9,10 +7,9 @@ use crate::fast3d::gbi::utils::{
 use crate::fast3d::utils::{
     color_combiner::{CombineParams, ACMUX, CCMUX},
     texture::TextFilt,
-    tile_descriptor::TileDescriptor,
 };
 
-use crate::fast3d::rdp::{OtherModeHCycleType, NUM_TILE_DESCRIPTORS};
+use crate::fast3d::rdp::OtherModeHCycleType;
 use std::collections::HashMap;
 
 #[derive(PartialEq, Eq)]
@@ -22,11 +19,11 @@ pub enum ShaderType {
 }
 
 #[derive(Debug, Clone)]
-pub struct OpenGLProgram {
+pub struct OpenGLProgram<T> {
     // Compiled program.
     pub preprocessed_vertex: String,
     pub preprocessed_frag: String,
-    pub compiled_program: Option<glow::NativeProgram>,
+    pub compiled_program: Option<T>,
 
     // inputs
     pub both: String,
@@ -38,12 +35,11 @@ pub struct OpenGLProgram {
     other_mode_h: u32,
     other_mode_l: u32,
     combine: CombineParams,
-    tile_descriptors: [TileDescriptor; NUM_TILE_DESCRIPTORS],
 
     pub num_floats: usize,
 }
 
-impl OpenGLProgram {
+impl<T> OpenGLProgram<T> {
     // MARK: - Defines
     pub fn defines_changed(&mut self) {
         self.preprocessed_vertex = "".to_string();
@@ -120,12 +116,7 @@ impl OpenGLProgram {
 
     // MARK: - Defaults
 
-    pub fn new(
-        other_mode_h: u32,
-        other_mode_l: u32,
-        combine: CombineParams,
-        tile_descriptors: [TileDescriptor; NUM_TILE_DESCRIPTORS],
-    ) -> Self {
+    pub fn new(other_mode_h: u32, other_mode_l: u32, combine: CombineParams) -> Self {
         Self {
             preprocessed_vertex: "".to_string(),
             preprocessed_frag: "".to_string(),
@@ -139,7 +130,6 @@ impl OpenGLProgram {
             other_mode_h,
             other_mode_l,
             combine,
-            tile_descriptors,
 
             num_floats: 0,
         }
@@ -198,8 +188,7 @@ impl OpenGLProgram {
             "#
         .to_string();
 
-        self.vertex = format!(
-            r#"
+        self.vertex = r#"
             in vec4 aVtxPos;
 
             in vec4 aVtxColor;
@@ -210,53 +199,19 @@ impl OpenGLProgram {
                 out vec2 vTexCoord;
             #endif
 
-            void main() {{
+            void main() {
                 vVtxColor = aVtxColor;
 
                 #if defined(USE_TEXTURE0) || defined(USE_TEXTURE1)
                     vTexCoord = aTexCoord;
                 #endif
 
-                #if defined(USE_TEXTURE0) || defined(USE_TEXTURE1)
-                    {}
-                #endif
-
                 gl_Position = aVtxPos;
-            }}
-        "#,
-            self.generate_clamp(),
-        );
+            }
+        "#
+        .to_string();
 
         self.fragment = self.generate_frag();
-    }
-
-    fn generate_clamp(&mut self) -> String {
-        let mut out = String::new();
-        for i in 0..self.tile_descriptors.len() {
-            let tile = &self.tile_descriptors[i];
-            if tile.cm_s & 0x2 != 0 {
-                let coord_ratio = (((tile.lrs - tile.uls) >> 2) + 1) / tile.get_width();
-                let comp = if i == 0 { 'x' } else { 'z' };
-                if coord_ratio > 1 {
-                    out.push_str(&format!(
-                        "vTexCoord.{} = clamp(vTexCoord.{}, 0.0, {});\n",
-                        comp, comp, coord_ratio
-                    ));
-                }
-            }
-            if tile.cm_t & 0x2 != 0 {
-                let coord_ratio = (((tile.lrt - tile.ult) >> 2) + 1) / tile.get_width();
-                let comp = if i == 0 { 'y' } else { 'w' };
-                if coord_ratio > 1 {
-                    out.push_str(&format!(
-                        "vTexCoord.{} = clamp(vTexCoord.{}, 0.0, {});\n",
-                        comp, comp, coord_ratio
-                    ));
-                }
-            }
-        }
-
-        out
     }
 
     fn generate_frag(&mut self) -> String {
@@ -449,6 +404,22 @@ impl OpenGLProgram {
             
             float CombineAlphaCycle1(vec4 tCombColor, vec4 texVal0, vec4 texVal1) {{
                 return ({} - {}) * {} + {};
+            }}
+
+            vec3 to_linear(vec3 v) {{
+                return pow(v, vec3(2.2));
+            }}
+
+            vec4 to_linear(vec4 v) {{
+                return vec4(to_linear(v.rgb), v.a);
+            }}
+
+            vec3 to_srgb(vec3 v) {{
+                return pow(v, vec3(1.0 / 2.2));
+            }}
+            
+            vec4 to_srgb(vec4 v) {{
+                return vec4(to_srgb(v.rgb), v.a);
             }}
 
             void main() {{

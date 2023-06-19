@@ -1,5 +1,6 @@
 #[cfg(feature = "opengl")]
-pub mod opengl_device;
+pub mod glium_device;
+
 #[cfg(feature = "opengl")]
 mod opengl_program;
 
