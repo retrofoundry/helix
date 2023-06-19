@@ -8,7 +8,7 @@ name = "helix"
 crate-type = ["lib", "staticlib"]
 
 [features]
-default = ["f3dex2"]
+default = ["f3dex2", "opengl"]
 
 # Graphics Features
 f3dex2 = []
@@ -16,6 +16,10 @@ f3dex2e = ["gbifloats", "f3dex2"]
 f3dzex2 = ["f3dex2"]
 
 gbifloats = []
+
+# Renderer Backend
+wgpu = ["imgui-wgpu"]
+opengl = ["glium", "glutin", "imgui-glium-renderer"]
 
 # Additional Features
 speech = ["dep:tts"]
@@ -29,14 +33,22 @@ device_query = {  git = "https://github.com/dcvz/device_query.git", branch = "fe
 env_logger = "0.10.0"
 farbe = "0.2.0"
 gilrs = { version = "0.10.2", features = ["serde", "serde-serialize"] }
-glam = { git = "https://github.com/bitshifter/glam-rs.git", branch = "neon", features = ["approx"] }
-imgui = { version = "0.10.0", features = ["docking"] }
-imgui-wgpu = "0.22.0"
-imgui-winit-support = "0.10.0"
+glam = { git = "https://github.com/bitshifter/glam-rs.git", branch = "neon", features = ["approx", "bytemuck"] }
+glium = { version = "0.32.1", optional = true }
+imgui = { version = "0.11.0", features = ["docking"] }
+imgui-wgpu = { git = "https://github.com/retrofoundry/imgui-wgpu-rs.git", branch = "helix", optional = true }
+imgui-winit-support = "0.11.0"
+imgui-glium-renderer = { version = "0.11.0", optional = true }
+winit = { version = "0.27.2", features = ["x11", "wayland", "wayland-dlopen", "wayland-csd-adwaita"] }
 libc = "0.2.139"
 log = "0.4.17"
 pollster = "0.3.0"
 tokio = { version = "1.26.0", features = ["full"], optional = true }
 tts = { version = "0.25.0", optional = true }
-wgpu = "0.15.1"
-winit = { version = "0.27.2", features = ["x11", "wayland", "wayland-dlopen", "wayland-csd-adwaita"] }
+glutin = { version = "0.29.1", optional = true }
+wgpu = "0.16"
+spin_sleep = "1.1.1"
+bytemuck = { version = "1.13.1"}
+
+[patch.crates-io]
+glium = { git = "https://github.com/retrofoundry/glium", branch = "helix" }

@@ -20,8 +20,10 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Test
-      run: cargo test --all-features
+    - name: Test (OpenGL)
+      run: cargo test --features "speech, network, opengl, f3dex2" --no-default-features
+    - name: Test (WGPU)
+      run: cargo test --features "speech, network, wgpu, f3dex2" --no-default-features
   ubuntu-check:
     runs-on: ubuntu-latest
     steps:
@@ -32,11 +34,15 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y $(cat .github/workflows/apt-deps.txt)
-    - name: Test
-      run: cargo test --all-features
+    - name: Test (OpenGL)
+      run: cargo test --features "speech, network, opengl, f3dex2" --no-default-features
+    - name: Test (WGPU)
+      run: cargo test --features "speech, network, wgpu, f3dex2" --no-default-features
   windows-check:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Test
-      run: cargo test --all-features
+    - name: Test (OpenGL)
+      run: cargo test --features "speech, network, opengl, f3dex2" --no-default-features
+    - name: Test (WGPU)
+      run: cargo test --features "speech, network, wgpu, f3dex2" --no-default-features

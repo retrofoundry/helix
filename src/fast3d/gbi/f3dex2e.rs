@@ -1,4 +1,4 @@
-use crate::fast3d::{graphics::GraphicsContext, rcp::RCP, rdp::RDP, rsp::RSP};
+use crate::fast3d::{graphics::GraphicsIntermediateDevice, rdp::RDP, rsp::RSP};
 
 use super::{
     defines::{Gfx, G_FILLRECT, G_TEXRECT, G_TEXRECTFLIP},
@@ -22,7 +22,7 @@ impl F3DEX2E {
     pub fn gdp_texture_rectangle(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        gfx_context: &GraphicsContext,
+        gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -57,7 +57,7 @@ impl F3DEX2E {
         F3DEX2::gdp_texture_rectangle_raw(
             rdp,
             rsp,
-            gfx_context,
+            gfx_device,
             ulx as i32,
             uly as i32,
             lrx as i32,
@@ -74,7 +74,7 @@ impl F3DEX2E {
     pub fn gdp_fill_rectangle(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        gfx_context: &GraphicsContext,
+        gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -93,41 +93,7 @@ impl F3DEX2E {
         let uly = get_cmd(w1, 0, 24) << 8 >> 8;
 
         F3DEX2::gdp_fill_rectangle_raw(
-            rdp,
-            rsp,
-            gfx_context,
-            ulx as i32,
-            uly as i32,
-            lrx as i32,
-            lry as i32,
+            rdp, rsp, gfx_device, ulx as i32, uly as i32, lrx as i32, lry as i32,
         )
     }
-}
-
-// MARK: - C Bridge
-
-#[no_mangle]
-pub extern "C" fn F3DEX2E_GDPTextureRectangle(
-    rcp: Option<&mut RCP>,
-    gfx_context: Option<&mut GraphicsContext>,
-    command: usize,
-) {
-    let rcp = rcp.unwrap();
-    let gfx_context = gfx_context.unwrap();
-    let mut command: *mut Gfx = command as *mut Gfx;
-
-    F3DEX2E::gdp_texture_rectangle(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
-}
-
-#[no_mangle]
-pub extern "C" fn F3DEX2E_GDPFillRectangle(
-    rcp: Option<&mut RCP>,
-    gfx_context: Option<&mut GraphicsContext>,
-    command: usize,
-) {
-    let rcp = rcp.unwrap();
-    let gfx_context = gfx_context.unwrap();
-    let mut command: *mut Gfx = command as *mut Gfx;
-
-    F3DEX2E::gdp_fill_rectangle(&mut rcp.rdp, &mut rcp.rsp, gfx_context, &mut command);
 }

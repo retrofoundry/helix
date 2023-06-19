@@ -82,7 +82,7 @@ pub extern "C" fn GamepadManagerCreate() -> Box<GamepadManager> {
 }
 
 #[no_mangle]
-extern "C" fn GamepadManagerInit(
+pub extern "C" fn GamepadManagerInit(
     manager: Option<&mut GamepadManager>,
     gamepad_bits: GamepadBits,
 ) -> i32 {
@@ -93,13 +93,13 @@ extern "C" fn GamepadManagerInit(
 }
 
 #[no_mangle]
-extern "C" fn GamepadManagerProcessEvents(manager: Option<&mut GamepadManager>) {
+pub extern "C" fn GamepadManagerProcessEvents(manager: Option<&mut GamepadManager>) {
     let manager = manager.unwrap();
     manager.process_events();
 }
 
 #[no_mangle]
-extern "C" fn GamepadManagerGetReadData(
+pub extern "C" fn GamepadManagerGetReadData(
     manager: Option<&mut GamepadManager>,
     pad: *mut OSControllerPad,
 ) {

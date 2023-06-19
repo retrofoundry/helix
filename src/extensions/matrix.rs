@@ -1,4 +1,3 @@
-use crate::fast3d::gbi::defines::Light;
 use glam::{Mat4, Vec3A, Vec4Swizzles};
 
 pub trait MatrixFrom {
@@ -50,12 +49,6 @@ impl Vec3AMul for Vec3A {
     }
 }
 
-pub fn calculate_normal_dir(light: &Light, matrix: &Mat4, output: &mut Vec3A) {
-    let light_dir = Vec3A::new(
-        light.dir[0] as f32 / 127.0,
-        light.dir[1] as f32 / 127.0,
-        light.dir[2] as f32 / 127.0,
-    );
-
-    *output = light_dir.mul_mat4(matrix).normalize_or_zero();
+pub fn calculate_normal_dir(vector: &Vec3A, matrix: &Mat4, output: &mut Vec3A) {
+    *output = vector.mul_mat4(matrix).normalize_or_zero();
 }

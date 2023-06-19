@@ -3,9 +3,6 @@ use farbe::image::n64::{
 };
 use log::trace;
 
-use super::super::graphics::GraphicsContext;
-use std::collections::{HashMap, VecDeque};
-
 pub fn translate_tile_rgba16(tmem: &[u8], tile_width: u32, tile_height: u32) -> Vec<u8> {
     let image = NativeImage::read(tmem, FarbeImageFormat::RGBA16, tile_width, tile_height).unwrap();
     trace!("Decoding RGBA16 image");
@@ -116,7 +113,7 @@ pub fn translate_tlut(
     decoded
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum ImageFormat {
     G_IM_FMT_RGBA = 0x00,
     G_IM_FMT_YUV = 0x01,
@@ -125,7 +122,7 @@ pub enum ImageFormat {
     G_IM_FMT_I = 0x04,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum ImageSize {
     G_IM_SIZ_4b = 0x00,
     G_IM_SIZ_8b = 0x01,
@@ -163,111 +160,6 @@ pub enum TextFilt {
     G_TF_POINT = 0x00,
     G_TF_AVERAGE = 0x03,
     G_TF_BILERP = 0x02,
-}
-
-pub struct TextureManager {
-    pub map: HashMap<usize, Texture>,
-    pub lru: VecDeque<usize>,
-    pub capacity: usize,
-}
-
-impl TextureManager {
-    pub fn new(capacity: usize) -> Self {
-        Self {
-            map: HashMap::new(),
-            lru: VecDeque::with_capacity(capacity),
-            capacity,
-        }
-    }
-
-    pub fn lookup(
-        &mut self,
-        gfx_context: &GraphicsContext,
-        tmem_index: usize,
-        orig_addr: usize,
-        format: ImageFormat,
-        size: ImageSize,
-    ) -> Option<&mut Texture> {
-        if let Some(value) = self.map.get_mut(&orig_addr) {
-            if value.format == format && value.size == size {
-                gfx_context
-                    .api
-                    .select_texture(tmem_index as i32, value.texture_id);
-                self.lru.retain(|&k| k != orig_addr);
-                self.lru.push_back(orig_addr);
-                return Some(value);
-            }
-        }
-        None
-    }
-
-    pub fn insert_if_not_found(
-        &mut self,
-        gfx_context: &GraphicsContext,
-        tmem_index: usize,
-        orig_addr: usize,
-        format: ImageFormat,
-        size: ImageSize,
-    ) -> &mut Texture {
-        if self.map.len() == self.capacity {
-            if let Some(lru_key) = self.lru.pop_front() {
-                self.map.remove(&lru_key);
-                // TODO: Remove texture from gfx_device
-            }
-        }
-        let texture_id = gfx_context.api.new_texture();
-        gfx_context
-            .api
-            .select_texture(tmem_index as i32, texture_id);
-        gfx_context
-            .api
-            .set_sampler_parameters(tmem_index as i32, false, 0, 0);
-        let value = self.map.entry(orig_addr).or_insert(Texture {
-            texture_addr: orig_addr,
-            format,
-            size,
-            texture_id,
-            cms: 0,
-            cmt: 0,
-            linear_filter: false,
-        });
-        self.lru.push_back(orig_addr);
-        value
-    }
-
-    pub fn insert(
-        &mut self,
-        gfx_context: &GraphicsContext,
-        tmem_index: usize,
-        orig_addr: usize,
-        format: ImageFormat,
-        size: ImageSize,
-    ) -> &mut Texture {
-        if self.map.len() == self.capacity {
-            if let Some(lru_key) = self.lru.pop_front() {
-                self.map.remove(&lru_key);
-                // TODO: Remove texture from gfx_device
-            }
-        }
-        let texture_id = gfx_context.api.new_texture();
-        gfx_context
-            .api
-            .select_texture(tmem_index as i32, texture_id);
-        gfx_context
-            .api
-            .set_sampler_parameters(tmem_index as i32, false, 0, 0);
-        let value = self.map.entry(orig_addr).or_insert(Texture {
-            texture_addr: orig_addr,
-            format,
-            size,
-            texture_id,
-            cms: 0,
-            cmt: 0,
-            linear_filter: false,
-        });
-        self.lru.push_back(orig_addr);
-        value
-    }
 }
 
 pub struct TextureState {
@@ -324,28 +216,19 @@ impl TextureImageState {
     }
 }
 
-#[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct Texture {
-    pub texture_addr: usize,
-    pub format: ImageFormat,
-    pub size: ImageSize,
-
-    pub texture_id: u32,
+pub struct RenderingStateTexture {
     pub cms: u8,
     pub cmt: u8,
 
     pub linear_filter: bool,
 }
 
-impl Texture {
+impl RenderingStateTexture {
     pub const EMPTY: Self = Self {
-        texture_addr: 0,
-        format: ImageFormat::G_IM_FMT_YUV,
-        size: ImageSize::G_IM_SIZ_16b,
-        texture_id: 0,
         cms: 0,
         cmt: 0,
+
         linear_filter: false,
     };
 }

@@ -1,7 +1,6 @@
 use wgpu::BlendFactor;
 
 use crate::fast3d::{
-    graphics::CullMode,
     rdp::{
         AlphaCompare, BlendParamB, BlendParamPMColor, OtherModeHCycleType, OtherModeH_Layout,
         OtherModeLayoutL,
@@ -14,10 +13,6 @@ pub fn get_cmd(val: usize, start_bit: u32, num_bits: u32) -> usize {
     (val >> start_bit) & ((1 << num_bits) - 1)
 }
 
-pub fn get_segmented_address(w1: usize) -> usize {
-    w1
-}
-
 pub fn other_mode_l_uses_texture_edge(other_mode_l: u32) -> bool {
     other_mode_l >> (OtherModeLayoutL::CVG_X_ALPHA as u32) & 0x01 == 0x01
 }
@@ -26,11 +21,15 @@ pub fn other_mode_l_uses_alpha(other_mode_l: u32) -> bool {
     other_mode_l & ((BlendParamB::G_BL_A_MEM as u32) << (OtherModeLayoutL::B_1 as u32)) == 0
 }
 
+pub fn other_mode_l_alpha_compare_threshold(other_mode_l: u32) -> bool {
+    other_mode_l & AlphaCompare::G_AC_THRESHOLD as u32 == AlphaCompare::G_AC_THRESHOLD as u32
+}
+
 pub fn other_mode_l_uses_fog(other_mode_l: u32) -> bool {
     (other_mode_l >> OtherModeLayoutL::P_1 as u32) == BlendParamPMColor::G_BL_CLR_FOG as u32
 }
 
-pub fn other_mode_l_uses_noise(other_mode_l: u32) -> bool {
+pub fn other_mode_l_alpha_compare_dither(other_mode_l: u32) -> bool {
     other_mode_l & AlphaCompare::G_AC_DITHER as u32 == AlphaCompare::G_AC_DITHER as u32
 }
 
@@ -71,18 +70,18 @@ pub fn translate_blend_param_b(param: u32, src: BlendFactor) -> BlendFactor {
     }
 }
 
-pub fn translate_cull_mode(geometry_mode: u32) -> CullMode {
+pub fn translate_cull_mode(geometry_mode: u32) -> Option<wgpu::Face> {
     let cull_front = (geometry_mode & RSPGeometry::G_CULL_FRONT as u32) != 0;
     let cull_back = (geometry_mode & RSPGeometry::G_CULL_BACK as u32) != 0;
 
     if cull_front && cull_back {
-        CullMode::FrontAndBack
+        panic!("Culling both front and back faces is not supported");
     } else if cull_front {
-        CullMode::Front
+        Some(wgpu::Face::Front)
     } else if cull_back {
-        CullMode::Back
+        Some(wgpu::Face::Back)
     } else {
-        CullMode::None
+        None
     }
 }
 

@@ -1,5 +1,5 @@
 #include <libultra/os_cont.h>
-#include <helix/gamepad.h>
+#include <helix/internal.h>
 
 void *_gamepad_manager;
 

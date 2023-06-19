@@ -1,12 +1,11 @@
 use self::defines::{Gfx, G_RDPFULLSYNC, G_RDPLOADSYNC, G_RDPPIPESYNC, G_RDPTILESYNC};
 
-use super::{graphics::GraphicsContext, rdp::RDP, rsp::RSP};
+use super::{graphics::GraphicsIntermediateDevice, rdp::RDP, rsp::RSP};
 use std::collections::HashMap;
 
 pub mod defines;
 mod f3d;
 mod f3dex2;
-mod f3dex2_c;
 mod f3dex2e;
 mod f3dzex2;
 pub mod utils;
@@ -21,7 +20,7 @@ pub enum GBIResult {
 pub type GBICommand = fn(
     dp: &mut RDP,
     rsp: &mut RSP,
-    gfx_context: &GraphicsContext,
+    gfx_device: &mut GraphicsIntermediateDevice,
     command: &mut *mut Gfx,
 ) -> GBIResult;
 
@@ -63,7 +62,7 @@ impl GBI {
         &self,
         rdp: &mut RDP,
         rsp: &mut RSP,
-        gfx_context: &GraphicsContext,
+        gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
@@ -72,7 +71,7 @@ impl GBI {
         let cmd = self.gbi_opcode_table.get(&opcode);
 
         match cmd {
-            Some(cmd) => cmd(rdp, rsp, gfx_context, command),
+            Some(cmd) => cmd(rdp, rsp, gfx_device, command),
             None => GBIResult::Unknown(opcode),
         }
     }

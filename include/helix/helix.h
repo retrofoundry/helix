@@ -10,9 +10,7 @@
 extern "C" {
 #endif
 
-void HelixInit(void);
-bool SpeechFeatureEnabled(void);
-bool NetworkFeatureEnabled(void);
+void HLXInit();
 
 #ifdef __cplusplus
 }

@@ -1,5 +1,3 @@
-use crate::fast3d::utils::color::Color;
-
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct GWords {
@@ -24,7 +22,21 @@ pub struct Viewport {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct Light {
+pub struct RawLight {
+    pub words: [u32; 4],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union Light {
+    pub raw: RawLight,
+    pub pos: PosLight,
+    pub dir: DirLight,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct DirLight {
     pub col: [u8; 3], // diffuse light value (rgba)
     pad1: i8,
     pub colc: [u8; 3], // copy of diffuse light value (rgba)
@@ -33,26 +45,45 @@ pub struct Light {
     pad3: i8,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct PosLight {
+    pub kc: u8,
+    pub col: [u8; 3],
+    pub kl: u8,
+    pub colc: [u8; 3],
+    pub pos: [i16; 2],
+    pub reserved1: u8,
+    pub kq: u8,
+    pub posz: i16,
+}
+
 impl Light {
     pub const ZERO: Self = Self {
-        col: [0, 0, 0],
-        pad1: 0,
-        colc: [0, 0, 0],
-        pad2: 0,
-        dir: [0, 0, 0],
-        pad3: 0,
+        raw: RawLight {
+            words: [0, 0, 0, 0],
+        },
     };
+}
 
-    pub const fn new(col: [u8; 3], colc: [u8; 3], dir: [i8; 3]) -> Self {
-        Self {
-            col,
-            pad1: 0,
-            colc,
-            pad2: 0,
-            dir,
-            pad3: 0,
-        }
+pub struct LookAt {
+    pub x: [f32; 3],
+    pub y: [f32; 3],
+}
+
+impl LookAt {
+    pub const fn new(x: [f32; 3], y: [f32; 3]) -> Self {
+        Self { x, y }
     }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Color_t {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
 }
 
 #[repr(C)]
@@ -72,7 +103,7 @@ pub struct Vtx_t {
     pub position: [i16; 3], // in object space
     flag: u16, // unused
     pub texture_coords: [i16; 2],
-    pub color: Color,
+    pub color: Color_t,
 }
 
 #[repr(C)]

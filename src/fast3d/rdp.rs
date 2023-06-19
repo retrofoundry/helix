@@ -1,10 +1,16 @@
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 
+use glam::{Vec2, Vec3, Vec4};
 use log::trace;
-use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState, CompareFunction};
+use wgpu::{BlendState, CompareFunction};
 
-use crate::fast3d::gbi::utils::translate_blend_param_b;
+use crate::fast3d::gbi::utils::{other_mode_l_uses_alpha, other_mode_l_uses_texture_edge};
 
+use super::graphics::GraphicsIntermediateDevice;
+use super::utils::color::Color;
+use super::utils::texture::RenderingStateTexture;
 use super::{
     gbi::{
         defines::Viewport,
@@ -12,21 +18,16 @@ use super::{
             get_cycle_type_from_other_mode_h, get_textfilter_from_other_mode_h, translate_cull_mode,
         },
     },
-    graphics::{CullMode, GraphicsContext, ShaderProgram},
-    rcp::RCP,
     rsp::RSPGeometry,
     utils::{
-        color::Color,
-        color_combiner::{
-            ColorCombiner, ColorCombinerManager, CombineParams, ACMUX, CCMUX, SHADER,
-        },
+        color_combiner::CombineParams,
         texture::{
             translate_tile_ci4, translate_tile_ci8, translate_tile_i4, translate_tile_i8,
             translate_tile_ia16, translate_tile_ia4, translate_tile_ia8, translate_tile_rgba16,
-            translate_tile_rgba32, translate_tlut, ImageFormat, ImageSize, TextFilt, Texture,
-            TextureImageState, TextureLUT, TextureManager, TextureState,
+            translate_tile_rgba32, translate_tlut, ImageFormat, ImageSize, TextFilt,
+            TextureImageState, TextureLUT, TextureState,
         },
-        tile::TileDescriptor,
+        tile_descriptor::TileDescriptor,
     },
 };
 
@@ -35,9 +36,8 @@ use farbe::image::n64::ImageSize as FarbeImageSize;
 pub const SCREEN_WIDTH: f32 = 320.0;
 pub const SCREEN_HEIGHT: f32 = 240.0;
 const MAX_VBO_SIZE: usize = 256;
-const TEXTURE_CACHE_MAX_SIZE: usize = 500;
 const MAX_TEXTURE_SIZE: usize = 4096;
-const NUM_TILE_DESCRIPTORS: usize = 8;
+pub const NUM_TILE_DESCRIPTORS: usize = 8;
 pub const MAX_BUFFERED: usize = 256;
 
 #[repr(C)]
@@ -88,12 +88,14 @@ pub struct RenderingState {
     pub depth_test: bool,
     pub depth_write: bool,
     pub polygon_offset: bool,
+    pub blend_enabled: bool,
     pub blend_state: BlendState,
     pub viewport: Rect,
     pub scissor: Rect,
-    pub shader_program: *mut ShaderProgram,
-    pub textures: [Texture; 2],
-    pub cull_mode: CullMode,
+    pub shader_program_hash: u64,
+    pub textures: [RenderingStateTexture; 2],
+    pub cull_mode: Option<wgpu::Face>,
+    pub blend_color: Color,
 }
 
 impl RenderingState {
@@ -102,12 +104,14 @@ impl RenderingState {
         depth_test: false,
         depth_write: false,
         polygon_offset: false,
+        blend_enabled: false,
         blend_state: BlendState::REPLACE,
         viewport: Rect::ZERO,
         scissor: Rect::ZERO,
-        shader_program: std::ptr::null_mut(),
-        textures: [Texture::EMPTY; 2],
-        cull_mode: CullMode::None,
+        shader_program_hash: 0,
+        textures: [RenderingStateTexture::EMPTY; 2],
+        cull_mode: None,
+        blend_color: Color::TRANSPARENT,
     };
 }
 
@@ -210,15 +214,11 @@ pub struct RDP {
     pub output_dimensions: OutputDimensions,
     pub rendering_state: RenderingState,
 
-    pub texture_manager: TextureManager,
-
     pub texture_state: TextureState,
     pub texture_image_state: TextureImageState, // coming via GBI (texture to load)
     pub tile_descriptors: [TileDescriptor; NUM_TILE_DESCRIPTORS],
     pub tmem_map: HashMap<u16, TMEMMapEntry>, // tmem address -> texture image state address
     pub textures_changed: [bool; 2],
-
-    pub color_combiner_manager: ColorCombinerManager,
 
     pub viewport: Rect,
     pub scissor: Rect,
@@ -232,11 +232,17 @@ pub struct RDP {
     pub buf_vbo_len: usize,
     pub buf_vbo_num_tris: usize,
 
-    pub env_color: Color,
-    pub fog_color: Color,
-    pub prim_color: Color,
-    pub blend_color: Color,
+    pub env_color: Vec4,
+    pub fog_color: Vec4,
+    pub prim_color: Vec4,
+    pub blend_color: Vec4,
     pub fill_color: Color,
+
+    pub prim_lod: Vec2,
+
+    pub convert_k: [i32; 6],
+    pub key_center: Vec3,
+    pub key_scale: Vec3,
 
     pub depth_image: usize,
     pub color_image: usize,
@@ -248,15 +254,11 @@ impl RDP {
             output_dimensions: OutputDimensions::ZERO,
             rendering_state: RenderingState::EMPTY,
 
-            texture_manager: TextureManager::new(TEXTURE_CACHE_MAX_SIZE),
-
             texture_state: TextureState::EMPTY,
             texture_image_state: TextureImageState::EMPTY,
             tile_descriptors: [TileDescriptor::EMPTY; 8],
             tmem_map: HashMap::new(),
             textures_changed: [false; 2],
-
-            color_combiner_manager: ColorCombinerManager::new(),
 
             viewport: Rect::ZERO,
             scissor: Rect::ZERO,
@@ -270,18 +272,37 @@ impl RDP {
             buf_vbo_len: 0,
             buf_vbo_num_tris: 0,
 
-            env_color: Color::TRANSPARENT,
-            fog_color: Color::TRANSPARENT,
-            prim_color: Color::TRANSPARENT,
-            blend_color: Color::TRANSPARENT,
+            env_color: Vec4::ZERO,
+            fog_color: Vec4::ZERO,
+            prim_color: Vec4::ZERO,
+            blend_color: Vec4::ZERO,
             fill_color: Color::TRANSPARENT,
+
+            prim_lod: Vec2::ZERO,
+
+            convert_k: [0; 6],
+            key_center: Vec3::ZERO,
+            key_scale: Vec3::ZERO,
 
             depth_image: 0,
             color_image: 0,
         }
     }
 
-    pub fn reset(&mut self) {}
+    pub fn reset(&mut self) {
+        self.combine = CombineParams::ZERO;
+        self.other_mode_l = 0;
+        self.other_mode_h = 0;
+        self.env_color = Vec4::ZERO;
+        self.fog_color = Vec4::ZERO;
+        self.prim_color = Vec4::ZERO;
+        self.blend_color = Vec4::ZERO;
+        self.fill_color = Color::TRANSPARENT;
+        self.prim_lod = Vec2::ZERO;
+        self.key_center = Vec3::ZERO;
+        self.key_scale = Vec3::ZERO;
+        self.convert_k = [0; 6];
+    }
 
     // Viewport
 
@@ -311,48 +332,28 @@ impl RDP {
 
     // Textures
 
-    pub fn lookup_texture(
+    pub fn import_tile_texture(
         &mut self,
-        gfx_context: &GraphicsContext,
+        gfx_device: &mut GraphicsIntermediateDevice,
         tmem_index: usize,
-        fmt: ImageFormat,
-        siz: ImageSize,
-    ) -> bool {
-        if let Some(value) = self.texture_manager.lookup(
-            gfx_context,
-            tmem_index,
-            self.texture_image_state.address,
-            fmt,
-            siz,
-        ) {
-            self.rendering_state.textures[tmem_index] = *value;
-            true
-        } else {
-            let value = self.texture_manager.insert(
-                gfx_context,
-                tmem_index,
-                self.texture_image_state.address,
-                fmt,
-                siz,
-            );
-            self.rendering_state.textures[tmem_index] = *value;
-            false
-        }
-    }
-
-    pub fn import_tile_texture(&mut self, gfx_context: &GraphicsContext, tmem_index: usize) {
+    ) {
         let tile = self.tile_descriptors[self.texture_state.tile as usize];
         let format = tile.format as u32;
         let size = tile.size as u32;
         let width = tile.get_width() as u32;
         let height = tile.get_height() as u32;
 
-        if self.lookup_texture(gfx_context, tmem_index, tile.format, tile.size) {
-            return;
-        }
-
         let tmap_entry = self.tmem_map.get(&tile.tmem).unwrap();
         let texture_address = tmap_entry.address;
+
+        if let Some(hash) =
+            gfx_device
+                .texture_cache
+                .contains(texture_address, tile.format, tile.size)
+        {
+            gfx_device.set_texture(tmem_index, hash);
+            return;
+        }
 
         // TODO: figure out how to find the size of bytes in the texture
         let texture_data = unsafe {
@@ -411,10 +412,15 @@ impl RDP {
             }
         };
 
-        let texture = texture.as_ptr() as *const u8;
-        gfx_context
-            .api
-            .upload_texture(texture, width as i32, height as i32);
+        let hash = gfx_device.texture_cache.insert(
+            texture_address,
+            tile.format,
+            tile.size,
+            width,
+            height,
+            texture,
+        );
+        gfx_device.set_texture(tmem_index, hash);
     }
 
     pub fn uses_texture1(&self) -> bool {
@@ -422,7 +428,7 @@ impl RDP {
             && self.combine.uses_texture1()
     }
 
-    pub fn flush_textures(&mut self, gfx_context: &GraphicsContext) {
+    pub fn flush_textures(&mut self, gfx_device: &mut GraphicsIntermediateDevice) {
         // if textures are not on, then we have no textures to flush
         // if !self.texture_state.on {
         //     return;
@@ -444,8 +450,10 @@ impl RDP {
             for i in 0..2 {
                 if i == 0 || self.uses_texture1() {
                     if self.textures_changed[i as usize] {
-                        self.flush(gfx_context);
-                        self.import_tile_texture(gfx_context, i as usize);
+                        self.flush(gfx_device);
+                        gfx_device.clear_textures(i as usize);
+
+                        self.import_tile_texture(gfx_device, i as usize);
                         self.textures_changed[i as usize] = false;
                     }
 
@@ -458,8 +466,8 @@ impl RDP {
                         || tile_descriptor.cm_s != texture.cms
                         || tile_descriptor.cm_t != texture.cmt
                     {
-                        gfx_context.api.set_sampler_parameters(
-                            i as i32,
+                        gfx_device.set_sampler_parameters(
+                            i as usize,
                             linear_filter,
                             tile_descriptor.cm_s as u32,
                             tile_descriptor.cm_t as u32,
@@ -473,13 +481,10 @@ impl RDP {
         }
     }
 
-    pub fn flush(&mut self, gfx_context: &GraphicsContext) {
+    pub fn flush(&mut self, gfx_device: &mut GraphicsIntermediateDevice) {
         if self.buf_vbo_len > 0 {
-            gfx_context.api.draw_triangles(
-                &self.buf_vbo as *const f32,
-                self.buf_vbo_len,
-                self.buf_vbo_num_tris,
-            );
+            let vbo = bytemuck::cast_slice(&self.buf_vbo[..self.buf_vbo_len]);
+            gfx_device.set_vbo(vbo.to_vec(), self.buf_vbo_num_tris);
             self.buf_vbo_len = 0;
             self.buf_vbo_num_tris = 0;
         }
@@ -487,123 +492,34 @@ impl RDP {
 
     // MARK: - Shader Programs
 
-    pub fn lookup_or_create_shader_program(
-        &mut self,
-        gfx_context: &GraphicsContext,
-        shader_id: u32,
-    ) -> *mut ShaderProgram {
-        let mut shader_program = gfx_context.api.lookup_shader(shader_id);
-        if shader_program.is_null() {
-            gfx_context
-                .api
-                .unload_shader(self.rendering_state.shader_program);
-            shader_program = gfx_context.api.create_and_load_new_shader(shader_id);
-            self.rendering_state.shader_program = shader_program;
-        }
+    pub fn shader_program_hash(&mut self) -> u64 {
+        let mut hasher = DefaultHasher::new();
 
-        shader_program
-    }
+        self.other_mode_h.hash(&mut hasher);
+        self.other_mode_l.hash(&mut hasher);
+        self.combine.hash(&mut hasher);
 
-    // MARK: - Color Combiners
-
-    pub fn create_color_combiner(
-        &mut self,
-        gfx_context: &GraphicsContext,
-        cc_id: u32,
-    ) -> &ColorCombiner {
-        self.flush(gfx_context);
-        self.generate_color_combiner(gfx_context, cc_id);
-
-        let combiner = self.color_combiner_manager.combiners.get(&cc_id).unwrap();
-        self.color_combiner_manager.current_combiner = Some(cc_id);
-
-        combiner
-    }
-
-    pub fn lookup_or_create_color_combiner(&mut self, gfx_context: &GraphicsContext, cc_id: u32) {
-        if let Some(_cc) = self.color_combiner_manager.lookup_color_combiner(cc_id) {
-        } else {
-            self.create_color_combiner(gfx_context, cc_id);
-        }
-    }
-
-    pub fn generate_color_combiner(&mut self, gfx_context: &GraphicsContext, cc_id: u32) {
-        let mut shader_id = (cc_id >> 24) << 24;
-        let mut shader_input_mapping = [[0u8; 4]; 2];
-
-        // parse the color combine pass
-        {
-            let mut input_number = [0u8; 8];
-            let mut next_input_number = SHADER::INPUT_1 as u8;
-
-            for i in 0..4 {
-                let mut val = 0;
-                match self.combine.c0.get(i) {
-                    CCMUX::TEXEL0 => val = SHADER::TEXEL0 as u8,
-                    CCMUX::TEXEL1 => val = SHADER::TEXEL1 as u8,
-                    CCMUX::TEXEL0_ALPHA => val = SHADER::TEXEL0A as u8,
-                    CCMUX::PRIMITIVE | CCMUX::SHADE | CCMUX::ENVIRONMENT | CCMUX::LOD_FRACTION => {
-                        let property = self.combine.c0.get(i) as u8;
-
-                        if input_number[property as usize] == 0 {
-                            shader_input_mapping[0][(next_input_number - 1) as usize] = property;
-                            input_number[property as usize] = next_input_number;
-                            next_input_number += 1;
-                        }
-                        val = input_number[property as usize];
-                    }
-                    _ => {}
-                }
-
-                shader_id |= (val as u32) << (i * 3);
-            }
-        }
-
-        // parse the alpha combine pass
-        {
-            let mut input_number = [0u8; 8];
-            let mut next_input_number = SHADER::INPUT_1 as u8;
-
-            for i in 0..4 {
-                let mut val = 0;
-                match self.combine.a0.get(i) {
-                    ACMUX::TEXEL0 => val = SHADER::TEXEL0 as u8,
-                    ACMUX::TEXEL1 => val = SHADER::TEXEL1 as u8,
-                    ACMUX::PRIMITIVE | ACMUX::SHADE | ACMUX::ENVIRONMENT => {
-                        let property = self.combine.a0.get(i) as u8;
-
-                        if input_number[property as usize] == 0 {
-                            shader_input_mapping[1][(next_input_number - 1) as usize] = property;
-                            input_number[property as usize] = next_input_number;
-                            next_input_number += 1;
-                        }
-                        val = input_number[property as usize];
-                    }
-                    _ => {}
-                }
-
-                shader_id |= (val as u32) << (12 + i * 3);
-            }
-        }
-
-        let shader_program = self.lookup_or_create_shader_program(gfx_context, shader_id);
-        let combiner = ColorCombiner::new(shader_id, shader_program, shader_input_mapping);
-        self.color_combiner_manager
-            .combiners
-            .insert(cc_id, combiner);
+        hasher.finish()
     }
 
     // MARK: - Blend
 
-    fn translate_blend_mode(
+    fn process_depth_params(
         &mut self,
-        gfx_context: &GraphicsContext,
+        gfx_device: &mut GraphicsIntermediateDevice,
+        geometry_mode: u32,
         render_mode: u32,
-    ) -> BlendState {
+    ) {
+        let depth_test = geometry_mode & RSPGeometry::G_ZBUFFER as u32 != 0;
+        if depth_test != self.rendering_state.depth_test {
+            self.flush(gfx_device);
+            self.rendering_state.depth_test = depth_test;
+        }
+
         let zmode: u32 = self.other_mode_l >> (OtherModeLayoutL::ZMODE as u32) & 0x03;
 
         // handle depth compare
-        if self.other_mode_l & (1 << OtherModeLayoutL::Z_CMP as u32) != 0 {
+        let depth_compare = if self.other_mode_l & (1 << OtherModeLayoutL::Z_CMP as u32) != 0 {
             let depth_compare = match zmode {
                 x if x == ZMode::ZMODE_OPA as u32 => CompareFunction::Less,
                 x if x == ZMode::ZMODE_INTER as u32 => CompareFunction::Less, // TODO: Understand this
@@ -613,133 +529,118 @@ impl RDP {
             };
 
             if depth_compare != self.rendering_state.depth_compare {
-                self.flush(gfx_context);
-                gfx_context.api.set_depth_compare(depth_compare as u8);
+                self.flush(gfx_device);
                 self.rendering_state.depth_compare = depth_compare;
             }
-        } else if self.rendering_state.depth_compare != CompareFunction::Always {
-            self.flush(gfx_context);
-            gfx_context
-                .api
-                .set_depth_compare(CompareFunction::Always as u8);
-            self.rendering_state.depth_compare = CompareFunction::Always;
-        }
+
+            depth_compare
+        } else {
+            if self.rendering_state.depth_compare != CompareFunction::Always {
+                self.flush(gfx_device);
+                self.rendering_state.depth_compare = CompareFunction::Always;
+            }
+
+            CompareFunction::Always
+        };
 
         // handle depth write
         let depth_write = render_mode & (1 << OtherModeLayoutL::Z_UPD as u32) != 0;
         if depth_write != self.rendering_state.depth_write {
-            self.flush(gfx_context);
-            gfx_context.api.set_depth_write(depth_write);
+            self.flush(gfx_device);
             self.rendering_state.depth_write = depth_write;
         }
 
         // handle polygon offset (slope scale depth bias)
         let polygon_offset = zmode == ZMode::ZMODE_DEC as u32;
         if polygon_offset != self.rendering_state.polygon_offset {
-            self.flush(gfx_context);
-            gfx_context.api.set_polygon_offset(polygon_offset);
+            self.flush(gfx_device);
             self.rendering_state.polygon_offset = polygon_offset;
         }
 
-        let src_color = render_mode >> OtherModeLayoutL::P_2 as u32 & 0x03;
-        let src_factor = render_mode >> OtherModeLayoutL::A_2 as u32 & 0x03;
-        let dst_color = render_mode >> OtherModeLayoutL::M_2 as u32 & 0x03;
-        let dst_factor = render_mode >> OtherModeLayoutL::B_2 as u32 & 0x03;
-
-        let do_blend = render_mode & (1 << OtherModeLayoutL::FORCE_BL as u32) != 0
-            && dst_color == BlendParamPMColor::G_BL_CLR_MEM as u32;
-
-        if do_blend {
-            assert!(src_color == BlendParamPMColor::G_BL_CLR_IN as u32);
-
-            let blend_src_factor: BlendFactor;
-            if src_factor == BlendParamA::G_BL_0 as u32 {
-                blend_src_factor = BlendFactor::Zero;
-            } else if (render_mode & (1 << OtherModeLayoutL::ALPHA_CVG_SEL as u32)) != 0
-                && (render_mode & (1 << OtherModeLayoutL::CVG_X_ALPHA as u32)) == 0
-            {
-                // this is technically "coverage", admitting blending on edges
-                blend_src_factor = BlendFactor::One;
-            } else {
-                blend_src_factor = BlendFactor::SrcAlpha;
-            }
-
-            let blend_component = BlendComponent {
-                src_factor: blend_src_factor,
-                dst_factor: translate_blend_param_b(dst_factor, blend_src_factor),
-                operation: BlendOperation::Add,
-            };
-
-            BlendState {
-                color: blend_component,
-                alpha: blend_component,
-            }
-        } else {
-            // without FORCE_BL, blending only happens for AA of internal edges
-            // since we are ignoring n64 coverage values and AA, this means "never"
-            // if dstColor isn't the framebuffer, we'll take care of the "blending" in the shader
-            let blend_component = BlendComponent {
-                src_factor: BlendFactor::One,
-                dst_factor: BlendFactor::Zero,
-                operation: BlendOperation::Add,
-            };
-
-            BlendState {
-                color: blend_component,
-                alpha: blend_component,
-            }
-        }
+        gfx_device.set_depth_stencil_params(depth_test, depth_write, depth_compare, polygon_offset);
     }
 
-    pub fn update_render_state(&mut self, gfx_context: &GraphicsContext, geometry_mode: u32) {
-        let depth_test = geometry_mode & RSPGeometry::G_ZBUFFER as u32 != 0;
-        if depth_test != self.rendering_state.depth_test {
-            self.flush(gfx_context);
-            gfx_context.api.set_depth_test(depth_test);
-            self.rendering_state.depth_test = depth_test;
-        }
-
+    pub fn update_render_state(
+        &mut self,
+        gfx_device: &mut GraphicsIntermediateDevice,
+        geometry_mode: u32,
+    ) {
         let cull_mode = translate_cull_mode(geometry_mode);
         if cull_mode != self.rendering_state.cull_mode {
-            self.flush(gfx_context);
-            gfx_context.api.set_cull_mode(cull_mode);
+            self.flush(gfx_device);
+            gfx_device.set_cull_mode(cull_mode);
             self.rendering_state.cull_mode = cull_mode;
         }
 
-        let blend_state = self.translate_blend_mode(gfx_context, self.other_mode_l);
+        self.process_depth_params(gfx_device, geometry_mode, self.other_mode_l);
 
-        // TODO: split checks into updating blend state separately: enable, blendeq and blendfunc
-        if blend_state != self.rendering_state.blend_state {
-            self.flush(gfx_context);
-            gfx_context.api.set_blend_state(blend_state);
-            self.rendering_state.blend_state = blend_state;
+        // handle alpha blending
+        let do_blend = other_mode_l_uses_alpha(self.other_mode_l)
+            || other_mode_l_uses_texture_edge(self.other_mode_l);
+
+        if do_blend != self.rendering_state.blend_enabled {
+            let blend_state = if do_blend {
+                Some(BlendState::ALPHA_BLENDING)
+            } else {
+                None
+            };
+
+            self.flush(gfx_device);
+            gfx_device.set_blend_state(blend_state);
+            self.rendering_state.blend_enabled = do_blend;
         }
 
+        // handle viewport and scissor
         if self.viewport_or_scissor_changed {
             let viewport = self.viewport;
             if viewport != self.rendering_state.viewport {
-                self.flush(gfx_context);
-                gfx_context.api.set_viewport(
-                    viewport.x as i32,
-                    viewport.y as i32,
-                    viewport.width as i32,
-                    viewport.height as i32,
+                self.flush(gfx_device);
+                gfx_device.set_viewport(
+                    viewport.x as f32,
+                    viewport.y as f32,
+                    viewport.width as f32,
+                    viewport.height as f32,
                 );
                 self.rendering_state.viewport = viewport;
             }
             let scissor = self.scissor;
             if scissor != self.rendering_state.scissor {
-                self.flush(gfx_context);
-                gfx_context.api.set_scissor(
-                    scissor.x as i32,
-                    scissor.y as i32,
-                    scissor.width as i32,
-                    scissor.height as i32,
+                self.flush(gfx_device);
+                gfx_device.set_scissor(
+                    scissor.x as u32,
+                    scissor.y as u32,
+                    scissor.width as u32,
+                    scissor.height as u32,
                 );
                 self.rendering_state.scissor = scissor;
             }
             self.viewport_or_scissor_changed = false;
         }
+    }
+
+    // MARK: - Setters
+
+    pub fn set_convert(&mut self, k0: i32, k1: i32, k2: i32, k3: i32, k4: i32, k5: i32) {
+        self.convert_k[0] = k0;
+        self.convert_k[1] = k1;
+        self.convert_k[2] = k2;
+        self.convert_k[3] = k3;
+        self.convert_k[4] = k4;
+        self.convert_k[5] = k5;
+    }
+
+    pub fn set_key_r(&mut self, cr: u32, sr: u32, _wr: u32) {
+        // TODO: Figure out how to use width
+        self.key_center.x = cr as f32 / 255.0;
+        self.key_scale.x = sr as f32 / 255.0;
+    }
+
+    pub fn set_key_gb(&mut self, cg: u32, sg: u32, _wg: u32, cb: u32, sb: u32, _wb: u32) {
+        // TODO: Figure out how to use width
+        self.key_center.y = cg as f32 / 255.0;
+        self.key_center.z = cb as f32 / 255.0;
+        self.key_scale.y = sg as f32 / 255.0;
+        self.key_scale.z = sb as f32 / 255.0;
     }
 
     // MARK: - Helpers
@@ -756,31 +657,4 @@ impl RDP {
         self.buf_vbo[self.buf_vbo_len] = data;
         self.buf_vbo_len += 1;
     }
-}
-
-// MARK: - C Bridge
-
-#[no_mangle]
-pub extern "C" fn RDPSetOutputDimensions(rcp: Option<&mut RCP>, dimensions: OutputDimensions) {
-    let rcp = rcp.unwrap();
-    rcp.rdp.output_dimensions = dimensions;
-}
-
-#[no_mangle]
-pub extern "C" fn RDPLookupOrCreateShaderProgram(
-    rcp: Option<&mut RCP>,
-    gfx_context: Option<&mut GraphicsContext>,
-    shader_id: u32,
-) {
-    let rcp = rcp.unwrap();
-    let gfx_context = gfx_context.unwrap();
-    rcp.rdp
-        .lookup_or_create_shader_program(gfx_context, shader_id);
-}
-
-#[no_mangle]
-pub extern "C" fn RDPFlush(rcp: Option<&mut RCP>, gfx_context: Option<&mut GraphicsContext>) {
-    let rcp = rcp.unwrap();
-    let gfx_context = gfx_context.unwrap();
-    rcp.rdp.flush(gfx_context);
 }

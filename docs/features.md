@@ -16,24 +16,29 @@ The following API is provided:
 
 ```cpp
 /**
- * Creates and sets up the event loop, returning a pointer to the instance or nullptr if creation failed
+ * Creates and sets up the window, passes in a function that is to be called to draw the menu bar
 **/
-void* GUICreateEventLoop();
-// Rust: let event_loop = Gui::create_event_loop();
+void HLXDisplaySetup(const char* title, void (*draw_menu)());
 
 /**
- * Creates the window and sets up the GUI, returning a pointer to the instance or nullptr if creation failed.
- * It takes two callbacks, one for drawing the menu and one for drawing the main screen and are called every frame.
- * ImGui is used for drawing, so you're free to use any ImGui functions in your callbacks.
+ * Used to start a frame and prepare for drawing
 **/
-void* GUICreate(const char* title, void* event_loop, void (*draw_menu_callback)(), void (*draw_main_callback)());
-// Rust: let mut gui = GUI::new("My Title", &event_loop, draw_menu_callback, draw_main_callback).unwrap();
+void HLXDisplayStartFrame();
 
 /**
- * Starts the rendering loop and returns when the window is closed.
+ * N64 Gfx commands are passed in to be drawn to the screen
 **/
-void* GUIStart(void* event_loop, void* gui);
-// Rust: gui.start();
+void HLXDisplayProcessDrawLists(u64* commands);
+
+/**
+ * Marks the end of the frame
+**/
+void HLXDisplayEndFrame();
+
+/**
+ * Can be used to get the display's aspect ratio
+**/
+float HLXDisplayGetAspectRatio();
 ```
 
 ## Audio
@@ -43,32 +48,22 @@ Helix provides functionality for audio playback. Audio playback is simple and He
 /**
  * Creates and sets up the audio player, returning a pointer to the instance or nullptr if creation failed
 **/
-void* HLXAudioPlayerCreate(uint32_t sampleRate, uint16_t channels);
-// Rust: let mut audio_Player = AudiPlayer::new().unwrap();
+void HLXAudioSetup(uint32_t sampleRate, uint16_t channels);
 
 /**
- * Frees the audio player instance.
+ * Returns the number of samples currently buffered
 **/
-void HLXAudioPlayerFree(void* player);
-// Rust: no dedicated method, instance drop will deallocate it
+size_t HLXAudioGetBufferredSampleCount();
 
 /**
- * Returns the amount of data currently in buffer.
+ * Returns the size of the available buffer
 **/
-int32_t HLXAudioPlayerGetBuffered(void* player);
-// Rust: audio_player.buffered() -> i32
-
-/**
- * Returns the amount of data we want the buffer to contain.
-**/
-int32_t HLXAudioPlayerGetDesiredBuffered(void* player);
-// Rust: audio_player.desired_buffer() -> i32
+size_t HLXAudioGetBufferSize();
 
 /**
  * Plays the audio from the given buffer - resampling if necessary for audio output device.
 **/
-void HLXAudioPlayerPlayBuffer(void* player, const uint8_t* buf, size_t len);
-// Rust: audio_player.play_buffer(buf: &[u8])
+void HLXAudioPlayBuffer(const uint8_t* buf, size_t len);
 ```
 
 ## Speech
