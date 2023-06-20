@@ -448,22 +448,6 @@ impl<T> OpenGLProgram<T> {
                 return ({} - {}) * {} + {};
             }}
 
-            vec3 to_linear(vec3 v) {{
-                return pow(v, vec3(2.2));
-            }}
-
-            vec4 to_linear(vec4 v) {{
-                return vec4(to_linear(v.rgb), v.a);
-            }}
-
-            vec3 to_srgb(vec3 v) {{
-                return pow(v, vec3(1.0 / 2.2));
-            }}
-            
-            vec4 to_srgb(vec4 v) {{
-                return vec4(to_srgb(v.rgb), v.a);
-            }}
-
             void main() {{
                 vec4 texVal0 = tOne, texVal1 = tOne;
 
