@@ -321,21 +321,6 @@ impl Gui {
         ui.show_metrics_window(&mut opened);
 
         // Set RDP output dimensions
-        // let available_draw_size = ui.content_region_avail();
-        // warn!("Available draw size: {:?}", available_draw_size);
-        // let scale = &ui.io().display_framebuffer_scale;
-        // let scaled_size = [
-        //     available_draw_size[0] * scale[0],
-        //     available_draw_size[1] * scale[1],
-        // ];
-        // warn!("Scaled size: {:?}", scaled_size);
-        // let output_dimensions = OutputDimensions {
-        //     width: scaled_size[0] as u32,
-        //     height: scaled_size[1] as u32,
-        //     aspect_ratio: available_draw_size[0] / available_draw_size[1],
-        // };
-        // self.rcp.rdp.output_dimensions = output_dimensions;
-
         let size = self.window.inner_size();
         let dimensions = OutputDimensions {
             width: size.width,
@@ -365,10 +350,6 @@ impl Gui {
                     });
 
             // Draw the RCP output
-            warn!(
-                "Number of draw calls: {}",
-                self.intermediate_graphics_device.draw_calls.len()
-            );
             for draw_call in &self.intermediate_graphics_device.draw_calls {
                 assert!(!draw_call.vbo.vbo.is_empty());
 

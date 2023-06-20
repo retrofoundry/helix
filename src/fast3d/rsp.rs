@@ -2,6 +2,7 @@ use crate::fast3d::gbi::defines::DirLight;
 
 use super::{gbi::defines::Light, utils::color::Color};
 use glam::{Mat4, Vec2, Vec3A};
+use log::{trace, warn};
 
 pub const MATRIX_STACK_SIZE: usize = 32;
 pub const MAX_VERTICES: usize = 256;
@@ -76,6 +77,7 @@ pub struct RSP {
 
     pub fog_multiplier: i16,
     pub fog_offset: i16,
+    pub fog_changed: bool,
 
     pub vertex_table: [StagingVertex; MAX_VERTICES + 4],
 
@@ -104,6 +106,7 @@ impl RSP {
 
             fog_multiplier: 0,
             fog_offset: 0,
+            fog_changed: false,
 
             vertex_table: [StagingVertex::ZERO; MAX_VERTICES + 4],
 
@@ -179,6 +182,7 @@ impl RSP {
         let light = unsafe { &*light_ptr };
 
         self.lights[index] = *light;
+
         self.lights_valid = false;
     }
 

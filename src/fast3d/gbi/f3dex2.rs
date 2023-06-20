@@ -2,10 +2,13 @@ use std::slice;
 
 use glam::{Mat4, Vec2, Vec3A, Vec4};
 
-use log::trace;
+use log::{trace};
 
 use super::defines::{Gfx, Light, Viewport, Vtx, G_FILLRECT, G_MTX, G_TEXRECT, G_TEXRECTFLIP};
-use super::utils::{get_cmd, get_cycle_type_from_other_mode_h, get_textfilter_from_other_mode_h};
+use super::utils::{
+    geometry_mode_uses_fog, get_cmd, get_cycle_type_from_other_mode_h,
+    get_textfilter_from_other_mode_h,
+};
 use super::{
     super::{
         rdp::RDP,
@@ -320,6 +323,7 @@ impl F3DEX2 {
                 let multiplier = get_cmd(w1, 16, 16) as i16;
                 let offset = get_cmd(w1, 0, 16) as i16;
                 rsp.set_fog(multiplier, offset);
+                rsp.fog_changed = true;
             }
             m_type if m_type == G_MW::LIGHTCOL => {
                 let index = get_cmd(w0, 0, 16) / 24;
@@ -365,14 +369,16 @@ impl F3DEX2 {
     pub fn gsp_vertex(
         rdp: &mut RDP,
         rsp: &mut RSP,
-        _gfx_device: &mut GraphicsIntermediateDevice,
+        gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
     ) -> GBIResult {
         let w0 = unsafe { (*(*command)).words.w0 };
         let w1 = unsafe { (*(*command)).words.w1 };
 
         if rsp.modelview_projection_matrix_changed {
+            rdp.flush(gfx_device);
             rsp.recompute_mvp_matrix();
+            gfx_device.set_projection_matrix(rsp.modelview_projection_matrix);
             rsp.modelview_projection_matrix_changed = false;
         }
 
@@ -384,29 +390,6 @@ impl F3DEX2 {
             let vertex = unsafe { &(*vertices.offset(i as isize)).vertex };
             let vertex_normal = unsafe { &(*vertices.offset(i as isize)).normal };
             let staging_vertex = &mut rsp.vertex_table[write_index as usize];
-
-            // translate to going via row-major order
-            let mut x = vertex.position[0] as f32 * rsp.modelview_projection_matrix.col(0).x
-                + vertex.position[1] as f32 * rsp.modelview_projection_matrix.col(0).y
-                + vertex.position[2] as f32 * rsp.modelview_projection_matrix.col(0).z
-                + rsp.modelview_projection_matrix.col(0).w;
-
-            let y = vertex.position[0] as f32 * rsp.modelview_projection_matrix.col(1).x
-                + vertex.position[1] as f32 * rsp.modelview_projection_matrix.col(1).y
-                + vertex.position[2] as f32 * rsp.modelview_projection_matrix.col(1).z
-                + rsp.modelview_projection_matrix.col(1).w;
-
-            let z = vertex.position[0] as f32 * rsp.modelview_projection_matrix.col(2).x
-                + vertex.position[1] as f32 * rsp.modelview_projection_matrix.col(2).y
-                + vertex.position[2] as f32 * rsp.modelview_projection_matrix.col(2).z
-                + rsp.modelview_projection_matrix.col(2).w;
-
-            let w = vertex.position[0] as f32 * rsp.modelview_projection_matrix.col(3).x
-                + vertex.position[1] as f32 * rsp.modelview_projection_matrix.col(3).y
-                + vertex.position[2] as f32 * rsp.modelview_projection_matrix.col(3).z
-                + rsp.modelview_projection_matrix.col(3).w;
-
-            x = rdp.adjust_x_for_viewport(x);
 
             let mut U = (((vertex.texture_coords[0] as i32) * (rdp.texture_state.scale_s as i32))
                 >> 16) as i16;
@@ -492,28 +475,51 @@ impl F3DEX2 {
                 staging_vertex.color.b = vertex.color.b as f32 / 255.0;
             }
 
+            // if geometry_mode_uses_lighting(rsp.geometry_mode) {
+            //     if !rsp.lights_valid {
+            //         warn!("Lights not valid - recomputing normals");
+            //         rsp.lights_valid = true;
+            //     }
+
+            //     if rsp.geometry_mode & RSPGeometry::G_TEXTURE_GEN as u32 > 0 {
+            //         let dotx = vertex_normal.normal[0] as f32 * rsp.lookat_coeffs[0][0]
+            //             + vertex_normal.normal[1] as f32 * rsp.lookat_coeffs[0][1]
+            //             + vertex_normal.normal[2] as f32 * rsp.lookat_coeffs[0][2];
+
+            //         let doty = vertex_normal.normal[0] as f32 * rsp.lookat_coeffs[1][0]
+            //             + vertex_normal.normal[1] as f32 * rsp.lookat_coeffs[1][1]
+            //             + vertex_normal.normal[2] as f32 * rsp.lookat_coeffs[1][2];
+
+            //         U = ((dotx / 127.0 + 1.0) / 4.0) as i16 * rdp.texture_state.scale_s as i16;
+            //         V = ((doty / 127.0 + 1.0) / 4.0) as i16 * rdp.texture_state.scale_t as i16;
+            //     }
+
+            //     staging_vertex.color.r =
+            //         unsafe { rsp.lights[rsp.num_lights as usize].dir.col[0] as f32 / 255.0 };
+            //     staging_vertex.color.g =
+            //         unsafe { rsp.lights[rsp.num_lights as usize].dir.col[1] as f32 / 255.0 };
+            //     staging_vertex.color.b =
+            //         unsafe { rsp.lights[rsp.num_lights as usize].dir.col[2] as f32 / 255.0 };
+            // } else {
+            //     staging_vertex.color.r = vertex.color.r as f32 / 255.0;
+            //     staging_vertex.color.g = vertex.color.g as f32 / 255.0;
+            //     staging_vertex.color.b = vertex.color.b as f32 / 255.0;
+            // }
+
             staging_vertex.uv[0] = U as f32;
             staging_vertex.uv[1] = V as f32;
 
-            staging_vertex.position.x = x;
-            staging_vertex.position.y = y;
-            staging_vertex.position.z = z;
-            staging_vertex.position.w = w;
+            staging_vertex.position.x = vertex.position[0] as f32;
+            staging_vertex.position.y = vertex.position[1] as f32;
+            staging_vertex.position.z = vertex.position[2] as f32;
+            staging_vertex.position.w = 1.0;
 
-            if rsp.geometry_mode & RSPGeometry::G_FOG as u32 > 0 {
-                let w = if w.abs() < 0.001 { 0.001 } else { w };
-
-                let winv = 1.0 / w;
-                let winv = if winv < 0.0 { 32767.0 } else { winv };
-
-                let fog = z * winv * rsp.fog_multiplier as f32 + rsp.fog_offset as f32;
-                let fog = if fog < 0.0 { 0.0 } else { fog };
-                let fog = if fog > 255.0 { 255.0 } else { fog };
-
-                staging_vertex.color.a = fog / 255.0;
-            } else {
-                staging_vertex.color.a = vertex.color.a as f32 / 255.0;
+            if geometry_mode_uses_fog(rsp.geometry_mode) && rsp.fog_changed {
+                rdp.flush(gfx_device);
+                gfx_device.set_fog(rsp.fog_multiplier, rsp.fog_offset);
             }
+
+            staging_vertex.color.a = vertex.color.a as f32 / 255.0;
 
             write_index += 1;
         }
@@ -522,7 +528,7 @@ impl F3DEX2 {
     }
 
     pub fn gsp_geometry_mode(
-        _rdp: &mut RDP,
+        rdp: &mut RDP,
         rsp: &mut RSP,
         _gfx_device: &mut GraphicsIntermediateDevice,
         command: &mut *mut Gfx,
@@ -535,6 +541,7 @@ impl F3DEX2 {
 
         rsp.geometry_mode &= clear_bits as u32;
         rsp.geometry_mode |= set_bits as u32;
+        rdp.shader_config_changed = true;
 
         GBIResult::Continue
     }
@@ -546,6 +553,7 @@ impl F3DEX2 {
         vertex_id1: usize,
         vertex_id2: usize,
         vertex_id3: usize,
+        is_drawing_rect: bool,
     ) -> GBIResult {
         let vertex1 = &rsp.vertex_table[vertex_id1];
         let vertex2 = &rsp.vertex_table[vertex_id2];
@@ -560,8 +568,9 @@ impl F3DEX2 {
 
         rdp.update_render_state(gfx_device, rsp.geometry_mode);
 
-        let shader_hash = rdp.shader_program_hash();
-        if shader_hash != rdp.rendering_state.shader_program_hash {
+        // let shader_hash = rdp.shader_program_hash(rsp.geometry_mode);
+        // if shader_hash != rdp.rendering_state.shader_program_hash {
+        if rdp.shader_config_changed {
             rdp.flush(gfx_device);
 
             gfx_device.set_program_params(
@@ -571,7 +580,8 @@ impl F3DEX2 {
                 rdp.tile_descriptors,
             );
 
-            rdp.rendering_state.shader_program_hash = shader_hash;
+            rdp.rendering_state.shader_program_hash = rdp.shader_program_hash(rsp.geometry_mode);
+            rdp.shader_config_changed = false;
         }
 
         rdp.flush_textures(gfx_device);
@@ -605,7 +615,7 @@ impl F3DEX2 {
             rdp.add_to_buf_vbo(vertex_array[i].position.x);
             rdp.add_to_buf_vbo(vertex_array[i].position.y);
             rdp.add_to_buf_vbo(z);
-            rdp.add_to_buf_vbo(w);
+            rdp.add_to_buf_vbo(if is_drawing_rect { 0.0 } else { w });
 
             rdp.add_to_buf_vbo(vertex_array[i].color.r);
             rdp.add_to_buf_vbo(vertex_array[i].color.g);
@@ -646,7 +656,9 @@ impl F3DEX2 {
         let vertex_id2 = get_cmd(w0, 8, 8) / 2;
         let vertex_id3 = get_cmd(w0, 0, 8) / 2;
 
-        F3DEX2::gsp_tri1_raw(rdp, rsp, gfx_device, vertex_id1, vertex_id2, vertex_id3)
+        F3DEX2::gsp_tri1_raw(
+            rdp, rsp, gfx_device, vertex_id1, vertex_id2, vertex_id3, false,
+        )
     }
 
     pub fn gsp_tri2(
@@ -662,12 +674,16 @@ impl F3DEX2 {
         let vertex_id2 = get_cmd(w0, 8, 8) / 2;
         let vertex_id3 = get_cmd(w0, 0, 8) / 2;
 
-        F3DEX2::gsp_tri1_raw(rdp, rsp, gfx_device, vertex_id1, vertex_id2, vertex_id3);
+        F3DEX2::gsp_tri1_raw(
+            rdp, rsp, gfx_device, vertex_id1, vertex_id2, vertex_id3, false,
+        );
 
         let vertex_id1 = get_cmd(w1, 16, 8) / 2;
         let vertex_id2 = get_cmd(w1, 8, 8) / 2;
         let vertex_id3 = get_cmd(w1, 0, 8) / 2;
-        F3DEX2::gsp_tri1_raw(rdp, rsp, gfx_device, vertex_id1, vertex_id2, vertex_id3)
+        F3DEX2::gsp_tri1_raw(
+            rdp, rsp, gfx_device, vertex_id1, vertex_id2, vertex_id3, false,
+        )
     }
 
     pub fn sub_dl(
@@ -732,6 +748,7 @@ impl F3DEX2 {
 
         rdp.other_mode_l = om as u32;
         rdp.other_mode_h = (om >> 32) as u32;
+        rdp.shader_config_changed = true;
 
         GBIResult::Continue
     }
@@ -838,6 +855,7 @@ impl F3DEX2 {
         let w1 = unsafe { (*(*command)).words.w1 };
 
         rdp.combine = CombineParams::decode(w0, w1);
+        rdp.shader_config_changed = true;
 
         GBIResult::Continue
     }
@@ -1189,6 +1207,7 @@ impl F3DEX2 {
             rdp.other_mode_h = (rdp.other_mode_h
                 & !(3 << OtherModeH_Layout::G_MDSFT_TEXTFILT as u32))
                 | (TextFilt::G_TF_POINT as u32);
+            rdp.shader_config_changed = true;
         }
 
         // U10.2 coordinates
@@ -1245,6 +1264,7 @@ impl F3DEX2 {
         rdp.viewport = default_viewport;
         rdp.viewport_or_scissor_changed = true;
         rsp.geometry_mode = 0;
+        rdp.shader_config_changed = true;
 
         F3DEX2::gsp_tri1_raw(
             rdp,
@@ -1253,6 +1273,7 @@ impl F3DEX2 {
             MAX_VERTICES,
             MAX_VERTICES + 1,
             MAX_VERTICES + 3,
+            true,
         );
         F3DEX2::gsp_tri1_raw(
             rdp,
@@ -1261,14 +1282,17 @@ impl F3DEX2 {
             MAX_VERTICES + 1,
             MAX_VERTICES + 2,
             MAX_VERTICES + 3,
+            true,
         );
 
         rsp.geometry_mode = geometry_mode_saved;
+        rdp.shader_config_changed = true;
         rdp.viewport = viewport_saved;
         rdp.viewport_or_scissor_changed = true;
 
         if cycle_type == OtherModeHCycleType::G_CYC_COPY {
             rdp.other_mode_h = saved_other_mode_h;
+            rdp.shader_config_changed = true;
         }
     }
 
@@ -1299,6 +1323,7 @@ impl F3DEX2 {
             let rhs =
                 (CCMUX::TEXEL0 as usize & 0b111) << 15 | (ACMUX::TEXEL0 as usize & 0b111) << 9;
             rdp.combine = CombineParams::decode(0, rhs);
+            rdp.shader_config_changed = true;
 
             // Per documentation one extra pixel is added in this modes to each edge
             lrx += 1 << 2;
@@ -1337,6 +1362,7 @@ impl F3DEX2 {
 
         F3DEX2::draw_rectangle(rdp, rsp, gfx_device, ulx, uly, lrx, lry);
         rdp.combine = saved_combine_mode;
+        rdp.shader_config_changed = true;
 
         GBIResult::Continue
     }
@@ -1422,8 +1448,10 @@ impl F3DEX2 {
         let saved_combine_mode = rdp.combine;
         let rhs = (CCMUX::SHADE as usize & 0b111) << 15 | (ACMUX::SHADE as usize & 0b111) << 9;
         rdp.combine = CombineParams::decode(0, rhs);
+        rdp.shader_config_changed = true;
         F3DEX2::draw_rectangle(rdp, rsp, gfx_device, ulx, uly, lrx, lry);
         rdp.combine = saved_combine_mode;
+        rdp.shader_config_changed = true;
 
         GBIResult::Continue
     }

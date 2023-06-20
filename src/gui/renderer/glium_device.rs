@@ -14,12 +14,13 @@ use glium::{
     BackfaceCullingMode, BlendingFunction, DepthTest, Display, DrawParameters, Frame,
     LinearBlendingFactor, Program, Surface,
 };
+use log::{trace};
 
 use crate::fast3d::{
     gbi::defines::G_TX,
     graphics::{
-        GraphicsIntermediateSampler, GraphicsIntermediateStencil, GraphicsIntermediateTexture,
-        GraphicsIntermediateUniforms,
+        GraphicsIntermediateFogParams, GraphicsIntermediateSampler, GraphicsIntermediateStencil,
+        GraphicsIntermediateTexture, GraphicsIntermediateUniforms,
     },
     utils::color_combiner::CombineParams,
 };
@@ -233,6 +234,7 @@ impl<'draw> GliumGraphicsDevice<'draw> {
         shader_hash: u64,
         other_mode_h: u32,
         other_mode_l: u32,
+        geometry_mode: u32,
         combine: CombineParams,
     ) {
         // check if the shader is already loaded
@@ -252,7 +254,7 @@ impl<'draw> GliumGraphicsDevice<'draw> {
         }
 
         // create the shader and add it to the cache
-        let mut program = OpenGLProgram::new(other_mode_h, other_mode_l, combine);
+        let mut program = OpenGLProgram::new(other_mode_h, other_mode_l, geometry_mode, combine);
         program.init();
         program.preprocess();
 
@@ -328,6 +330,8 @@ impl<'draw> GliumGraphicsDevice<'draw> {
         &self,
         display: &Display,
         target: &mut Frame,
+        projection_matrix: glam::Mat4,
+        fog: &GraphicsIntermediateFogParams,
         vbo: &[u8],
         uniforms: &GraphicsIntermediateUniforms,
     ) {
@@ -377,6 +381,10 @@ impl<'draw> GliumGraphicsDevice<'draw> {
         // Setup uniforms
         let mut shader_uniforms = vec![
             (
+                "uProjection",
+                UniformValue::Mat4(projection_matrix.to_cols_array_2d()),
+            ),
+            (
                 "uBlendColor",
                 UniformValue::Vec4(uniforms.blend.blend_color.to_array()),
             ),
@@ -406,6 +414,9 @@ impl<'draw> GliumGraphicsDevice<'draw> {
                 "uFogColor",
                 UniformValue::Vec3(uniforms.blend.fog_color.xyz().to_array()),
             ));
+
+            shader_uniforms.push(("uFogMultiplier", UniformValue::Float(fog.multiplier as f32)));
+            shader_uniforms.push(("uFogOffset", UniformValue::Float(fog.offset as f32)));
         }
 
         if program.get_define_bool("USE_TEXTURE0") {

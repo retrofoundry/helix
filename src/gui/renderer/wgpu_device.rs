@@ -370,7 +370,6 @@ impl WgpuGraphicsDevice {
     ) {
         // Update the Blend uniforms
         if self.last_blend_uniform != uniforms.blend {
-            warn!("Updating blend uniforms");
             let blend_color_bytes = bytemuck::bytes_of(&uniforms.blend.blend_color);
             let fog_color_sans_alpha = uniforms.blend.fog_color.xyz();
             let fog_color_bytes = bytemuck::bytes_of(&fog_color_sans_alpha);
@@ -396,7 +395,6 @@ impl WgpuGraphicsDevice {
 
         // Set the combine uniforms
         if self.last_combine_uniform != uniforms.combine {
-            warn!("Updating combine uniforms");
             let prim_color_bytes = bytemuck::bytes_of(&uniforms.combine.prim_color);
             let env_color_bytes = bytemuck::bytes_of(&uniforms.combine.env_color);
             let key_center_bytes = bytemuck::bytes_of(&uniforms.combine.key_center);
@@ -436,7 +434,6 @@ impl WgpuGraphicsDevice {
 
         // Set the frame uniforms
         if !self.has_set_frame_uniform_buf {
-            warn!("Updating frame uniforms");
             let frame_count_bytes = bytemuck::bytes_of(&self.frame_count);
             let frame_height_bytes = bytemuck::bytes_of(&self.current_height);
 

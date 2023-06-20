@@ -1,7 +1,8 @@
 use crate::fast3d::gbi::utils::{
-    get_cycle_type_from_other_mode_h, get_textfilter_from_other_mode_h,
-    other_mode_l_alpha_compare_dither, other_mode_l_alpha_compare_threshold,
-    other_mode_l_uses_alpha, other_mode_l_uses_fog, other_mode_l_uses_texture_edge,
+    geometry_mode_uses_lighting, get_cycle_type_from_other_mode_h,
+    get_textfilter_from_other_mode_h, other_mode_l_alpha_compare_dither,
+    other_mode_l_alpha_compare_threshold, other_mode_l_uses_alpha, other_mode_l_uses_fog,
+    other_mode_l_uses_texture_edge,
 };
 
 use crate::fast3d::utils::{
@@ -34,6 +35,7 @@ pub struct OpenGLProgram<T> {
     // configurators
     other_mode_h: u32,
     other_mode_l: u32,
+    geometry_mode: u32,
     combine: CombineParams,
 
     pub num_floats: usize,
@@ -116,7 +118,12 @@ impl<T> OpenGLProgram<T> {
 
     // MARK: - Defaults
 
-    pub fn new(other_mode_h: u32, other_mode_l: u32, combine: CombineParams) -> Self {
+    pub fn new(
+        other_mode_h: u32,
+        other_mode_l: u32,
+        geometry_mode: u32,
+        combine: CombineParams,
+    ) -> Self {
         Self {
             preprocessed_vertex: "".to_string(),
             preprocessed_frag: "".to_string(),
@@ -129,6 +136,7 @@ impl<T> OpenGLProgram<T> {
 
             other_mode_h,
             other_mode_l,
+            geometry_mode,
             combine,
 
             num_floats: 0,
@@ -144,6 +152,10 @@ impl<T> OpenGLProgram<T> {
             "TWO_CYCLE".to_string(),
             get_cycle_type_from_other_mode_h(self.other_mode_h)
                 == OtherModeHCycleType::G_CYC_2CYCLE,
+        );
+        self.set_define_bool(
+            "LIGHTING".to_string(),
+            geometry_mode_uses_lighting(self.geometry_mode),
         );
         self.set_define_bool("USE_TEXTURE0".to_string(), self.combine.uses_texture0());
         self.set_define_bool("USE_TEXTURE1".to_string(), self.combine.uses_texture1());
@@ -183,6 +195,8 @@ impl<T> OpenGLProgram<T> {
             const vec4 tZero = vec4(0.0);
             const vec4 tHalf = vec4(0.5);
             const vec4 tOne = vec4(1.0);
+
+            const int DRAWING_RECT = 0;
             "#
         .to_string();
 
@@ -197,14 +211,44 @@ impl<T> OpenGLProgram<T> {
                 out vec2 vTexCoord;
             #endif
 
+            uniform mat4 uProjection;
+            #ifdef USE_FOG
+                uniform float uFogMultiplier;
+                uniform float uFogOffset;
+            #endif
+
+            // Convert from 0...1 UNORM range to SNORM range
+            vec3 ConvertToSignedInt(vec3 t_Input) {
+                ivec3 t_Num = ivec3(t_Input * 255.0);
+                // Sign extend
+                t_Num = t_Num << 24 >> 24;
+                return vec3(t_Num) / 127.0;
+            }
+
             void main() {
-                vVtxColor = aVtxColor;
+                if (aVtxPos.w == DRAWING_RECT) {
+                    gl_Position = vec4(aVtxPos.xyz, 1.0);
+                } else {
+                    gl_Position = aVtxPos * uProjection;
+                }
+
+                #ifdef USE_FOG
+                    float fogValue = (max(gl_Position.z, 0.0) / gl_Position.w) * uFogMultiplier + uFogOffset;
+                    fogValue = clamp(fogValue, 0.0, 255.0);
+                    vVtxColor = vec4(aVtxColor.rgb, fogValue / 255.0);
+                #else
+                    vVtxColor = aVtxColor;
+                #endif
+
+                #ifdef LIGHTING
+                    // convert (unsigned) colors to normal vector components
+                    vec4 t_Normal = vec4(ConvertToSignedInt(aVtxColor.rgb), 0.0);
+                    // t_Normal = normalize(Mul(_Mat4x4(u_BoneMatrix[t_BoneIndex]), t_Normal));
+                #endif
 
                 #if defined(USE_TEXTURE0) || defined(USE_TEXTURE1)
                     vTexCoord = aTexCoord;
                 #endif
-
-                gl_Position = aVtxPos;
             }
         "#
         .to_string();

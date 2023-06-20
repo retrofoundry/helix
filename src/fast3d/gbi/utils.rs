@@ -13,6 +13,14 @@ pub fn get_cmd(val: usize, start_bit: u32, num_bits: u32) -> usize {
     (val >> start_bit) & ((1 << num_bits) - 1)
 }
 
+pub fn geometry_mode_uses_lighting(geometry_mode: u32) -> bool {
+    geometry_mode & RSPGeometry::G_LIGHTING as u32 > 0
+}
+
+pub fn geometry_mode_uses_fog(geometry_mode: u32) -> bool {
+    geometry_mode & RSPGeometry::G_FOG as u32 > 0
+}
+
 pub fn other_mode_l_uses_texture_edge(other_mode_l: u32) -> bool {
     other_mode_l >> (OtherModeLayoutL::CVG_X_ALPHA as u32) & 0x01 == 0x01
 }

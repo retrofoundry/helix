@@ -38,7 +38,7 @@ pub const SCREEN_HEIGHT: f32 = 240.0;
 const MAX_VBO_SIZE: usize = 256;
 const MAX_TEXTURE_SIZE: usize = 4096;
 pub const NUM_TILE_DESCRIPTORS: usize = 8;
-pub const MAX_BUFFERED: usize = 256;
+pub const MAX_BUFFERED: usize = 256 * 4;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -227,6 +227,7 @@ pub struct RDP {
     pub combine: CombineParams,
     pub other_mode_l: u32,
     pub other_mode_h: u32,
+    pub shader_config_changed: bool,
 
     pub buf_vbo: [f32; MAX_VBO_SIZE * (26 * 3)], // 3 vertices in a triangle and 26 floats per vtx
     pub buf_vbo_len: usize,
@@ -267,6 +268,7 @@ impl RDP {
             combine: CombineParams::ZERO,
             other_mode_l: 0,
             other_mode_h: 0,
+            shader_config_changed: false,
 
             buf_vbo: [0.0; MAX_VBO_SIZE * (26 * 3)],
             buf_vbo_len: 0,
@@ -492,11 +494,12 @@ impl RDP {
 
     // MARK: - Shader Programs
 
-    pub fn shader_program_hash(&mut self) -> u64 {
+    pub fn shader_program_hash(&mut self, geometry_mode: u32) -> u64 {
         let mut hasher = DefaultHasher::new();
 
         self.other_mode_h.hash(&mut hasher);
         self.other_mode_l.hash(&mut hasher);
+        geometry_mode.hash(&mut hasher);
         self.combine.hash(&mut hasher);
 
         hasher.finish()

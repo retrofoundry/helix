@@ -3,6 +3,8 @@ use std::{
     hash::{Hash, Hasher},
 };
 
+use log::{trace};
+
 use super::{
     rdp::NUM_TILE_DESCRIPTORS,
     utils::{
@@ -126,10 +128,24 @@ impl GraphicsIntermediateVBO {
 }
 
 #[derive(Debug, Clone)]
+pub struct GraphicsIntermediateFogParams {
+    pub multiplier: i16,
+    pub offset: i16,
+}
+
+impl GraphicsIntermediateFogParams {
+    pub const EMPTY: Self = GraphicsIntermediateFogParams {
+        multiplier: 0,
+        offset: 0,
+    };
+}
+
+#[derive(Debug, Clone)]
 pub struct GraphicsDrawCall {
     // Shader Configuration
     pub other_mode_h: u32,
     pub other_mode_l: u32,
+    pub geometry_mode: u32,
     pub combine: CombineParams,
     pub tile_descriptors: [TileDescriptor; NUM_TILE_DESCRIPTORS],
     pub shader_hash: u64,
@@ -160,12 +176,19 @@ pub struct GraphicsDrawCall {
 
     // Triangle Data
     pub vbo: GraphicsIntermediateVBO,
+
+    // Projection Matrix
+    pub projection_matrix: glam::Mat4,
+
+    // Fog Params
+    pub fog: GraphicsIntermediateFogParams,
 }
 
 impl GraphicsDrawCall {
     pub const EMPTY: Self = GraphicsDrawCall {
         other_mode_h: 0,
         other_mode_l: 0,
+        geometry_mode: 0,
         combine: CombineParams::ZERO,
         tile_descriptors: [TileDescriptor::EMPTY; NUM_TILE_DESCRIPTORS],
         shader_hash: 0,
@@ -178,6 +201,8 @@ impl GraphicsDrawCall {
         cull_mode: None,
         uniforms: GraphicsIntermediateUniforms::EMPTY,
         vbo: GraphicsIntermediateVBO::EMPTY,
+        projection_matrix: glam::Mat4::ZERO,
+        fog: GraphicsIntermediateFogParams::EMPTY,
     };
 
     pub fn finalize(&mut self) {
@@ -186,6 +211,7 @@ impl GraphicsDrawCall {
 
         self.other_mode_h.hash(&mut hasher);
         self.other_mode_l.hash(&mut hasher);
+        self.geometry_mode.hash(&mut hasher);
         self.combine.hash(&mut hasher);
 
         self.shader_hash = hasher.finish();
@@ -231,7 +257,10 @@ impl GraphicsIntermediateDevice {
 
     pub fn is_z_from_0_to_1(&self) -> bool {
         // false for OpenGL, true for WGPU
-        false
+        #[cfg(feature = "opengl")]
+        return false;
+        #[cfg(feature = "wgpu")]
+        return true;
     }
 
     pub fn set_program_params(
@@ -282,6 +311,16 @@ impl GraphicsIntermediateDevice {
             depth_compare,
             polygon_offset,
         });
+    }
+
+    pub fn set_projection_matrix(&mut self, matrix: glam::Mat4) {
+        let draw_call = self.current_draw_call();
+        draw_call.projection_matrix = matrix;
+    }
+
+    pub fn set_fog(&mut self, multiplier: i16, offset: i16) {
+        let draw_call = self.current_draw_call();
+        draw_call.fog = GraphicsIntermediateFogParams { multiplier, offset };
     }
 
     pub fn set_viewport(&mut self, x: f32, y: f32, width: f32, height: f32) {

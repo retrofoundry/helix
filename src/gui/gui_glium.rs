@@ -5,6 +5,7 @@ use glutin::{event_loop::EventLoop, GlRequest};
 use imgui::{Context, FontSource, Ui};
 use imgui_glium_renderer::Renderer;
 
+use log::{trace};
 use winit::event::{Event, WindowEvent};
 
 use std::str;
@@ -196,6 +197,8 @@ impl<'render> Gui<'render> {
             (self.draw_menu_callback)(ui);
         });
 
+        ui.show_metrics_window(&mut true);
+
         // Setup for drawing
         let gl_window = self.display.gl_window();
 
@@ -226,6 +229,7 @@ impl<'render> Gui<'render> {
                 draw_call.shader_hash,
                 draw_call.other_mode_h,
                 draw_call.other_mode_l,
+                draw_call.geometry_mode,
                 draw_call.combine,
             );
 
@@ -253,6 +257,8 @@ impl<'render> Gui<'render> {
             self.graphics_device.draw_triangles(
                 &self.display,
                 target,
+                draw_call.projection_matrix,
+                &draw_call.fog,
                 &draw_call.vbo.vbo,
                 &draw_call.uniforms,
             );
