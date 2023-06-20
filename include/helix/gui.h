@@ -2,6 +2,7 @@
 #define HELIX_LIB_GUI_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include <libultra/ultratypes.h>
 
@@ -9,11 +10,13 @@
 extern "C" {
 #endif
 
-void HLXDisplaySetup(const char* title, void (*draw_menu)());
+void HLXDisplaySetup(const char* title, void (*draw_menu)(), void (*draw_windows)());
 void HLXDisplayStartFrame();
 void HLXDisplayProcessDrawLists(u64* commands);
 void HLXDisplayEndFrame();
 float HLXDisplayGetAspectRatio();
+
+void HLXShowProfilerWindow(void* ui, bool* opened);
 
 #ifdef __cplusplus
 }

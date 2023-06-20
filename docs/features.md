@@ -18,7 +18,7 @@ The following API is provided:
 /**
  * Creates and sets up the window, passes in a function that is to be called to draw the menu bar
 **/
-void HLXDisplaySetup(const char* title, void (*draw_menu)());
+void HLXDisplaySetup(const char* title, void (*draw_menu)(), void (*draw_windows)());
 
 /**
  * Used to start a frame and prepare for drawing

@@ -30,12 +30,14 @@ void AudioPlayerQueueBuffer(void* player, const uint8_t* buf, size_t len);
 
 // GUI
 void* GUICreateEventLoop(void);
-void* GUICreate(const char* title, void* event_loop, void (*draw_menu_callback)());
+void* GUICreate(const char* title, void* event_loop, void (*draw_menu_callback)(void*), void (*draw_windows_callback)(void*));
 void* GUIStartFrame(void* gui, void* event_loop);
 void GUIDrawLists(void* gui, void* frame, uint64_t* commands);
 void GUIEndFrame(void* gui);
 
 f32 GUIGetAspectRatio(void* gui);
+
+void GUIShowProfilerWindow(void* ui, void* gui, bool* opened);
 
 // Gamepad
 

@@ -36,10 +36,11 @@ pub struct Gui<'render> {
 
     // draw callbacks
     draw_menu_callback: Box<dyn Fn(&Ui) + 'static>,
+    draw_windows_callback: Box<dyn Fn(&Ui) + 'static>,
 
     // game renderer
     rcp: RCP,
-    intermediate_graphics_device: GraphicsIntermediateDevice,
+    pub intermediate_graphics_device: GraphicsIntermediateDevice,
     graphics_device: GliumGraphicsDevice<'render>,
 }
 
@@ -52,9 +53,15 @@ pub struct EventLoopWrapper {
 }
 
 impl<'render> Gui<'render> {
-    pub fn new<D>(title: &str, event_loop_wrapper: &EventLoopWrapper, draw_menu: D) -> Result<Self>
+    pub fn new<D, W>(
+        title: &str,
+        event_loop_wrapper: &EventLoopWrapper,
+        draw_menu: D,
+        draw_windows: W,
+    ) -> Result<Self>
     where
         D: Fn(&Ui) + 'static,
+        W: Fn(&Ui) + 'static,
     {
         let (width, height) = (800, 600);
 
@@ -113,6 +120,7 @@ impl<'render> Gui<'render> {
             imgui,
             ui_state: UIState { last_frame_time },
             draw_menu_callback: Box::new(draw_menu),
+            draw_windows_callback: Box::new(draw_windows),
             rcp: RCP::new(),
             intermediate_graphics_device: GraphicsIntermediateDevice::new(),
             graphics_device: GliumGraphicsDevice::new(),
@@ -196,7 +204,8 @@ impl<'render> Gui<'render> {
             (self.draw_menu_callback)(ui);
         });
 
-        ui.show_metrics_window(&mut true);
+        // Draw windows
+        (self.draw_windows_callback)(ui);
 
         // Setup for drawing
         let gl_window = self.display.gl_window();
@@ -282,10 +291,12 @@ impl<'render> Gui<'render> {
 
         // Finish rendering
         self.graphics_device.end_frame();
-        self.intermediate_graphics_device.clear_draw_calls();
 
         // Render ImGui on top of any drawn content
         self.render(&mut frame)?;
+
+        // Clear the draw calls
+        self.intermediate_graphics_device.clear_draw_calls();
 
         // Swap buffers
         frame.finish()?;
@@ -301,7 +312,7 @@ impl<'render> Gui<'render> {
 
 // MARK: - C API
 
-type OnDraw = unsafe extern "C" fn();
+type OnDraw = unsafe extern "C" fn(ui: &Ui);
 
 #[no_mangle]
 pub extern "C" fn GUICreateEventLoop() -> Box<EventLoopWrapper> {
@@ -314,16 +325,26 @@ pub unsafe extern "C" fn GUICreate(
     title_raw: *const i8,
     event_loop: Option<&mut EventLoopWrapper>,
     draw_menu: Option<OnDraw>,
+    draw_windows: Option<OnDraw>,
 ) -> Box<Gui> {
     let title_str: &CStr = unsafe { CStr::from_ptr(title_raw) };
     let title: &str = str::from_utf8(title_str.to_bytes()).unwrap();
 
     let event_loop = event_loop.unwrap();
-    let gui = Gui::new(title, event_loop, move |_ui| unsafe {
-        if let Some(draw_menu) = draw_menu {
-            draw_menu();
-        }
-    })
+    let gui = Gui::new(
+        title,
+        event_loop,
+        move |ui| unsafe {
+            if let Some(draw_menu) = draw_menu {
+                draw_menu(ui);
+            }
+        },
+        move |ui| unsafe {
+            if let Some(draw_windows) = draw_windows {
+                draw_windows(ui);
+            }
+        },
+    )
     .unwrap();
 
     Box::new(gui)

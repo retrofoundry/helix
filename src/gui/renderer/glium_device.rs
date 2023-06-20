@@ -54,7 +54,7 @@ impl Uniforms for UniformVec<'_, '_> {
 }
 
 pub struct GliumGraphicsDevice<'draw> {
-    shader_cache: HashMap<u64, OpenGLProgram<Program>>,
+    pub shader_cache: HashMap<u64, OpenGLProgram<Program>>,
     current_shader: u64,
 
     textures: Vec<TextureData>,
