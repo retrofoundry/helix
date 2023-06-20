@@ -28,7 +28,6 @@ network = ["dep:tokio"]
 [dependencies]
 anyhow = "1.0.70"
 approx = "0.5.1"
-arie = "0.1.0"
 device_query = {  git = "https://github.com/dcvz/device_query.git", branch = "feature/macos-init-throw" }
 env_logger = "0.10.0"
 farbe = "0.2.0"
@@ -49,6 +48,9 @@ glutin = { version = "0.29.1", optional = true }
 wgpu = "0.16"
 spin_sleep = "1.1.1"
 bytemuck = { version = "1.13.1"}
+cpal = "0.15.1"
+ringbuf = "0.3.2"
+rubato = "0.12.0"
 
 [patch.crates-io]
 glium = { git = "https://github.com/retrofoundry/glium", branch = "helix" }

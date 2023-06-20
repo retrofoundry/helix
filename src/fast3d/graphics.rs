@@ -3,8 +3,6 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use log::{trace};
-
 use super::{
     rdp::NUM_TILE_DESCRIPTORS,
     utils::{

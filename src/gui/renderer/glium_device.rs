@@ -14,7 +14,6 @@ use glium::{
     BackfaceCullingMode, BlendingFunction, DepthTest, Display, DrawParameters, Frame,
     LinearBlendingFactor, Program, Surface,
 };
-use log::{trace};
 
 use crate::fast3d::{
     gbi::defines::G_TX,

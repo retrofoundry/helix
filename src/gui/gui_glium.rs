@@ -5,7 +5,6 @@ use glutin::{event_loop::EventLoop, GlRequest};
 use imgui::{Context, FontSource, Ui};
 use imgui_glium_renderer::Renderer;
 
-use log::{trace};
 use winit::event::{Event, WindowEvent};
 
 use std::str;

@@ -1,4 +1,4 @@
-pub use arie;
+pub mod audio;
 use env_logger::Builder;
 mod extensions;
 pub mod fast3d;

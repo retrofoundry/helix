@@ -2,7 +2,6 @@ use crate::fast3d::gbi::defines::DirLight;
 
 use super::{gbi::defines::Light, utils::color::Color};
 use glam::{Mat4, Vec2, Vec3A};
-use log::{trace, warn};
 
 pub const MATRIX_STACK_SIZE: usize = 32;
 pub const MAX_VERTICES: usize = 256;

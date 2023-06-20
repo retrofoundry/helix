@@ -2,7 +2,7 @@ use std::slice;
 
 use glam::{Mat4, Vec2, Vec3A, Vec4};
 
-use log::{trace};
+use log::trace;
 
 use super::defines::{Gfx, Light, Viewport, Vtx, G_FILLRECT, G_MTX, G_TEXRECT, G_TEXRECTFLIP};
 use super::utils::{
