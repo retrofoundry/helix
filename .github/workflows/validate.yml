@@ -7,7 +7,7 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-jobs:
+jobs:    
   rustfmt-check:
     runs-on: ubuntu-latest
     steps:
@@ -18,14 +18,18 @@ jobs:
       run: cargo fmt --all -- --check
   macos-check:
     runs-on: macos-latest
+    strategy:
+      matrix:
+        renderer: [opengl, wgpu]
     steps:
     - uses: actions/checkout@v2
-    - name: Test (OpenGL)
-      run: cargo test --features "speech, network, opengl, f3dex2" --no-default-features
-    - name: Test (WGPU)
-      run: cargo test --features "speech, network, wgpu, f3dex2" --no-default-features
+    - name: Test
+      run: cargo test --features "speech, network, ${{ matrix.renderer }}, f3dex2" --no-default-features
   ubuntu-check:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        renderer: [opengl, wgpu]
     steps:
     - uses: actions/checkout@v2
     - name: Update apt
@@ -34,15 +38,14 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y $(cat .github/workflows/apt-deps.txt)
-    - name: Test (OpenGL)
-      run: cargo test --features "speech, network, opengl, f3dex2" --no-default-features
-    - name: Test (WGPU)
-      run: cargo test --features "speech, network, wgpu, f3dex2" --no-default-features
+    - name: Test
+      run: cargo test --features "speech, network, ${{ matrix.renderer }}, f3dex2" --no-default-features
   windows-check:
     runs-on: windows-latest
+    strategy:
+      matrix:
+        renderer: [opengl, wgpu]
     steps:
     - uses: actions/checkout@v2
-    - name: Test (OpenGL)
-      run: cargo test --features "speech, network, opengl, f3dex2" --no-default-features
-    - name: Test (WGPU)
-      run: cargo test --features "speech, network, wgpu, f3dex2" --no-default-features
+    - name: Test
+      run: cargo test --features "speech, network, ${{ matrix.renderer }}, f3dex2" --no-default-features
