@@ -6,7 +6,7 @@ use imgui_winit_support::winit::{
     event_loop::EventLoop,
     window::{Window, WindowBuilder},
 };
-use log::{trace, warn};
+use log::trace;
 use wgpu::{
     Device, SurfaceConfiguration, SurfaceTexture, TextureDescriptor, TextureFormat, TextureUsages,
     TextureView,
@@ -37,7 +37,6 @@ pub struct Gui {
     surface_config: SurfaceConfiguration,
     renderer: Renderer,
     platform: imgui_winit_support::WinitPlatform,
-    depth_texture: wgpu::TextureView,
 
     // imgui
     imgui: Context,
@@ -47,6 +46,7 @@ pub struct Gui {
 
     // draw callbacks
     draw_menu_callback: Box<dyn Fn(&Ui) + 'static>,
+    draw_windows_callback: Box<dyn Fn(&Ui) + 'static>,
 
     // game renderer
     rcp: RCP,
@@ -64,9 +64,15 @@ pub struct EventLoopWrapper {
 }
 
 impl Gui {
-    pub fn new<D>(title: &str, event_loop_wrapper: &EventLoopWrapper, draw_menu: D) -> Result<Self>
+    pub fn new<D, W>(
+        title: &str,
+        event_loop_wrapper: &EventLoopWrapper,
+        draw_menu: D,
+        draw_windows: W,
+    ) -> Result<Self>
     where
         D: Fn(&Ui) + 'static,
+        W: Fn(&Ui) + 'static,
     {
         let (width, height) = (800, 600);
 
@@ -119,9 +125,6 @@ impl Gui {
 
         surface.configure(&device, &surface_config);
 
-        // Create the depth texture
-        let depth_texture = Self::create_depth_texture(&device, &surface_config, "depth_texture");
-
         // Setup ImGui
         let mut imgui = Context::create();
         imgui.io_mut().config_flags |=
@@ -161,7 +164,7 @@ impl Gui {
         let renderer = Renderer::new(&mut imgui, &device, &queue, renderer_config);
 
         // Create graphics device
-        let graphics_device = WgpuGraphicsDevice::new(&device);
+        let graphics_device = WgpuGraphicsDevice::new(&surface_config, &device);
 
         // Initial UI state
         let last_frame_time = Instant::now();
@@ -175,13 +178,13 @@ impl Gui {
             surface_config,
             renderer,
             platform,
-            depth_texture,
             imgui,
             ui_state: UIState {
                 last_frame_time,
                 last_cursor,
             },
             draw_menu_callback: Box::new(draw_menu),
+            draw_windows_callback: Box::new(draw_windows),
             rcp: RCP::default(),
             intermediate_graphics_device: GraphicsIntermediateDevice::default(),
             graphics_device,
@@ -240,11 +243,7 @@ impl Gui {
                         self.surface_config.width = size.width.max(1);
                         self.surface_config.height = size.height.max(1);
                         self.surface.configure(&self.device, &self.surface_config);
-                        self.depth_texture = Self::create_depth_texture(
-                            &self.device,
-                            &self.surface_config,
-                            "depth_texture",
-                        );
+                        self.graphics_device.resize(&self.surface_config, &self.device);
                     }
                     Event::WindowEvent {
                         event: WindowEvent::CloseRequested,
@@ -316,10 +315,6 @@ impl Gui {
             (self.draw_menu_callback)(ui);
         });
 
-        // Demo window for now
-        let mut opened = true;
-        ui.show_metrics_window(&mut opened);
-
         // Set RDP output dimensions
         let size = self.window.inner_size();
         let dimensions = OutputDimensions {
@@ -336,7 +331,7 @@ impl Gui {
 
         {
             // Prepare the context device
-            self.graphics_device.start_frame();
+            self.graphics_device.update_frame_count();
 
             // Run the RCP
             self.rcp
@@ -350,14 +345,17 @@ impl Gui {
                     });
 
             // Draw the RCP output
-            for draw_call in &self.intermediate_graphics_device.draw_calls {
+            for (index, draw_call) in self.intermediate_graphics_device.draw_calls.iter().enumerate() {
                 assert!(!draw_call.vbo.vbo.is_empty());
 
-                self.graphics_device.load_program(
+                self.graphics_device.update_current_height(draw_call.viewport.w as i32);
+
+                self.graphics_device.select_program(
                     &self.device,
                     draw_call.shader_hash,
                     draw_call.other_mode_h,
                     draw_call.other_mode_l,
+                    draw_call.geometry_mode,
                     draw_call.combine,
                 );
 
@@ -387,31 +385,42 @@ impl Gui {
                 }
 
                 // set uniforms
-                self.graphics_device.set_uniforms(
-                    &self.device,
+                self.graphics_device.update_uniforms(
                     &self.queue,
-                    &mut encoder,
-                    &draw_call.uniforms,
+                    draw_call.projection_matrix,
+                    &draw_call.fog,
+                    &draw_call.uniforms
                 );
 
-                self.graphics_device.draw_triangles(
+                // create pipeline
+                let (texture_bind_group_layout, pipeline) = self.graphics_device.create_pipeline(
                     &self.device,
-                    &mut encoder,
-                    &view,
-                    &self.depth_texture,
                     self.surface_config.format,
-                    &draw_call.viewport,
-                    draw_call.scissor,
                     draw_call.blend_state,
                     draw_call.cull_mode,
                     draw_call.stencil,
+                );
+
+                // render triangles to texture
+                self.graphics_device.draw_triangles(
+                    index,
+                    &view,
+                    &self.device,
+                    &self.queue,
+                    &mut encoder,
+                    &pipeline,
+                    &texture_bind_group_layout,
+                    &draw_call.viewport,
+                    draw_call.scissor,
                     &draw_call.vbo.vbo,
                     draw_call.vbo.num_tris,
-                )
+                );
             }
 
-            // Finish rendering
-            self.graphics_device.end_frame();
+            // Draw client windows
+            (self.draw_windows_callback)(ui);
+
+            // Reset state
             self.intermediate_graphics_device.clear_draw_calls();
 
             // Finish game encoding and submit
@@ -463,7 +472,7 @@ impl Gui {
 
 // MARK: - C API
 
-type OnDraw = unsafe extern "C" fn();
+type OnDraw = unsafe extern "C" fn(ui: &Ui);
 
 #[no_mangle]
 pub extern "C" fn GUICreateEventLoop() -> Box<EventLoopWrapper> {
@@ -476,16 +485,26 @@ pub unsafe extern "C" fn GUICreate(
     title_raw: *const i8,
     event_loop: Option<&mut EventLoopWrapper>,
     draw_menu: Option<OnDraw>,
+    draw_windows: Option<OnDraw>,
 ) -> Box<Gui> {
     let title_str: &CStr = unsafe { CStr::from_ptr(title_raw) };
     let title: &str = str::from_utf8(title_str.to_bytes()).unwrap();
 
     let event_loop = event_loop.unwrap();
-    let gui = Gui::new(title, event_loop, move |_ui| unsafe {
-        if let Some(draw_menu) = draw_menu {
-            draw_menu();
-        }
-    })
+    let gui = Gui::new(
+        title,
+        event_loop,
+        move |ui| unsafe {
+            if let Some(draw_menu) = draw_menu {
+                draw_menu(ui);
+            }
+        },
+        move |ui| unsafe {
+            if let Some(draw_windows) = draw_windows {
+                draw_windows(ui);
+            }
+        },
+    )
     .unwrap();
 
     Box::new(gui)

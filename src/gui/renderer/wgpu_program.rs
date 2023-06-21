@@ -32,6 +32,7 @@ pub struct WgpuProgram {
     // configurators
     other_mode_h: u32,
     other_mode_l: u32,
+    geometry_mode: u32,
     combine: CombineParams,
 
     pub num_floats: usize,
@@ -95,7 +96,12 @@ impl WgpuProgram {
 
     // MARK: - Defaults
 
-    pub fn new(other_mode_h: u32, other_mode_l: u32, combine: CombineParams) -> Self {
+    pub fn new(
+        other_mode_h: u32,
+        other_mode_l: u32,
+        geometry_mode: u32,
+        combine: CombineParams,
+    ) -> Self {
         Self {
             processed_shader: "".to_string(),
             compiled_program: None,
@@ -107,6 +113,7 @@ impl WgpuProgram {
 
             other_mode_h,
             other_mode_l,
+            geometry_mode,
             combine,
 
             num_floats: 0,
@@ -163,6 +170,8 @@ impl WgpuProgram {
             const tHalf = vec4<f32>(0.5 ,0.5, 0.5, 0.5);
             const tOne = vec4<f32>(1.0 ,1.0, 1.0, 1.0);
 
+            const DRAWING_RECT: f32 = 0.0;
+
             struct VertexInput {{
                 @location(0) position: vec4<f32>,
                 @location(1) color: vec4<f32>,
@@ -175,31 +184,6 @@ impl WgpuProgram {
                 @builtin(position) position: vec4<f32>,
             }};
 
-            fn srand(val1: u32, val2: u32) -> u32 {{
-                var backoff = 16;
-
-                var v0: u32 = val1;
-                var v1: u32 = val2;
-                var s0: u32 = 0u;
-
-                for (var n = 0; n < backoff; n += 1) {{
-                    s0 = s0 + 0x9e3779b9u;
-                    v0 = v0 + ((v1 << 4u) + 0xa341316cu) ^ (v1 + s0) ^ ((v1 >> 5u) + 0xc8013ea4u);
-                    v1 = v1 + ((v0 << 4u) + 0xad90777du) ^ (v0 + s0) ^ ((v0 >> 5u) + 0x7e95761eu);
-                }}
-
-                return v0;
-            }}
-
-            fn urand(s: u32) -> u32 {{
-                return (1664525u * s + 1013904223u);
-            }}
-
-            // Returns a pseudorandom float in [0..1]
-            fn rand(s: u32) -> f32 {{
-                return f32(s & 0x00FFFFFFu) / 16777216.0;
-            }}
-
             "#,
             uv_input = self.on_define(
                 &["USE_TEXTURE0", "USE_TEXTURE1"],
@@ -211,21 +195,73 @@ impl WgpuProgram {
             ),
         );
 
-        self.vertex = format!(
+        self.vertex = self.generate_vertex();
+
+        self.fragment = self.generate_fragment();
+    }
+
+    fn generate_vertex(&mut self) -> String {
+        let compute_uniform_fields = || {
+            if self.get_define_bool("USE_FOG") {
+                return format!(
+                    r#"
+                    fog_multiplier: f32,
+                    fog_offset: f32,
+                    "#
+                );
+            }
+
+            return "_pad: vec2<f32>,".to_string();
+        };
+
+        let compute_color = || {
+            if self.get_define_bool("USE_FOG") {
+                return format!(
+                    r#"
+                    var fog_value = (max(0.0, out.position.z) - out.position.w) * uniforms.fog_multiplier + uniforms.fog_offset;
+                    fog_value = clamp(fog_value, 0.0, 255.0);
+                    out.color = vec4<f32>(in.color.xyz, fog_value);
+                    "#
+                );
+            }
+
+            return "out.color = in.color;".to_string();
+        };
+
+        format!(
             r#"
+            struct Uniforms {{
+                projection_matrix: mat4x4<f32>,
+                {fog_params}
+            }}
+
+            @group(0) @binding(0)
+            var<uniform> uniforms: Uniforms;
+
             @vertex
             fn vs_main(in: VertexInput) -> VertexOutput {{
                 var out: VertexOutput;
+
+                if (in.position.w == DRAWING_RECT) {{
+                    out.position = uniforms.projection_matrix * vec4<f32>(in.position.xyz, 1.0);
+                }} else {{
+                    out.position = uniforms.projection_matrix * in.position;
+                }}
+
+                // map z to [0, 1]
+                out.position.z = (out.position.z + out.position.w) / (2.0 * out.position.w);
+
+                {color}
+
                 {uv}
-                out.color = in.color;
-                out.position = in.position;
+
                 return out;
             }}
             "#,
             uv = self.on_define(&["USE_TEXTURE0", "USE_TEXTURE1"], "out.uv = in.uv;"),
-        );
-
-        self.fragment = self.generate_fragment();
+            fog_params = compute_uniform_fields(),
+            color = compute_color(),
+        )
     }
 
     fn generate_fragment(&mut self) -> String {
@@ -336,7 +372,7 @@ impl WgpuProgram {
             r#"
             struct BlendParamsUniforms {{
                 blend_color: vec4<f32>,
-                fog_color: vec3<f32>,
+                fog_color: vec4<f32>,
             }};
             
             struct CombineParamsUniforms {{
@@ -354,11 +390,11 @@ impl WgpuProgram {
                 height: u32,
             }};
 
-            @group(0) @binding(0)
+            @group(1) @binding(0)
             var<uniform> blend_uniforms: BlendParamsUniforms;
-            @group(0) @binding(1)
+            @group(1) @binding(1)
             var<uniform> combine_uniforms: CombineParamsUniforms;
-            @group(0) @binding(2)
+            @group(1) @binding(2)
             var<uniform> frame_uniforms: FrameUniforms;
 
             {tex0_bindings}
@@ -416,10 +452,8 @@ impl WgpuProgram {
 
                 {sample_texture0}
                 {sample_texture1}
-
-                var random_seed = srand(frame_uniforms.count, u32(in.position.x) * u32(in.position.y) * (240u / frame_uniforms.height));
-                random_seed = urand(random_seed);
-                var noise = rand(random_seed);
+                
+                var noise = (random(vec3(floor(in.position.xy * (240.0 / f32(frame_uniforms.height))), f32(frame_uniforms.count))) + 1.0) / 2.0;
 
                 var texel = vec4<f32>(
                     combineColorCycle0(tHalf, in.color, tex_val0, tex_val1, noise),
@@ -443,18 +477,18 @@ impl WgpuProgram {
             tex0_bindings = self.on_define(
                 &["USE_TEXTURE0"],
                 r#"
-                @group(1) @binding(0)
+                @group(2) @binding(0)
                 var texture0: texture_2d<f32>;
-                @group(1) @binding(1)
+                @group(2) @binding(1)
                 var sampler0: sampler;
                 "#
             ),
             tex1_bindings = self.on_define(
                 &["USE_TEXTURE1"],
                 r#"
-                @group(1) @binding(2)
+                @group(2) @binding(2)
                 var texture1: texture_2d<f32>;
-                @group(1) @binding(3)
+                @group(2) @binding(3)
                 var sampler1: sampler;
             "#
             ),
@@ -495,8 +529,8 @@ impl WgpuProgram {
             alpha_compare_dither = self.on_define(
                 &["USE_ALPHA", "ALPHA_COMPARE_DITHER"],
                 r#"
-                random_seed = urand(random_seed);
-                if texel.a < rand(random_seed) { discard; }
+                var random_alpha = floor(random(vec3(floor(in.position.xy * (240.0 / f32(frame_uniforms.height))), f32(frame_uniforms.count))) + 0.5);
+                if texel.a < random_alpha { discard; }
                 "#,
             ),
             alpha_compare_threshold = self.on_define(
