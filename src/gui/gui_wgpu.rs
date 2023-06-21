@@ -50,7 +50,7 @@ pub struct Gui {
 
     // game renderer
     rcp: RCP,
-    intermediate_graphics_device: GraphicsIntermediateDevice,
+    pub intermediate_graphics_device: GraphicsIntermediateDevice,
     graphics_device: WgpuGraphicsDevice,
 }
 

@@ -2,7 +2,11 @@ use imgui::{CollapsingHeader, TreeNode, Ui};
 
 use crate::fast3d::gbi::utils::{geometry_mode_uses_fog, geometry_mode_uses_lighting};
 
+#[cfg(feature = "glium")]
 use super::gui_glium::Gui;
+
+#[cfg(feature = "wgpu")]
+use super::gui_wgpu::Gui;
 
 pub trait HelixWindows {
     fn show_profiler_window(&self, opened: &mut bool, gui: &mut Gui);
