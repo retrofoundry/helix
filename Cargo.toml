@@ -50,7 +50,7 @@ spin_sleep = "1.1.1"
 bytemuck = { version = "1.13.1"}
 cpal = "0.15.1"
 ringbuf = "0.3.2"
-rubato = "0.12.0"
+rubato = "0.14.0"
 
 [patch.crates-io]
 glium = { git = "https://github.com/retrofoundry/glium", branch = "helix" }

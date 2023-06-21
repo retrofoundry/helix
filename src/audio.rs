@@ -1,8 +1,8 @@
 use anyhow::Result;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::{HeapProducer, HeapRb};
-use rubato::{FftFixedInOut, Resampler};
-use std::{error::Error, io::Read};
+use rubato::{FastFixedOut, PolynomialDegree, Resampler};
+use std::error::Error;
 
 pub struct AudioConfiguration {
     pub sample_rate: u32,
@@ -11,7 +11,7 @@ pub struct AudioConfiguration {
 
 pub struct AudioPlayer {
     buffer_producer: HeapProducer<f32>,
-    resampler: Option<FftFixedInOut<f32>>,
+    resampler: Option<FastFixedOut<f32>>,
     pre_resampled_buffer: Vec<f32>,
     pre_resampled_split_buffers: [Vec<f32>; 2],
     resample_process_buffers: [Vec<f32>; 2],
@@ -34,12 +34,6 @@ impl std::fmt::Display for AudioPlayerError {
             Self::DualChannelNotSupported => write!(f, "Dual channel not supported"),
         }
     }
-}
-
-fn read_i16_le<T: Read>(reader: &mut T) -> Result<i16> {
-    let mut buf = [0; 2];
-    reader.read_exact(&mut buf)?;
-    Ok(i16::from_le_bytes(buf))
 }
 
 impl AudioPlayer {
@@ -84,12 +78,15 @@ impl AudioPlayer {
                 return Err(AudioPlayerError::DualChannelNotSupported.into());
             }
 
+            // output / input ratio
+            let f_ratio = def_conf.sample_rate().0 as f64 / sample_rate.0 as f64;
             (
                 def_conf.sample_rate(),
-                Some(FftFixedInOut::<f32>::new(
-                    sample_rate.0 as usize,
-                    def_conf.sample_rate().0 as usize,
-                    sample_rate.0 as usize / 60,
+                Some(FastFixedOut::<f32>::new(
+                    f_ratio,
+                    1.1,
+                    PolynomialDegree::Nearest, // Nearest is the fastest, Septic is the best quality
+                    def_conf.sample_rate().0 as usize / 30,
                     2,
                 )?),
             )
@@ -175,11 +172,10 @@ impl AudioPlayer {
 
         // transform the buffer into a vector of f32 samples
         // buffer data is of 2 channels, 16 bit samples
-        let mut cursor = std::io::Cursor::new(buffer);
-        let mut samples = Vec::with_capacity(buffer.len() / 2);
-        while let Ok(sample) = read_i16_le(&mut cursor) {
-            samples.push(sample as f32 / 32768.0);
-        }
+        let samples = buffer
+            .chunks(2)
+            .map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0)
+            .collect::<Vec<_>>();
 
         if let Some(resampler) = &mut self.resampler {
             self.pre_resampled_buffer.extend_from_slice(&samples);
@@ -201,8 +197,8 @@ impl AudioPlayer {
                 self.resample_process_buffers[0].clear();
 
                 let output_frames = resampler.output_frames_next();
-                self.resample_process_buffers[0].reserve(output_frames);
-                self.resample_process_buffers[1].reserve(output_frames);
+                self.resample_process_buffers[0].resize(output_frames, 0.);
+                self.resample_process_buffers[1].resize(output_frames, 0.);
 
                 resampler
                     .process_into_buffer(
