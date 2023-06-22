@@ -279,8 +279,8 @@ impl F3DEX2 {
                 rdp.calculate_and_set_viewport(*viewport);
             }
             index if index == F3DEX2::G_MV_MATRIX => {
-                assert!(true, "Unimplemented move matrix");
-                unsafe { *command = (*command).add(1) };
+                panic!("Unimplemented move matrix");
+                // unsafe { *command = (*command).add(1) };
             }
             index if index == F3DEX2::G_MV_LIGHT => {
                 let index = offset / 24;
@@ -290,7 +290,7 @@ impl F3DEX2 {
                     rsp.set_look_at(index, w1);
                 }
             }
-            _ => assert!(true, "Unimplemented move_mem command"),
+            _ => panic!("Unimplemented move_mem command"),
         }
 
         GBIResult::Continue
@@ -332,7 +332,7 @@ impl F3DEX2 {
             }
             // TODO: G_MW_MATRIX
             _ => {
-                assert!(false, "Unknown moveword type: {}", m_type)
+                // panic!("Unknown moveword type: {}", m_type);
             }
         }
 
