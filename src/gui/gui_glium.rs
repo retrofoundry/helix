@@ -127,9 +127,9 @@ impl<'render> Gui<'render> {
             draw_menu_callback: Box::new(draw_menu),
             draw_windows_callback: Box::new(draw_windows),
             keyboard_manager,
-            rcp: RCP::new(),
-            intermediate_graphics_device: GraphicsIntermediateDevice::new(),
-            graphics_device: GliumGraphicsDevice::new(),
+            rcp: RCP::default(),
+            intermediate_graphics_device: GraphicsIntermediateDevice::default(),
+            graphics_device: GliumGraphicsDevice::default(),
         })
     }
 

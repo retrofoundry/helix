@@ -13,6 +13,12 @@ pub struct GamepadManager {
     providers: Vec<Box<dyn GamepadProvider>>,
 }
 
+impl Default for GamepadManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GamepadManager {
     pub fn new() -> Self {
         Self {
@@ -25,10 +31,8 @@ impl GamepadManager {
         }
     }
 
-    pub fn init(&mut self, gamepad_bits: GamepadBits) {
-        unsafe {
-            *gamepad_bits = 0;
-        }
+    pub unsafe fn init(&mut self, gamepad_bits: GamepadBits) {
+        *gamepad_bits = 0;
 
         self.gamepad_bits = gamepad_bits;
         self.scan_for_controllers();
@@ -43,15 +47,13 @@ impl GamepadManager {
         }
     }
 
-    pub fn read(&mut self, pad: *mut OSControllerPad) {
+    pub unsafe fn read(&mut self, pad: *mut OSControllerPad) {
         // TODO: Handle current slot?
 
-        unsafe {
-            (*pad).button = 0;
-            (*pad).stick_x = 0;
-            (*pad).stick_y = 0;
-            (*pad).errno = 0;
-        }
+        (*pad).button = 0;
+        (*pad).stick_x = 0;
+        (*pad).stick_y = 0;
+        (*pad).errno = 0;
 
         for controller in &self.gamepads {
             for provider in &self.providers {
@@ -97,7 +99,7 @@ pub extern "C" fn GamepadManagerCreate() -> Box<GamepadManager> {
 }
 
 #[no_mangle]
-pub extern "C" fn GamepadManagerInit(
+pub unsafe extern "C" fn GamepadManagerInit(
     manager: Option<&mut GamepadManager>,
     gamepad_bits: GamepadBits,
 ) -> i32 {
@@ -114,7 +116,7 @@ pub extern "C" fn GamepadManagerProcessEvents(manager: Option<&mut GamepadManage
 }
 
 #[no_mangle]
-pub extern "C" fn GamepadManagerGetReadData(
+pub unsafe extern "C" fn GamepadManagerGetReadData(
     manager: Option<&mut GamepadManager>,
     pad: *mut OSControllerPad,
 ) {

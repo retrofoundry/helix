@@ -15,6 +15,12 @@ impl GirlsGamepadProvider {
     }
 }
 
+impl Default for GirlsGamepadProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GamepadProvider for GirlsGamepadProvider {
     fn scan(&self) -> Vec<Gamepad> {
         let mut devices: Vec<Gamepad> = Vec::new();
@@ -31,7 +37,7 @@ impl GamepadProvider for GirlsGamepadProvider {
         while let Some(_ev) = self.api.next_event() {}
     }
 
-    fn read(&self, controller: &Gamepad, pad: *mut OSControllerPad) {
+    unsafe fn read(&self, controller: &Gamepad, pad: *mut OSControllerPad) {
         if let GamepadService::GilRs(gamepad_id) = controller.service {
             let gamepad = self.api.gamepad(gamepad_id);
 

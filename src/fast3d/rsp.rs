@@ -86,6 +86,12 @@ pub struct RSP {
     pub segments: [usize; MAX_SEGMENTS],
 }
 
+impl Default for RSP {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RSP {
     pub fn new() -> Self {
         RSP {

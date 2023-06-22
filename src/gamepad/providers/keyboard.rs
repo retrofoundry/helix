@@ -13,6 +13,12 @@ impl KeyboardGamepadProvider {
     }
 }
 
+impl Default for KeyboardGamepadProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GamepadProvider for KeyboardGamepadProvider {
     fn scan(&self) -> Vec<Gamepad> {
         let device = Gamepad::new(GamepadService::Keyboard());
@@ -21,7 +27,7 @@ impl GamepadProvider for KeyboardGamepadProvider {
 
     fn process_events(&mut self) {}
 
-    fn read(&self, _controllers: &Gamepad, pad: *mut OSControllerPad) {
+    unsafe fn read(&self, _controllers: &Gamepad, pad: *mut OSControllerPad) {
         unsafe {
             if self.keys.contains(&VirtualKeyCode::X) {
                 (*pad).button |= N64Button::A as u16;

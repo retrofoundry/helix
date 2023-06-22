@@ -24,12 +24,18 @@ pub type GBICommand = fn(
     command: &mut *mut Gfx,
 ) -> GBIResult;
 
+trait GBIDefinition {
+    fn setup(gbi: &mut GBI);
+}
+
 pub struct GBI {
     pub gbi_opcode_table: HashMap<usize, GBICommand>,
 }
 
-trait GBIDefinition {
-    fn setup(gbi: &mut GBI);
+impl Default for GBI {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl GBI {

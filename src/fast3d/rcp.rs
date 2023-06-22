@@ -13,15 +13,21 @@ pub struct RCP {
     pub rsp: RSP,
 }
 
+impl Default for RCP {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RCP {
     pub fn new() -> Self {
-        let mut gbi = GBI::new();
+        let mut gbi = GBI::default();
         gbi.setup();
 
         RCP {
             gbi,
-            rdp: RDP::new(),
-            rsp: RSP::new(),
+            rdp: RDP::default(),
+            rsp: RSP::default(),
         }
     }
 

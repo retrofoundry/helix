@@ -182,8 +182,8 @@ impl Gui {
                 last_cursor,
             },
             draw_menu_callback: Box::new(draw_menu),
-            rcp: RCP::new(),
-            intermediate_graphics_device: GraphicsIntermediateDevice::new(),
+            rcp: RCP::default(),
+            intermediate_graphics_device: GraphicsIntermediateDevice::default(),
             graphics_device,
         })
     }
