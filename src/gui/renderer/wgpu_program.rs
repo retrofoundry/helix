@@ -185,11 +185,11 @@ impl WgpuProgram {
             }};
 
             "#,
-            uv_input = self.on_define(
+            uv_input = self.on_defined(
                 &["USE_TEXTURE0", "USE_TEXTURE1"],
                 "@location(2) uv: vec2<f32>,"
             ),
-            uv_output = self.on_define(
+            uv_output = self.on_defined(
                 &["USE_TEXTURE0", "USE_TEXTURE1"],
                 "@location(1) uv: vec2<f32>,"
             ),
@@ -255,7 +255,7 @@ impl WgpuProgram {
                 return out;
             }}
             "#,
-            uv = self.on_define(&["USE_TEXTURE0", "USE_TEXTURE1"], "out.uv = in.uv;"),
+            uv = self.on_defined(&["USE_TEXTURE0", "USE_TEXTURE1"], "out.uv = in.uv;"),
             fog_params = compute_uniform_fields(),
             color = compute_color(),
         )
@@ -471,7 +471,7 @@ impl WgpuProgram {
                 return texel;
             }}
             "#,
-            tex0_bindings = self.on_define(
+            tex0_bindings = self.on_defined(
                 &["USE_TEXTURE0"],
                 r#"
                 @group(2) @binding(0)
@@ -480,7 +480,7 @@ impl WgpuProgram {
                 var sampler0: sampler;
                 "#
             ),
-            tex1_bindings = self.on_define(
+            tex1_bindings = self.on_defined(
                 &["USE_TEXTURE1"],
                 r#"
                 @group(2) @binding(2)
@@ -505,15 +505,15 @@ impl WgpuProgram {
             a1b = alpha_input_abd(self.combine.a1.b),
             a1c = alpha_input_c(self.combine.a1.c),
             a1d = alpha_input_abd(self.combine.a1.d),
-            sample_texture0 = self.on_define_str(
+            sample_texture0 = self.on_defined_str(
                 &["USE_TEXTURE0"],
                 format!("tex_val0 = textureSampleN64{tex_filter}(texture0, sampler0, in.uv);")
             ),
-            sample_texture1 = self.on_define_str(
+            sample_texture1 = self.on_defined_str(
                 &["USE_TEXTURE1"],
                 format!("tex_val1 = textureSampleN64{tex_filter}(texture1, sampler1, in.uv);")
             ),
-            second_pass_combine =  self.on_define(
+            second_pass_combine =  self.on_defined(
                 &["TWO_CYCLE"],
                 r#"
                 // Note that in the second cycle, Tex0 and Tex1 are swapped
@@ -523,26 +523,26 @@ impl WgpuProgram {
                  );
                 "#,
             ),
-            alpha_compare_dither = self.on_define(
+            alpha_compare_dither = self.on_defined(
                 &["USE_ALPHA", "ALPHA_COMPARE_DITHER"],
                 r#"
                 var random_alpha = floor(random(vec3(floor(in.position.xy * (240.0 / f32(frame_uniforms.height))), f32(frame_uniforms.count))) + 0.5);
                 if texel.a < random_alpha { discard; }
                 "#,
             ),
-            alpha_compare_threshold = self.on_define(
+            alpha_compare_threshold = self.on_defined(
                 &["USE_ALPHA", "ALPHA_COMPARE_THRESHOLD"],
                 "if texel.a < blend_uniforms.blend_color.a { discard; }"
             ),
-            texture_edge = self.on_define(
+            texture_edge = self.on_defined(
                 &["USE_ALPHA", "TEXTURE_EDGE"],
                 "if texel.a < 0.125 { discard; }"
             ),
-            alpha_visualizer = self.on_define(
+            alpha_visualizer = self.on_defined(
                 &["USE_ALPHA", "USE_ALPHA_VISUALIZER"],
                 "texel = mix(texel, vec4<f32>(1.0, 0.0, 1.0, 1.0), 0.5);"
             ),
-            blend_fog = self.on_define(
+            blend_fog = self.on_defined(
                 &["USE_FOG"],
                 "texel = vec4<f32>(mix(texel.rgb, blend_uniforms.fog_color.rgb, in.color.a), texel.a);"
             ),
@@ -630,24 +630,20 @@ impl WgpuProgram {
 
     // MARK: - Helpers
 
-    fn on_define(&self, def: &[&str], output: &'static str) -> &str {
-        for d in def {
+    fn on_defined(&self, def: &[&str], output: &'static str) -> &str {
+        if let Some(d) = def.iter().next() {
             if self.get_define_bool(d) {
                 return output;
-            } else {
-                return "";
             }
         }
 
         ""
     }
 
-    fn on_define_str(&self, def: &[&str], output: String) -> String {
-        for d in def {
+    fn on_defined_str(&self, def: &[&str], output: String) -> String {
+        if let Some(d) = def.iter().next() {
             if self.get_define_bool(d) {
                 return output;
-            } else {
-                return "".to_string();
             }
         }
 
