@@ -7,10 +7,7 @@ use imgui_winit_support::winit::{
     window::{Window, WindowBuilder},
 };
 use log::trace;
-use wgpu::{
-    Device, SurfaceConfiguration, SurfaceTexture, TextureDescriptor, TextureFormat, TextureUsages,
-    TextureView,
-};
+use wgpu::{SurfaceConfiguration, SurfaceTexture};
 
 use std::{
     ffi::CStr,
@@ -20,13 +17,13 @@ use std::{
 };
 use winit::{dpi::LogicalSize, platform::run_return::EventLoopExtRunReturn};
 
-use crate::fast3d::graphics::GraphicsIntermediateDevice;
 use crate::fast3d::rcp::RCP;
 use crate::fast3d::rdp::OutputDimensions;
+use crate::{fast3d::graphics::GraphicsIntermediateDevice, gamepad::manager::GamepadManager};
 
 use super::renderer::wgpu_device::WgpuGraphicsDevice;
 
-pub struct Gui {
+pub struct Gui<'a> {
     // window
     pub window: Window,
 
@@ -48,6 +45,9 @@ pub struct Gui {
     draw_menu_callback: Box<dyn Fn(&Ui) + 'static>,
     draw_windows_callback: Box<dyn Fn(&Ui) + 'static>,
 
+    // gamepad
+    gamepad_manager: Option<&'a mut GamepadManager>,
+
     // game renderer
     rcp: RCP,
     pub intermediate_graphics_device: GraphicsIntermediateDevice,
@@ -63,12 +63,13 @@ pub struct EventLoopWrapper {
     event_loop: EventLoop<()>,
 }
 
-impl Gui {
+impl<'a> Gui<'a> {
     pub fn new<D, W>(
         title: &str,
         event_loop_wrapper: &EventLoopWrapper,
         draw_menu: D,
         draw_windows: W,
+        gamepad_manager: Option<&'a mut GamepadManager>,
     ) -> Result<Self>
     where
         D: Fn(&Ui) + 'static,
@@ -185,37 +186,11 @@ impl Gui {
             },
             draw_menu_callback: Box::new(draw_menu),
             draw_windows_callback: Box::new(draw_windows),
+            gamepad_manager,
             rcp: RCP::default(),
             intermediate_graphics_device: GraphicsIntermediateDevice::default(),
             graphics_device,
         })
-    }
-
-    fn create_depth_texture(
-        device: &Device,
-        config: &SurfaceConfiguration,
-        label: &str,
-    ) -> TextureView {
-        let size = wgpu::Extent3d {
-            // 2.
-            width: config.width,
-            height: config.height,
-            depth_or_array_layers: 1,
-        };
-        let desc = TextureDescriptor {
-            label: Some(label),
-            size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: TextureFormat::Depth32Float,
-            usage: TextureUsages::RENDER_ATTACHMENT // 3.
-                | TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        };
-        let texture = device.create_texture(&desc);
-
-        texture.create_view(&wgpu::TextureViewDescriptor::default())
     }
 
     fn handle_events(&mut self, event_loop_wrapper: &mut EventLoopWrapper) {
@@ -243,7 +218,24 @@ impl Gui {
                         self.surface_config.width = size.width.max(1);
                         self.surface_config.height = size.height.max(1);
                         self.surface.configure(&self.device, &self.surface_config);
-                        self.graphics_device.resize(&self.surface_config, &self.device);
+                        self.graphics_device
+                            .resize(&self.surface_config, &self.device);
+                    }
+                    Event::WindowEvent {
+                        event: WindowEvent::ModifiersChanged(modifiers),
+                        ..
+                    } => {
+                        if let Some(gamepad_manager) = self.gamepad_manager.as_mut() {
+                            gamepad_manager.handle_modifiers_changed(modifiers);
+                        }
+                    }
+                    Event::WindowEvent {
+                        event: WindowEvent::KeyboardInput { input, .. },
+                        ..
+                    } => {
+                        if let Some(gamepad_manager) = self.gamepad_manager.as_mut() {
+                            gamepad_manager.handle_keyboard_input(input);
+                        }
                     }
                     Event::WindowEvent {
                         event: WindowEvent::CloseRequested,
@@ -345,10 +337,16 @@ impl Gui {
                     });
 
             // Draw the RCP output
-            for (index, draw_call) in self.intermediate_graphics_device.draw_calls.iter().enumerate() {
+            for (index, draw_call) in self
+                .intermediate_graphics_device
+                .draw_calls
+                .iter()
+                .enumerate()
+            {
                 assert!(!draw_call.vbo.vbo.is_empty());
 
-                self.graphics_device.update_current_height(draw_call.viewport.w as i32);
+                self.graphics_device
+                    .update_current_height(draw_call.viewport.w as i32);
 
                 self.graphics_device.select_program(
                     &self.device,
@@ -389,7 +387,7 @@ impl Gui {
                     &self.queue,
                     draw_call.projection_matrix,
                     &draw_call.fog,
-                    &draw_call.uniforms
+                    &draw_call.uniforms,
                 );
 
                 // create pipeline
@@ -481,12 +479,13 @@ pub extern "C" fn GUICreateEventLoop() -> Box<EventLoopWrapper> {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn GUICreate(
+pub unsafe extern "C" fn GUICreate<'a>(
     title_raw: *const i8,
-    event_loop: Option<&mut EventLoopWrapper>,
+    event_loop: Option<&'a mut EventLoopWrapper>,
     draw_menu: Option<OnDraw>,
     draw_windows: Option<OnDraw>,
-) -> Box<Gui> {
+    gamepad_manager: Option<&'a mut GamepadManager>,
+) -> Box<Gui<'a>> {
     let title_str: &CStr = unsafe { CStr::from_ptr(title_raw) };
     let title: &str = str::from_utf8(title_str.to_bytes()).unwrap();
 
@@ -504,6 +503,7 @@ pub unsafe extern "C" fn GUICreate(
                 draw_windows(ui);
             }
         },
+        gamepad_manager,
     )
     .unwrap();
 

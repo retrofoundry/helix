@@ -8,7 +8,7 @@ name = "helix"
 crate-type = ["lib", "staticlib"]
 
 [features]
-default = ["f3dex2", "wgpu"]
+default = ["f3dex2", "opengl"]
 
 # Graphics Features
 f3dex2 = []

@@ -19,9 +19,7 @@ use crate::gamepad::manager::GamepadManager;
 
 use super::renderer::glium_device::GliumGraphicsDevice;
 
-// use super::renderer::opengl_device::OpenGLGraphicsDevice;
-
-pub struct Gui<'render> {
+pub struct Gui<'a> {
     // window
     pub display: glium::Display,
 
@@ -40,12 +38,12 @@ pub struct Gui<'render> {
     draw_windows_callback: Box<dyn Fn(&Ui) + 'static>,
 
     // gamepad
-    keyboard_manager: Option<&'render mut GamepadManager>,
+    gamepad_manager: Option<&'a mut GamepadManager>,
 
     // game renderer
     rcp: RCP,
     pub intermediate_graphics_device: GraphicsIntermediateDevice,
-    graphics_device: GliumGraphicsDevice<'render>,
+    graphics_device: GliumGraphicsDevice<'a>,
 }
 
 pub struct UIState {
@@ -56,13 +54,13 @@ pub struct EventLoopWrapper {
     event_loop: EventLoop<()>,
 }
 
-impl<'render> Gui<'render> {
+impl<'a> Gui<'a> {
     pub fn new<D, W>(
         title: &str,
         event_loop_wrapper: &EventLoopWrapper,
         draw_menu: D,
         draw_windows: W,
-        keyboard_manager: Option<&'render mut GamepadManager>,
+        gamepad_manager: Option<&'a mut GamepadManager>,
     ) -> Result<Self>
     where
         D: Fn(&Ui) + 'static,
@@ -126,7 +124,7 @@ impl<'render> Gui<'render> {
             ui_state: UIState { last_frame_time },
             draw_menu_callback: Box::new(draw_menu),
             draw_windows_callback: Box::new(draw_windows),
-            keyboard_manager,
+            gamepad_manager,
             rcp: RCP::default(),
             intermediate_graphics_device: GraphicsIntermediateDevice::default(),
             graphics_device: GliumGraphicsDevice::default(),
@@ -155,8 +153,8 @@ impl<'render> Gui<'render> {
                     event: WindowEvent::ModifiersChanged(modifiers),
                     ..
                 } => {
-                    if let Some(keyboard_manager) = self.keyboard_manager.as_mut() {
-                        keyboard_manager.handle_modifiers_changed(modifiers);
+                    if let Some(gamepad_manager) = self.gamepad_manager.as_mut() {
+                        gamepad_manager.handle_modifiers_changed(modifiers);
                     }
 
                     // Forward the event over to Dear ImGui
@@ -168,8 +166,8 @@ impl<'render> Gui<'render> {
                     event: WindowEvent::KeyboardInput { input, .. },
                     ..
                 } => {
-                    if let Some(keyboard_manager) = self.keyboard_manager.as_mut() {
-                        keyboard_manager.handle_keyboard_input(input);
+                    if let Some(gamepad_manager) = self.gamepad_manager.as_mut() {
+                        gamepad_manager.handle_keyboard_input(input);
                     }
 
                     // Forward the event over to Dear ImGui
@@ -352,13 +350,13 @@ pub extern "C" fn GUICreateEventLoop() -> Box<EventLoopWrapper> {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn GUICreate<'render>(
+pub unsafe extern "C" fn GUICreate<'a>(
     title_raw: *const i8,
-    event_loop: Option<&'render mut EventLoopWrapper>,
+    event_loop: Option<&'a mut EventLoopWrapper>,
     draw_menu: Option<OnDraw>,
     draw_windows: Option<OnDraw>,
-    keyboard_manager: Option<&'render mut GamepadManager>,
-) -> Box<Gui<'render>> {
+    gamepad_manager: Option<&'a mut GamepadManager>,
+) -> Box<Gui<'a>> {
     let title_str: &CStr = unsafe { CStr::from_ptr(title_raw) };
     let title: &str = str::from_utf8(title_str.to_bytes()).unwrap();
 
@@ -376,7 +374,7 @@ pub unsafe extern "C" fn GUICreate<'render>(
                 draw_windows(ui);
             }
         },
-        keyboard_manager,
+        gamepad_manager,
     )
     .unwrap();
 

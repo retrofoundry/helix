@@ -604,7 +604,11 @@ impl F3DEX2 {
             rdp.add_to_buf_vbo(vertex.position.x);
             rdp.add_to_buf_vbo(vertex.position.y);
             rdp.add_to_buf_vbo(vertex.position.z);
-            rdp.add_to_buf_vbo(if is_drawing_rect { 0.0 } else { vertex.position.w });
+            rdp.add_to_buf_vbo(if is_drawing_rect {
+                0.0
+            } else {
+                vertex.position.w
+            });
 
             rdp.add_to_buf_vbo(vertex.color.r);
             rdp.add_to_buf_vbo(vertex.color.g);

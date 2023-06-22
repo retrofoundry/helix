@@ -203,29 +203,26 @@ impl WgpuProgram {
     fn generate_vertex(&mut self) -> String {
         let compute_uniform_fields = || {
             if self.get_define_bool("USE_FOG") {
-                return format!(
-                    r#"
+                return r#"
                     fog_multiplier: f32,
                     fog_offset: f32,
                     "#
-                );
+                .to_string();
             }
 
-            return "_pad: vec2<f32>,".to_string();
+            "_pad: vec2<f32>,".to_string()
         };
 
         let compute_color = || {
             if self.get_define_bool("USE_FOG") {
-                return format!(
-                    r#"
+                return r#"
                     var fog_value = (max(0.0, out.position.z) - out.position.w) * uniforms.fog_multiplier + uniforms.fog_offset;
                     fog_value = clamp(fog_value, 0.0, 255.0);
                     out.color = vec4<f32>(in.color.xyz, fog_value);
-                    "#
-                );
+                    "#.to_string();
             }
 
-            return "out.color = in.color;".to_string();
+            "out.color = in.color;".to_string()
         };
 
         format!(
