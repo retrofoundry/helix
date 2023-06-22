@@ -1,5 +1,4 @@
 pub const MAX_N64_AXIS_RANGE: f32 = 80.0;
-const OCTAGON_ANGLE_THRESHOLD: f32 = 5.0;
 const DEADZONE_PERCENTAGE: f32 = 0.15;
 
 fn normalize_stick_value(value: f32, max_range: f32) -> f32 {

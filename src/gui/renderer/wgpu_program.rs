@@ -32,6 +32,7 @@ pub struct WgpuProgram {
     // configurators
     other_mode_h: u32,
     other_mode_l: u32,
+    geometry_mode: u32,
     combine: CombineParams,
 
     pub num_floats: usize,
@@ -95,7 +96,12 @@ impl WgpuProgram {
 
     // MARK: - Defaults
 
-    pub fn new(other_mode_h: u32, other_mode_l: u32, combine: CombineParams) -> Self {
+    pub fn new(
+        other_mode_h: u32,
+        other_mode_l: u32,
+        geometry_mode: u32,
+        combine: CombineParams,
+    ) -> Self {
         Self {
             processed_shader: "".to_string(),
             compiled_program: None,
@@ -107,6 +113,7 @@ impl WgpuProgram {
 
             other_mode_h,
             other_mode_l,
+            geometry_mode,
             combine,
 
             num_floats: 0,
@@ -163,6 +170,8 @@ impl WgpuProgram {
             const tHalf = vec4<f32>(0.5 ,0.5, 0.5, 0.5);
             const tOne = vec4<f32>(1.0 ,1.0, 1.0, 1.0);
 
+            const DRAWING_RECT: f32 = 0.0;
+
             struct VertexInput {{
                 @location(0) position: vec4<f32>,
                 @location(1) color: vec4<f32>,
@@ -175,57 +184,81 @@ impl WgpuProgram {
                 @builtin(position) position: vec4<f32>,
             }};
 
-            fn srand(val1: u32, val2: u32) -> u32 {{
-                var backoff = 16;
-
-                var v0: u32 = val1;
-                var v1: u32 = val2;
-                var s0: u32 = 0u;
-
-                for (var n = 0; n < backoff; n += 1) {{
-                    s0 = s0 + 0x9e3779b9u;
-                    v0 = v0 + ((v1 << 4u) + 0xa341316cu) ^ (v1 + s0) ^ ((v1 >> 5u) + 0xc8013ea4u);
-                    v1 = v1 + ((v0 << 4u) + 0xad90777du) ^ (v0 + s0) ^ ((v0 >> 5u) + 0x7e95761eu);
-                }}
-
-                return v0;
-            }}
-
-            fn urand(s: u32) -> u32 {{
-                return (1664525u * s + 1013904223u);
-            }}
-
-            // Returns a pseudorandom float in [0..1]
-            fn rand(s: u32) -> f32 {{
-                return f32(s & 0x00FFFFFFu) / 16777216.0;
-            }}
-
             "#,
-            uv_input = self.on_define(
+            uv_input = self.on_defined(
                 &["USE_TEXTURE0", "USE_TEXTURE1"],
                 "@location(2) uv: vec2<f32>,"
             ),
-            uv_output = self.on_define(
+            uv_output = self.on_defined(
                 &["USE_TEXTURE0", "USE_TEXTURE1"],
                 "@location(1) uv: vec2<f32>,"
             ),
         );
 
-        self.vertex = format!(
+        self.vertex = self.generate_vertex();
+
+        self.fragment = self.generate_fragment();
+    }
+
+    fn generate_vertex(&mut self) -> String {
+        let compute_uniform_fields = || {
+            if self.get_define_bool("USE_FOG") {
+                return r#"
+                    fog_multiplier: f32,
+                    fog_offset: f32,
+                    "#
+                .to_string();
+            }
+
+            "_pad: vec2<f32>,".to_string()
+        };
+
+        let compute_color = || {
+            if self.get_define_bool("USE_FOG") {
+                return r#"
+                    var fog_value = (max(0.0, out.position.z) - out.position.w) * uniforms.fog_multiplier + uniforms.fog_offset;
+                    fog_value = clamp(fog_value, 0.0, 255.0);
+                    out.color = vec4<f32>(in.color.xyz, fog_value);
+                    "#.to_string();
+            }
+
+            "out.color = in.color;".to_string()
+        };
+
+        format!(
             r#"
+            struct Uniforms {{
+                projection_matrix: mat4x4<f32>,
+                {fog_params}
+            }}
+
+            @group(0) @binding(0)
+            var<uniform> uniforms: Uniforms;
+
             @vertex
             fn vs_main(in: VertexInput) -> VertexOutput {{
                 var out: VertexOutput;
+
+                if (in.position.w == DRAWING_RECT) {{
+                    out.position = uniforms.projection_matrix * vec4<f32>(in.position.xyz, 1.0);
+                }} else {{
+                    out.position = uniforms.projection_matrix * in.position;
+                }}
+
+                // map z to [0, 1]
+                out.position.z = (out.position.z + out.position.w) / (2.0 * out.position.w);
+
+                {color}
+
                 {uv}
-                out.color = in.color;
-                out.position = in.position;
+
                 return out;
             }}
             "#,
-            uv = self.on_define(&["USE_TEXTURE0", "USE_TEXTURE1"], "out.uv = in.uv;"),
-        );
-
-        self.fragment = self.generate_fragment();
+            uv = self.on_defined(&["USE_TEXTURE0", "USE_TEXTURE1"], "out.uv = in.uv;"),
+            fog_params = compute_uniform_fields(),
+            color = compute_color(),
+        )
     }
 
     fn generate_fragment(&mut self) -> String {
@@ -336,7 +369,7 @@ impl WgpuProgram {
             r#"
             struct BlendParamsUniforms {{
                 blend_color: vec4<f32>,
-                fog_color: vec3<f32>,
+                fog_color: vec4<f32>,
             }};
             
             struct CombineParamsUniforms {{
@@ -354,11 +387,11 @@ impl WgpuProgram {
                 height: u32,
             }};
 
-            @group(0) @binding(0)
+            @group(1) @binding(0)
             var<uniform> blend_uniforms: BlendParamsUniforms;
-            @group(0) @binding(1)
+            @group(1) @binding(1)
             var<uniform> combine_uniforms: CombineParamsUniforms;
-            @group(0) @binding(2)
+            @group(1) @binding(2)
             var<uniform> frame_uniforms: FrameUniforms;
 
             {tex0_bindings}
@@ -416,10 +449,8 @@ impl WgpuProgram {
 
                 {sample_texture0}
                 {sample_texture1}
-
-                var random_seed = srand(frame_uniforms.count, u32(in.position.x) * u32(in.position.y) * (240u / frame_uniforms.height));
-                random_seed = urand(random_seed);
-                var noise = rand(random_seed);
+                
+                var noise = (random(vec3(floor(in.position.xy * (240.0 / f32(frame_uniforms.height))), f32(frame_uniforms.count))) + 1.0) / 2.0;
 
                 var texel = vec4<f32>(
                     combineColorCycle0(tHalf, in.color, tex_val0, tex_val1, noise),
@@ -440,21 +471,21 @@ impl WgpuProgram {
                 return texel;
             }}
             "#,
-            tex0_bindings = self.on_define(
+            tex0_bindings = self.on_defined(
                 &["USE_TEXTURE0"],
                 r#"
-                @group(1) @binding(0)
+                @group(2) @binding(0)
                 var texture0: texture_2d<f32>;
-                @group(1) @binding(1)
+                @group(2) @binding(1)
                 var sampler0: sampler;
                 "#
             ),
-            tex1_bindings = self.on_define(
+            tex1_bindings = self.on_defined(
                 &["USE_TEXTURE1"],
                 r#"
-                @group(1) @binding(2)
+                @group(2) @binding(2)
                 var texture1: texture_2d<f32>;
-                @group(1) @binding(3)
+                @group(2) @binding(3)
                 var sampler1: sampler;
             "#
             ),
@@ -474,15 +505,15 @@ impl WgpuProgram {
             a1b = alpha_input_abd(self.combine.a1.b),
             a1c = alpha_input_c(self.combine.a1.c),
             a1d = alpha_input_abd(self.combine.a1.d),
-            sample_texture0 = self.on_define_str(
+            sample_texture0 = self.on_defined_str(
                 &["USE_TEXTURE0"],
                 format!("tex_val0 = textureSampleN64{tex_filter}(texture0, sampler0, in.uv);")
             ),
-            sample_texture1 = self.on_define_str(
+            sample_texture1 = self.on_defined_str(
                 &["USE_TEXTURE1"],
                 format!("tex_val1 = textureSampleN64{tex_filter}(texture1, sampler1, in.uv);")
             ),
-            second_pass_combine =  self.on_define(
+            second_pass_combine =  self.on_defined(
                 &["TWO_CYCLE"],
                 r#"
                 // Note that in the second cycle, Tex0 and Tex1 are swapped
@@ -492,26 +523,26 @@ impl WgpuProgram {
                  );
                 "#,
             ),
-            alpha_compare_dither = self.on_define(
+            alpha_compare_dither = self.on_defined(
                 &["USE_ALPHA", "ALPHA_COMPARE_DITHER"],
                 r#"
-                random_seed = urand(random_seed);
-                if texel.a < rand(random_seed) { discard; }
+                var random_alpha = floor(random(vec3(floor(in.position.xy * (240.0 / f32(frame_uniforms.height))), f32(frame_uniforms.count))) + 0.5);
+                if texel.a < random_alpha { discard; }
                 "#,
             ),
-            alpha_compare_threshold = self.on_define(
+            alpha_compare_threshold = self.on_defined(
                 &["USE_ALPHA", "ALPHA_COMPARE_THRESHOLD"],
                 "if texel.a < blend_uniforms.blend_color.a { discard; }"
             ),
-            texture_edge = self.on_define(
+            texture_edge = self.on_defined(
                 &["USE_ALPHA", "TEXTURE_EDGE"],
                 "if texel.a < 0.125 { discard; }"
             ),
-            alpha_visualizer = self.on_define(
+            alpha_visualizer = self.on_defined(
                 &["USE_ALPHA", "USE_ALPHA_VISUALIZER"],
                 "texel = mix(texel, vec4<f32>(1.0, 0.0, 1.0, 1.0), 0.5);"
             ),
-            blend_fog = self.on_define(
+            blend_fog = self.on_defined(
                 &["USE_FOG"],
                 "texel = vec4<f32>(mix(texel.rgb, blend_uniforms.fog_color.rgb, in.color.a), texel.a);"
             ),
@@ -599,24 +630,20 @@ impl WgpuProgram {
 
     // MARK: - Helpers
 
-    fn on_define(&self, def: &[&str], output: &'static str) -> &str {
-        for d in def {
+    fn on_defined(&self, def: &[&str], output: &'static str) -> &str {
+        if let Some(d) = def.iter().next() {
             if self.get_define_bool(d) {
                 return output;
-            } else {
-                return "";
             }
         }
 
         ""
     }
 
-    fn on_define_str(&self, def: &[&str], output: String) -> String {
-        for d in def {
+    fn on_defined_str(&self, def: &[&str], output: String) -> String {
+        if let Some(d) = def.iter().next() {
             if self.get_define_bool(d) {
                 return output;
-            } else {
-                return "".to_string();
             }
         }
 

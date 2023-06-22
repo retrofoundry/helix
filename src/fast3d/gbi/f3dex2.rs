@@ -279,8 +279,8 @@ impl F3DEX2 {
                 rdp.calculate_and_set_viewport(*viewport);
             }
             index if index == F3DEX2::G_MV_MATRIX => {
-                assert!(true, "Unimplemented move matrix");
-                unsafe { *command = (*command).add(1) };
+                panic!("Unimplemented move matrix");
+                // unsafe { *command = (*command).add(1) };
             }
             index if index == F3DEX2::G_MV_LIGHT => {
                 let index = offset / 24;
@@ -290,7 +290,7 @@ impl F3DEX2 {
                     rsp.set_look_at(index, w1);
                 }
             }
-            _ => assert!(true, "Unimplemented move_mem command"),
+            _ => panic!("Unimplemented move_mem command"),
         }
 
         GBIResult::Continue
@@ -332,7 +332,7 @@ impl F3DEX2 {
             }
             // TODO: G_MW_MATRIX
             _ => {
-                assert!(false, "Unknown moveword type: {}", m_type)
+                // panic!("Unknown moveword type: {}", m_type);
             }
         }
 
@@ -598,22 +598,17 @@ impl F3DEX2 {
         let current_tile = rdp.tile_descriptors[rdp.texture_state.tile as usize];
         let tex_width = current_tile.get_width();
         let tex_height = current_tile.get_height();
-
-        let z_is_from_0_to_1 = gfx_device.is_z_from_0_to_1();
-
         let use_texture = rdp.combine.uses_texture0() || rdp.combine.uses_texture1();
 
         for vertex in &vertex_array {
-            let mut z = vertex.position.z;
-            let w = vertex.position.w;
-            if z_is_from_0_to_1 {
-                z = (z + w) / 2.0;
-            }
-
             rdp.add_to_buf_vbo(vertex.position.x);
             rdp.add_to_buf_vbo(vertex.position.y);
-            rdp.add_to_buf_vbo(z);
-            rdp.add_to_buf_vbo(if is_drawing_rect { 0.0 } else { w });
+            rdp.add_to_buf_vbo(vertex.position.z);
+            rdp.add_to_buf_vbo(if is_drawing_rect {
+                0.0
+            } else {
+                vertex.position.w
+            });
 
             rdp.add_to_buf_vbo(vertex.color.r);
             rdp.add_to_buf_vbo(vertex.color.g);

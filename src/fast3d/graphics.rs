@@ -259,14 +259,6 @@ impl GraphicsIntermediateDevice {
         draw_call.textures[index] = None;
     }
 
-    pub fn is_z_from_0_to_1(&self) -> bool {
-        // false for OpenGL, true for WGPU
-        #[cfg(feature = "opengl")]
-        return false;
-        #[cfg(feature = "wgpu")]
-        return true;
-    }
-
     pub fn set_program_params(
         &mut self,
         other_mode_h: u32,
