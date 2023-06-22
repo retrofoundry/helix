@@ -76,7 +76,6 @@ impl<'a> Gui<'a> {
 
         let context = glutin::ContextBuilder::new()
             .with_depth_buffer(24)
-            .with_double_buffer(Some(true))
             .with_gl(GlRequest::Latest)
             .with_vsync(true);
 
