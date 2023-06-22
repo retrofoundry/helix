@@ -30,7 +30,7 @@ void AudioPlayerQueueBuffer(void* player, const uint8_t* buf, size_t len);
 
 // GUI
 void* GUICreateEventLoop(void);
-void* GUICreate(const char* title, void* event_loop, void (*draw_menu_callback)(void*), void (*draw_windows_callback)(void*));
+void* GUICreate(const char* title, void* event_loop, void (*draw_menu_callback)(void*), void (*draw_windows_callback)(void*), void* gamepad_manager);
 void* GUIStartFrame(void* gui, void* event_loop);
 void GUIDrawLists(void* gui, void* frame, uint64_t* commands);
 void GUIEndFrame(void* gui);

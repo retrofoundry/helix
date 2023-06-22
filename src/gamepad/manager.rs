@@ -1,3 +1,5 @@
+use winit::event::{KeyboardInput, ModifiersState};
+
 use super::providers::gilrs::GirlsGamepadProvider;
 use super::types::{GamepadBits, OSControllerPad};
 use crate::gamepad::providers::keyboard::KeyboardGamepadProvider;
@@ -69,6 +71,19 @@ impl GamepadManager {
 
         unsafe {
             *self.gamepad_bits = if !self.gamepads.is_empty() { 1 } else { 0 };
+        }
+    }
+
+    // Keyboard Handlind Methods (from Window)
+    pub fn handle_keyboard_input(&mut self, input: KeyboardInput) {
+        for provider in &mut self.providers {
+            provider.handle_keyboard_input(input);
+        }
+    }
+
+    pub fn handle_modifiers_changed(&mut self, modifiers: ModifiersState) {
+        for provider in &mut self.providers {
+            provider.handle_modifiers_changed(modifiers);
         }
     }
 }

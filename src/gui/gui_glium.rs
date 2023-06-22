@@ -15,6 +15,7 @@ use winit::platform::run_return::EventLoopExtRunReturn;
 use crate::fast3d::graphics::GraphicsIntermediateDevice;
 use crate::fast3d::rcp::RCP;
 use crate::fast3d::rdp::OutputDimensions;
+use crate::gamepad::manager::GamepadManager;
 
 use super::renderer::glium_device::GliumGraphicsDevice;
 
@@ -38,6 +39,9 @@ pub struct Gui<'render> {
     draw_menu_callback: Box<dyn Fn(&Ui) + 'static>,
     draw_windows_callback: Box<dyn Fn(&Ui) + 'static>,
 
+    // gamepad
+    keyboard_manager: Option<&'render mut GamepadManager>,
+
     // game renderer
     rcp: RCP,
     pub intermediate_graphics_device: GraphicsIntermediateDevice,
@@ -58,6 +62,7 @@ impl<'render> Gui<'render> {
         event_loop_wrapper: &EventLoopWrapper,
         draw_menu: D,
         draw_windows: W,
+        keyboard_manager: Option<&'render mut GamepadManager>,
     ) -> Result<Self>
     where
         D: Fn(&Ui) + 'static,
@@ -121,6 +126,7 @@ impl<'render> Gui<'render> {
             ui_state: UIState { last_frame_time },
             draw_menu_callback: Box::new(draw_menu),
             draw_windows_callback: Box::new(draw_windows),
+            keyboard_manager,
             rcp: RCP::new(),
             intermediate_graphics_device: GraphicsIntermediateDevice::new(),
             graphics_device: GliumGraphicsDevice::new(),
@@ -144,6 +150,33 @@ impl<'render> Gui<'render> {
                 } => {
                     let gl_window = self.display.gl_window();
                     gl_window.resize(size);
+                }
+                // handle modifier changed event
+                Event::WindowEvent {
+                    event: WindowEvent::ModifiersChanged(modifiers),
+                    ..
+                } => {
+                    if let Some(keyboard_manager) = self.keyboard_manager.as_mut() {
+                        keyboard_manager.handle_modifiers_changed(modifiers);
+                    }
+
+                    // Forward the event over to Dear ImGui
+                    let gl_window = self.display.gl_window();
+                    self.platform
+                        .handle_event(self.imgui.io_mut(), gl_window.window(), &event);
+                }
+                Event::WindowEvent {
+                    event: WindowEvent::KeyboardInput { input, .. },
+                    ..
+                } => {
+                    if let Some(keyboard_manager) = self.keyboard_manager.as_mut() {
+                        keyboard_manager.handle_keyboard_input(input);
+                    }
+
+                    // Forward the event over to Dear ImGui
+                    let gl_window = self.display.gl_window();
+                    self.platform
+                        .handle_event(self.imgui.io_mut(), gl_window.window(), &event);
                 }
                 event => {
                     let gl_window = self.display.gl_window();
@@ -321,12 +354,13 @@ pub extern "C" fn GUICreateEventLoop() -> Box<EventLoopWrapper> {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn GUICreate(
+pub unsafe extern "C" fn GUICreate<'render>(
     title_raw: *const i8,
-    event_loop: Option<&mut EventLoopWrapper>,
+    event_loop: Option<&'render mut EventLoopWrapper>,
     draw_menu: Option<OnDraw>,
     draw_windows: Option<OnDraw>,
-) -> Box<Gui> {
+    keyboard_manager: Option<&'render mut GamepadManager>,
+) -> Box<Gui<'render>> {
     let title_str: &CStr = unsafe { CStr::from_ptr(title_raw) };
     let title: &str = str::from_utf8(title_str.to_bytes()).unwrap();
 
@@ -344,6 +378,7 @@ pub unsafe extern "C" fn GUICreate(
                 draw_windows(ui);
             }
         },
+        keyboard_manager,
     )
     .unwrap();
 

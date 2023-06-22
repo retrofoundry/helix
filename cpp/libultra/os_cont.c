@@ -3,11 +3,11 @@
 
 void *_gamepad_manager;
 
-s32 osContInit(OSMesgQueue *mq, u8 *controller_bits, OSContStatus *status) {
-    if (_gamepad_manager == NULL) {
-        _gamepad_manager = GamepadManagerCreate();
-    }
+void _osContInternalSetup(void* gamepad_manager) {
+    _gamepad_manager = GamepadManagerCreate();
+}
 
+s32 osContInit(OSMesgQueue *mq, u8 *controller_bits, OSContStatus *status) {
     return GamepadManagerInit(_gamepad_manager, controller_bits);
 }
 
