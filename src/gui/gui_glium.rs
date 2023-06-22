@@ -151,7 +151,6 @@ impl<'render> Gui<'render> {
                     let gl_window = self.display.gl_window();
                     gl_window.resize(size);
                 }
-                // handle modifier changed event
                 Event::WindowEvent {
                     event: WindowEvent::ModifiersChanged(modifiers),
                     ..
@@ -188,27 +187,26 @@ impl<'render> Gui<'render> {
     }
 
     fn sync_frame_rate(&mut self) {
-        // TODO: Fix off by one error & test other OSes
-        const FRAME_INTERVAL_MS: u64 = 1000 / (30 + 1) as u64;
+        const FRAME_INTERVAL_MS: u64 = 1000 / 30;
 
         let frame_duration = self.ui_state.last_frame_time.elapsed();
-
         if frame_duration < Duration::from_millis(FRAME_INTERVAL_MS) {
             let sleep_duration = Duration::from_millis(FRAME_INTERVAL_MS) - frame_duration;
             spin_sleep::sleep(sleep_duration);
         }
+
+        let now = Instant::now();
+
+        self.imgui
+            .io_mut()
+            .update_delta_time(now - self.ui_state.last_frame_time);
+
+        self.ui_state.last_frame_time = now;
     }
 
     pub fn start_frame(&mut self, event_loop_wrapper: &mut EventLoopWrapper) -> Result<Frame> {
         // Handle events
         self.handle_events(event_loop_wrapper);
-
-        // Update delta time
-        let now = Instant::now();
-        self.imgui
-            .io_mut()
-            .update_delta_time(now - self.ui_state.last_frame_time);
-        self.ui_state.last_frame_time = now;
 
         // Grab current window size and store them
         let size = self.display.gl_window().window().inner_size();
