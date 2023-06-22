@@ -249,6 +249,12 @@ pub struct RDP {
     pub color_image: usize,
 }
 
+impl Default for RDP {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RDP {
     pub fn new() -> Self {
         RDP {

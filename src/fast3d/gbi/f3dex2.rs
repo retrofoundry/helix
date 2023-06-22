@@ -180,17 +180,15 @@ impl F3DEX2 {
 
         let params = get_cmd(w0, 0, 8) as u8 ^ G_MTX::PUSH;
 
-        let matrix: Mat4;
-
-        if cfg!(feature = "gbifloats") {
+        let matrix = if cfg!(feature = "gbifloats") {
             let addr = rsp.from_segmented(w1) as *const f32;
             let slice = unsafe { slice::from_raw_parts(addr, 16) };
-            matrix = Mat4::from_floats(slice);
+            Mat4::from_floats(slice)
         } else {
             let addr = rsp.from_segmented(w1) as *const i32;
             let slice = unsafe { slice::from_raw_parts(addr, 16) };
-            matrix = Mat4::from_fixed_point(slice);
-        }
+            Mat4::from_fixed_point(slice)
+        };
 
         if params & G_MTX::PROJECTION != 0 {
             if (params & G_MTX::LOAD) != 0 {
@@ -605,26 +603,26 @@ impl F3DEX2 {
 
         let use_texture = rdp.combine.uses_texture0() || rdp.combine.uses_texture1();
 
-        for i in 0..3 {
-            let mut z = vertex_array[i].position.z;
-            let w = vertex_array[i].position.w;
+        for vertex in &vertex_array {
+            let mut z = vertex.position.z;
+            let w = vertex.position.w;
             if z_is_from_0_to_1 {
                 z = (z + w) / 2.0;
             }
 
-            rdp.add_to_buf_vbo(vertex_array[i].position.x);
-            rdp.add_to_buf_vbo(vertex_array[i].position.y);
+            rdp.add_to_buf_vbo(vertex.position.x);
+            rdp.add_to_buf_vbo(vertex.position.y);
             rdp.add_to_buf_vbo(z);
             rdp.add_to_buf_vbo(if is_drawing_rect { 0.0 } else { w });
 
-            rdp.add_to_buf_vbo(vertex_array[i].color.r);
-            rdp.add_to_buf_vbo(vertex_array[i].color.g);
-            rdp.add_to_buf_vbo(vertex_array[i].color.b);
-            rdp.add_to_buf_vbo(vertex_array[i].color.a);
+            rdp.add_to_buf_vbo(vertex.color.r);
+            rdp.add_to_buf_vbo(vertex.color.g);
+            rdp.add_to_buf_vbo(vertex.color.b);
+            rdp.add_to_buf_vbo(vertex.color.a);
 
             if use_texture {
-                let mut u = (vertex_array[i].uv[0] - (current_tile.uls as f32) * 8.0) / 32.0;
-                let mut v = (vertex_array[i].uv[1] - (current_tile.ult as f32) * 8.0) / 32.0;
+                let mut u = (vertex.uv[0] - (current_tile.uls as f32) * 8.0) / 32.0;
+                let mut v = (vertex.uv[1] - (current_tile.ult as f32) * 8.0) / 32.0;
 
                 if get_textfilter_from_other_mode_h(rdp.other_mode_h) != TextFilt::G_TF_POINT {
                     u += 0.5;

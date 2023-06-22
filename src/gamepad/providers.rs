@@ -13,7 +13,7 @@ pub enum GamepadService {
 pub trait GamepadProvider {
     fn scan(&self) -> Vec<Gamepad>;
     fn process_events(&mut self);
-    fn read(&self, controllers: &Gamepad, pad: *mut OSControllerPad);
+    unsafe fn read(&self, controllers: &Gamepad, pad: *mut OSControllerPad);
 
     fn handle_keyboard_input(&mut self, input: KeyboardInput);
     fn handle_modifiers_changed(&mut self, modifiers: ModifiersState);

@@ -116,6 +116,12 @@ fn clamp_to_glium(clamp: u32) -> SamplerWrapFunction {
     SamplerWrapFunction::Repeat
 }
 
+impl<'draw> Default for GliumGraphicsDevice<'draw> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'draw> GliumGraphicsDevice<'draw> {
     pub fn new() -> Self {
         Self {

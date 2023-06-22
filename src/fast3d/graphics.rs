@@ -221,6 +221,12 @@ pub struct GraphicsIntermediateDevice {
     pub draw_calls: Vec<GraphicsDrawCall>,
 }
 
+impl Default for GraphicsIntermediateDevice {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GraphicsIntermediateDevice {
     pub fn new() -> Self {
         GraphicsIntermediateDevice {

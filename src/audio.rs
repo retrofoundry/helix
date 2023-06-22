@@ -300,7 +300,7 @@ pub extern "C" fn AudioPlayerPause(player: Option<&mut AudioPlayer>) {
 }
 
 #[no_mangle]
-pub extern "C" fn AudioPlayerQueueBuffer(
+pub unsafe extern "C" fn AudioPlayerQueueBuffer(
     player: Option<&mut AudioPlayer>,
     buf: *const u8,
     len: usize,
