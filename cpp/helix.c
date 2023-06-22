@@ -1,13 +1,20 @@
 #include <helix/internal.h>
 
-static void *_event_loop;
-static void *_gui;
-static void *_audio_player;
-static void *_frame;
+void *_event_loop;
+void *_gamepad_manager;
+void *_gui;
+void *_audio_player;
+void *_frame;
 
+// Bridges to setup libultra components
+extern void _osContInternalSetup(void* gamepad_manager);
+
+// Helix
 void HLXInit() {
     HelixInit();
     _event_loop = GUICreateEventLoop();
+    _gamepad_manager = GamepadManagerCreate();
+    _osContInternalSetup(_gamepad_manager);
 }
 
 // Audio
@@ -16,11 +23,11 @@ void HLXAudioSetup(uint32_t sampleRate, uint16_t channels) {
 }
 
 size_t HLXAudioGetBufferredSampleCount() {
-    AudioPlayerGetBufferredSampleCount(_audio_player);
+    return AudioPlayerGetBufferredSampleCount(_audio_player);
 }
 
 size_t HLXAudioGetBufferSize() {
-    AudioPlayerGetBufferSize(_audio_player);
+    return AudioPlayerGetBufferSize(_audio_player);
 }
 
 void HLXAudioPlayBuffer(const uint8_t* buf, size_t len) {
@@ -29,7 +36,7 @@ void HLXAudioPlayBuffer(const uint8_t* buf, size_t len) {
 
 // Window & Graphics
 void HLXDisplaySetup(const char* title, void (*draw_menu)(void*), void (*draw_windows)(void*)) {
-    _gui = GUICreate(title, _event_loop, draw_menu, draw_windows);
+    _gui = GUICreate(title, _event_loop, draw_menu, draw_windows, _gamepad_manager); // pass in a possible keyboard observing object
 }
 
 void HLXDisplayStartFrame() {

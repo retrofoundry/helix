@@ -1339,10 +1339,10 @@ impl F3DEX2 {
             dtdy = -dtdy;
         }
 
-        let width = if !flipped { lrx - ulx } else { lry - uly };
-        let height = if !flipped { lry - uly } else { lrx - ulx };
-        let lrs: i32 = ((uls << 7) as i32 + (dsdx as i32) * width) >> 7;
-        let lrt: i32 = ((ult << 7) as i32 + (dtdy as i32) * height) >> 7;
+        let width = if !flipped { lrx - ulx } else { lry - uly } as i64;
+        let height = if !flipped { lry - uly } else { lrx - ulx } as i64;
+        let lrs: i64 = ((uls << 7) as i64 + (dsdx as i64) * width) >> 7;
+        let lrt: i64 = ((ult << 7) as i64 + (dtdy as i64) * height) >> 7;
 
         let ul = &mut rsp.vertex_table[MAX_VERTICES];
         ul.uv[0] = uls as f32;

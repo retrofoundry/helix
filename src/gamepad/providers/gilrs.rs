@@ -98,4 +98,7 @@ impl GamepadProvider for GirlsGamepadProvider {
             }
         }
     }
+
+    fn handle_keyboard_input(&mut self, _input: winit::event::KeyboardInput) {}
+    fn handle_modifiers_changed(&mut self, _modifiers: winit::event::ModifiersState) {}
 }
