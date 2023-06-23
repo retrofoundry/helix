@@ -17,6 +17,8 @@ pub struct AudioPlayer {
     resample_process_buffers: [Vec<f32>; 2],
     resampled_buffer: Vec<f32>,
     output_stream: cpal::Stream,
+
+    target_fps: u32,
 }
 
 #[derive(Debug)]
@@ -86,7 +88,7 @@ impl AudioPlayer {
                     f_ratio,
                     1.1,
                     PolynomialDegree::Nearest, // Nearest is the fastest, Septic is the best quality
-                    def_conf.sample_rate().0 as usize / 30,
+                    def_conf.sample_rate().0 as usize / 60,
                     2,
                 )?),
             )
@@ -124,6 +126,7 @@ impl AudioPlayer {
             resample_process_buffers: [Vec::new(), Vec::new()],
             resampled_buffer: Vec::new(),
             resampler,
+            target_fps: 60,
         })
     }
 
@@ -252,6 +255,16 @@ pub extern "C" fn AudioPlayerCreate(sample_rate: u32, channels: u16) -> Box<Audi
 pub extern "C" fn AudioPlayerFree(player: Option<Box<AudioPlayer>>) {
     if let Some(player) = player {
         drop(player);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn AudioPlayerSetFPS(player: Option<&mut AudioPlayer>, fps: u32) {
+    match player {
+        Some(player) => player.target_fps = fps,
+        None => {
+            eprintln!("[Audio] failed to set fps: was given an invalid instance pointer");
+        }
     }
 }
 

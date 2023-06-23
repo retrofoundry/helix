@@ -11,6 +11,7 @@ extern "C" {
 #endif
 
 void HLXDisplaySetup(const char* title, void (*draw_menu)(), void (*draw_windows)());
+void HLXDisplaySetFPS(uint32_t fps);
 void HLXDisplayStartFrame();
 void HLXDisplayProcessDrawLists(u64* commands);
 void HLXDisplayEndFrame();

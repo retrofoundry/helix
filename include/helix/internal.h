@@ -20,6 +20,8 @@ bool NetworkFeatureEnabled(void);
 void* AudioPlayerCreate(uint32_t sampleRate, uint16_t channels);
 void AudioPlayerFree(void* player);
 
+void AudioPlayerSetFPS(void* player, uint32_t fps);
+
 size_t AudioPlayerGetBufferredSampleCount(void* player);
 size_t AudioPlayerGetBufferSize(void* player);
 
@@ -31,6 +33,7 @@ void AudioPlayerQueueBuffer(void* player, const uint8_t* buf, size_t len);
 // GUI
 void* GUICreateEventLoop(void);
 void* GUICreate(const char* title, void* event_loop, void (*draw_menu_callback)(void*), void (*draw_windows_callback)(void*), void* gamepad_manager);
+void GUISetFPS(void* gui, uint32_t fps);
 void* GUIStartFrame(void* gui, void* event_loop);
 void GUIDrawLists(void* gui, void* frame, uint64_t* commands);
 void GUIEndFrame(void* gui);

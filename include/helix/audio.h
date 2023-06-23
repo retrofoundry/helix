@@ -9,6 +9,7 @@ extern "C" {
 #endif
 
 void HLXAudioSetup(uint32_t sampleRate, uint16_t channels);
+void HLXAudioSetFPS(uint32_t fps);
 size_t HLXAudioGetBufferredSampleCount();
 size_t HLXAudioGetBufferSize();
 void HLXAudioPlayBuffer(const uint8_t* buf, size_t len);

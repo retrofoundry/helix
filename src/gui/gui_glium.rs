@@ -42,6 +42,7 @@ pub struct Gui<'a> {
 
     // game renderer
     rcp: RCP,
+    pub target_fps: u32,
     pub intermediate_graphics_device: GraphicsIntermediateDevice,
     graphics_device: GliumGraphicsDevice<'a>,
 }
@@ -125,6 +126,7 @@ impl<'a> Gui<'a> {
             draw_windows_callback: Box::new(draw_windows),
             gamepad_manager,
             rcp: RCP::default(),
+            target_fps: 30,
             intermediate_graphics_device: GraphicsIntermediateDevice::default(),
             graphics_device: GliumGraphicsDevice::default(),
         })
@@ -184,11 +186,10 @@ impl<'a> Gui<'a> {
     }
 
     fn sync_frame_rate(&mut self) {
-        const FRAME_INTERVAL_MS: u64 = 1000 / 30;
-
+        let frame_interval_ms: u64 = 1000 / self.target_fps as u64;
         let frame_duration = self.ui_state.last_frame_time.elapsed();
-        if frame_duration < Duration::from_millis(FRAME_INTERVAL_MS) {
-            let sleep_duration = Duration::from_millis(FRAME_INTERVAL_MS) - frame_duration;
+        if frame_duration < Duration::from_millis(frame_interval_ms) {
+            let sleep_duration = Duration::from_millis(frame_interval_ms) - frame_duration;
             spin_sleep::sleep(sleep_duration);
         }
 
@@ -378,6 +379,15 @@ pub unsafe extern "C" fn GUICreate<'a>(
     .unwrap();
 
     Box::new(gui)
+}
+
+#[no_mangle]
+pub extern "C" fn GUISetFPS(
+    gui: Option<&mut Gui>,
+    fps: u32,
+) {
+    let gui = gui.unwrap();
+    gui.target_fps = fps;
 }
 
 #[no_mangle]

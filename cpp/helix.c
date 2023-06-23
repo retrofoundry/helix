@@ -22,6 +22,10 @@ void HLXAudioSetup(uint32_t sampleRate, uint16_t channels) {
     _audio_player = AudioPlayerCreate(32000, 2);
 }
 
+void HLXAudioSetFPS(uint32_t fps) {
+    AudioPlayerSetFPS(_audio_player, fps);
+}
+
 size_t HLXAudioGetBufferredSampleCount() {
     return AudioPlayerGetBufferredSampleCount(_audio_player);
 }
@@ -37,6 +41,10 @@ void HLXAudioPlayBuffer(const uint8_t* buf, size_t len) {
 // Window & Graphics
 void HLXDisplaySetup(const char* title, void (*draw_menu)(void*), void (*draw_windows)(void*)) {
     _gui = GUICreate(title, _event_loop, draw_menu, draw_windows, _gamepad_manager); // pass in a possible keyboard observing object
+}
+
+void HLXDisplaySetFPS(uint32_t fps) {
+    GUISetFPS(_gui, fps);
 }
 
 void HLXDisplayStartFrame() {
