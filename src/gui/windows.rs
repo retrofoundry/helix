@@ -1,11 +1,11 @@
 use imgui::{CollapsingHeader, TreeNode, Ui};
 
-use crate::fast3d::gbi::utils::{geometry_mode_uses_fog, geometry_mode_uses_lighting};
+use fast3d::gbi::utils::{geometry_mode_uses_fog, geometry_mode_uses_lighting};
 
-#[cfg(feature = "glium")]
+#[cfg(feature = "opengl_renderer")]
 use super::gui_glium::Gui;
 
-#[cfg(feature = "wgpu")]
+#[cfg(feature = "wgpu_renderer")]
 use super::gui_wgpu::Gui;
 
 pub trait HelixWindows {

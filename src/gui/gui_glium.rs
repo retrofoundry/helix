@@ -12,12 +12,12 @@ use std::time::Duration;
 use std::{ffi::CStr, result::Result::Ok, time::Instant};
 use winit::platform::run_return::EventLoopExtRunReturn;
 
-use crate::fast3d::graphics::GraphicsIntermediateDevice;
-use crate::fast3d::rcp::RCP;
-use crate::fast3d::rdp::OutputDimensions;
 use crate::gamepad::manager::GamepadManager;
+use fast3d::graphics::GraphicsIntermediateDevice;
+use fast3d::rcp::RCP;
+use fast3d::rdp::OutputDimensions;
 
-use super::renderer::glium_device::GliumGraphicsDevice;
+use fast3d_glium_renderer::glium_device::GliumGraphicsDevice;
 
 pub struct Gui<'a> {
     // window
