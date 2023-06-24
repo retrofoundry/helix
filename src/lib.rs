@@ -1,4 +1,3 @@
-pub mod audio;
 use env_logger::Builder;
 mod extensions;
 pub mod fast3d;
@@ -8,6 +7,8 @@ pub mod gui;
 pub mod network;
 #[cfg(feature = "speech")]
 pub mod speech;
+
+pub use arie;
 
 // Check for invalid feature combinations
 #[cfg(all(feature = "opengl", feature = "wgpu"))]
