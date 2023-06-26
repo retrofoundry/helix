@@ -13,7 +13,7 @@ use std::{ffi::CStr, result::Result::Ok, time::Instant};
 use winit::platform::run_return::EventLoopExtRunReturn;
 
 use crate::gamepad::manager::GamepadManager;
-use fast3d::graphics::GraphicsIntermediateDevice;
+use fast3d::output::RCPOutput;
 use fast3d::rcp::RCP;
 use fast3d::rdp::OutputDimensions;
 
@@ -42,7 +42,7 @@ pub struct Gui<'a> {
 
     // game renderer
     rcp: RCP,
-    pub intermediate_graphics_device: GraphicsIntermediateDevice,
+    pub rcp_output: RCPOutput,
     graphics_device: GliumGraphicsDevice<'a>,
 }
 
@@ -125,7 +125,7 @@ impl<'a> Gui<'a> {
             draw_windows_callback: Box::new(draw_windows),
             gamepad_manager,
             rcp: RCP::default(),
-            intermediate_graphics_device: GraphicsIntermediateDevice::default(),
+            rcp_output: RCPOutput::default(),
             graphics_device: GliumGraphicsDevice::default(),
         })
     }
@@ -248,7 +248,7 @@ impl<'a> Gui<'a> {
     }
 
     fn render_game(&mut self, target: &mut Frame) -> Result<()> {
-        for draw_call in &self.intermediate_graphics_device.draw_calls {
+        for draw_call in &self.rcp_output.draw_calls {
             assert!(!draw_call.vbo.vbo.is_empty());
 
             self.graphics_device.set_cull_mode(draw_call.cull_mode);
@@ -272,11 +272,7 @@ impl<'a> Gui<'a> {
             // loop through textures and bind them
             for (index, hash) in draw_call.textures.iter().enumerate() {
                 if let Some(hash) = hash {
-                    let texture = self
-                        .intermediate_graphics_device
-                        .texture_cache
-                        .get_mut(*hash)
-                        .unwrap();
+                    let texture = self.rcp_output.texture_cache.get_mut(*hash).unwrap();
                     self.graphics_device
                         .bind_texture(&self.display, index, texture);
                 }
@@ -313,8 +309,7 @@ impl<'a> Gui<'a> {
         self.graphics_device.start_frame(&mut frame);
 
         // Run the RCP
-        self.rcp
-            .run(&mut self.intermediate_graphics_device, commands);
+        self.rcp.run(&mut self.rcp_output, commands);
         self.render_game(&mut frame)?;
 
         // Finish rendering
@@ -324,7 +319,7 @@ impl<'a> Gui<'a> {
         self.render(&mut frame)?;
 
         // Clear the draw calls
-        self.intermediate_graphics_device.clear_draw_calls();
+        self.rcp_output.clear_draw_calls();
 
         // Swap buffers
         frame.finish()?;

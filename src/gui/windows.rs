@@ -27,14 +27,14 @@ impl HelixWindows for Ui {
                 ));
 
                 let total_tris = gui
-                    .intermediate_graphics_device
+                    .rcp_output
                     .draw_calls
                     .iter()
                     .fold(0, |acc, draw_call| acc + draw_call.vbo.num_tris);
 
                 self.text(format!(
                     "{} draw calls, {} vertices ({} triangles)",
-                    gui.intermediate_graphics_device.draw_calls.len(),
+                    gui.rcp_output.draw_calls.len(),
                     total_tris * 3,
                     total_tris,
                 ));
@@ -43,12 +43,7 @@ impl HelixWindows for Ui {
 
                 if CollapsingHeader::new("Draw Calls").build(self) {
                     self.indent();
-                    for (i, dc) in gui
-                        .intermediate_graphics_device
-                        .draw_calls
-                        .iter()
-                        .enumerate()
-                    {
+                    for (i, dc) in gui.rcp_output.draw_calls.iter().enumerate() {
                         TreeNode::new(format!("Draw Call: {}", i), self).build(|| {
                             self.text(format!("Viewport: {}", dc.viewport));
                             self.text(format!("Scissor: {:?}", dc.scissor));
