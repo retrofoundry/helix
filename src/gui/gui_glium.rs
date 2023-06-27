@@ -270,7 +270,7 @@ impl<'a> Gui<'a> {
             );
 
             // loop through textures and bind them
-            for (index, hash) in draw_call.textures.iter().enumerate() {
+            for (index, hash) in draw_call.texture_indices.iter().enumerate() {
                 if let Some(hash) = hash {
                     let texture = self.rcp_output.texture_cache.get_mut(*hash).unwrap();
                     self.graphics_device
