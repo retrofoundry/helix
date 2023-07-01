@@ -14,3 +14,7 @@ For details on each of the features provided please see our [documentation](http
 ## How to setup?
 
 For setup and more in-depth information please see our [documentation](https://retrofoundry.github.io/helix/).
+
+## Community
+
+[![](https://dcbadge.vercel.app/api/server/nGckYNTp4w)](https://discord.gg/nGckYNTp4w)
