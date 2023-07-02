@@ -13,9 +13,7 @@ use std::{ffi::CStr, result::Result::Ok, time::Instant};
 use winit::platform::run_return::EventLoopExtRunReturn;
 
 use crate::gamepad::manager::GamepadManager;
-use fast3d::output::RCPOutput;
-use fast3d::rcp::RCP;
-use fast3d::rdp::OutputDimensions;
+use fast3d::{output::RCPOutput, rcp::RCP, rdp::OutputDimensions};
 
 use fast3d_glium_renderer::glium_device::GliumGraphicsDevice;
 
@@ -248,7 +246,14 @@ impl<'a> Gui<'a> {
     }
 
     fn render_game(&mut self, target: &mut Frame) -> Result<()> {
-        for draw_call in &self.rcp_output.draw_calls {
+        // omit the last draw call, because we know we that's an extra from the last flush
+        // for draw_call in &self.rcp_output.draw_calls[..self.rcp_output.draw_calls.len() - 1] {
+        for draw_call in self
+            .rcp_output
+            .draw_calls
+            .iter()
+            .take(self.rcp_output.draw_calls.len() - 1)
+        {
             assert!(!draw_call.vbo.vbo.is_empty());
 
             self.graphics_device.set_cull_mode(draw_call.cull_mode);

@@ -17,11 +17,10 @@ use std::{
 };
 use winit::{dpi::LogicalSize, platform::run_return::EventLoopExtRunReturn};
 
-use crate::fast3d::rcp::RCP;
-use crate::fast3d::rdp::OutputDimensions;
-use crate::{fast3d::graphics::GraphicsIntermediateDevice, gamepad::manager::GamepadManager};
+use crate::gamepad::manager::GamepadManager;
+use fast3d::{output::RCPOutput, rcp::RCP, rdp::OutputDimensions};
 
-use super::renderer::wgpu_device::WgpuGraphicsDevice;
+use fast3d_wgpu_renderer::wgpu_device::WgpuGraphicsDevice;
 
 pub struct Gui<'a> {
     // window
@@ -50,7 +49,7 @@ pub struct Gui<'a> {
 
     // game renderer
     rcp: RCP,
-    pub intermediate_graphics_device: GraphicsIntermediateDevice,
+    pub rcp_output: RCPOutput,
     graphics_device: WgpuGraphicsDevice,
 }
 
@@ -188,7 +187,7 @@ impl<'a> Gui<'a> {
             draw_windows_callback: Box::new(draw_windows),
             gamepad_manager,
             rcp: RCP::default(),
-            intermediate_graphics_device: GraphicsIntermediateDevice::default(),
+            rcp_output: RCPOutput::default(),
             graphics_device,
         })
     }
@@ -253,15 +252,21 @@ impl<'a> Gui<'a> {
     }
 
     fn sync_frame_rate(&mut self) {
-        // TODO: Fix off by one error & test other OSes
-        const FRAME_INTERVAL_MS: u64 = 1000 / (30 + 1) as u64;
+        const FRAME_INTERVAL_MS: u64 = 1000 / 30;
 
         let frame_duration = self.ui_state.last_frame_time.elapsed();
-
         if frame_duration < Duration::from_millis(FRAME_INTERVAL_MS) {
             let sleep_duration = Duration::from_millis(FRAME_INTERVAL_MS) - frame_duration;
             spin_sleep::sleep(sleep_duration);
         }
+
+        let now = Instant::now();
+
+        self.imgui
+            .io_mut()
+            .update_delta_time(now - self.ui_state.last_frame_time);
+
+        self.ui_state.last_frame_time = now;
     }
 
     pub fn start_frame(
@@ -270,13 +275,6 @@ impl<'a> Gui<'a> {
     ) -> Result<Option<SurfaceTexture>> {
         // Handle events
         self.handle_events(event_loop_wrapper);
-
-        // Update delta time
-        let now = Instant::now();
-        self.imgui
-            .io_mut()
-            .update_delta_time(now - self.ui_state.last_frame_time);
-        self.ui_state.last_frame_time = now;
 
         // Start the frame
         let frame = match self.surface.get_current_texture() {
@@ -326,8 +324,7 @@ impl<'a> Gui<'a> {
             self.graphics_device.update_frame_count();
 
             // Run the RCP
-            self.rcp
-                .run(&mut self.intermediate_graphics_device, commands);
+            self.rcp.run(&mut self.rcp_output, commands);
 
             // Setup encoder that the RDP will use
             let mut encoder: wgpu::CommandEncoder =
@@ -337,10 +334,12 @@ impl<'a> Gui<'a> {
                     });
 
             // Draw the RCP output
+            // omit the last draw call, because we know we that's an extra from the last flush
             for (index, draw_call) in self
-                .intermediate_graphics_device
+                .rcp_output
                 .draw_calls
                 .iter()
+                .take(self.rcp_output.draw_calls.len() - 1)
                 .enumerate()
             {
                 assert!(!draw_call.vbo.vbo.is_empty());
@@ -358,13 +357,9 @@ impl<'a> Gui<'a> {
                 );
 
                 // loop through textures and bind them
-                for (index, hash) in draw_call.textures.iter().enumerate() {
+                for (index, hash) in draw_call.texture_indices.iter().enumerate() {
                     if let Some(hash) = hash {
-                        let texture = self
-                            .intermediate_graphics_device
-                            .texture_cache
-                            .get_mut(*hash)
-                            .unwrap();
+                        let texture = self.rcp_output.texture_cache.get_mut(*hash).unwrap();
                         self.graphics_device.bind_texture(
                             &self.device,
                             &self.queue,
@@ -419,7 +414,7 @@ impl<'a> Gui<'a> {
             (self.draw_windows_callback)(ui);
 
             // Reset state
-            self.intermediate_graphics_device.clear_draw_calls();
+            self.rcp_output.clear_draw_calls();
 
             // Finish game encoding and submit
             self.queue.submit(Some(encoder.finish()));
