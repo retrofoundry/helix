@@ -1,4 +1,4 @@
-use imgui::{CollapsingHeader, TreeNode, Ui};
+use imgui::{CollapsingHeader, Ui};
 
 use fast3d::gbi::utils::{geometry_mode_uses_fog, geometry_mode_uses_lighting};
 
@@ -44,62 +44,72 @@ impl HelixWindows for Ui {
                 if CollapsingHeader::new("Draw Calls").build(self) {
                     self.indent();
                     for (i, dc) in gui.rcp_output.draw_calls.iter().enumerate() {
-                        TreeNode::new(format!("Draw Call: {}", i), self).build(|| {
-                            self.text(format!("Viewport: {}", dc.viewport));
-                            self.text(format!("Scissor: {:?}", dc.scissor));
-                            self.text(format!(
-                                "Fog: Mul {} Offset {}",
-                                dc.fog.multiplier, dc.fog.offset
-                            ));
-                            self.text(format!("Cull Mode: {:?}", dc.cull_mode));
+                        self.tree_node_config(format!("Draw Call: {}", i))
+                            .build(|| {
+                                self.text(format!("Viewport: {}", dc.viewport));
+                                self.text(format!("Scissor: {:?}", dc.scissor));
+                                self.text(format!(
+                                    "Fog: Mul {} Offset {}",
+                                    dc.fog.multiplier, dc.fog.offset
+                                ));
+                                self.text(format!("Cull Mode: {:?}", dc.cull_mode));
 
-                            TreeNode::new("Geometry Mode", self).build(|| {
-                                self.text(format!(
-                                    "Lighting: {}",
-                                    geometry_mode_uses_lighting(dc.geometry_mode)
-                                ));
-                                self.text(format!(
-                                    "Fog: {}",
-                                    geometry_mode_uses_fog(dc.geometry_mode)
-                                ));
-                            });
+                                self.tree_node_config("Geometry Mode").build(|| {
+                                    self.text(format!(
+                                        "Lighting: {}",
+                                        geometry_mode_uses_lighting(dc.geometry_mode)
+                                    ));
+                                    self.text(format!(
+                                        "Fog: {}",
+                                        geometry_mode_uses_fog(dc.geometry_mode)
+                                    ));
+                                });
 
-                            TreeNode::new("Uniforms", self).build(|| {
-                                self.text("Blend");
-                                self.indent();
-                                self.text(format!(
-                                    "Blend Color: {}",
-                                    dc.uniforms.blend.blend_color
-                                ));
-                                self.text(format!("Fog Color: {}", dc.uniforms.blend.fog_color));
-                                self.unindent();
-                                self.text("Combine");
-                                self.indent();
-                                self.text(format!(
-                                    "Prim Color: {}",
-                                    dc.uniforms.combine.prim_color
-                                ));
-                                self.text(format!("Env Color: {}", dc.uniforms.combine.env_color));
-                                self.text(format!(
-                                    "Key Center: {}",
-                                    dc.uniforms.combine.key_center
-                                ));
-                                self.text(format!("Key Scale: {}", dc.uniforms.combine.key_scale));
-                                self.text(format!(
-                                    "Prim LOD (Frac/Min): {}",
-                                    dc.uniforms.combine.prim_lod
-                                ));
-                                self.text(format!(
-                                    "Convert K4: {}",
-                                    dc.uniforms.combine.convert_k4
-                                ));
-                                self.text(format!(
-                                    "Convert K5: {}",
-                                    dc.uniforms.combine.convert_k5
-                                ));
-                                self.unindent();
+                                self.tree_node_config("Uniforms").build(|| {
+                                    self.text("Blend");
+                                    self.indent();
+                                    self.text(format!(
+                                        "Blend Color: {}",
+                                        dc.uniforms.blend.blend_color
+                                    ));
+                                    self.text(format!(
+                                        "Fog Color: {}",
+                                        dc.uniforms.blend.fog_color
+                                    ));
+                                    self.unindent();
+                                    self.text("Combine");
+                                    self.indent();
+                                    self.text(format!(
+                                        "Prim Color: {}",
+                                        dc.uniforms.combine.prim_color
+                                    ));
+                                    self.text(format!(
+                                        "Env Color: {}",
+                                        dc.uniforms.combine.env_color
+                                    ));
+                                    self.text(format!(
+                                        "Key Center: {}",
+                                        dc.uniforms.combine.key_center
+                                    ));
+                                    self.text(format!(
+                                        "Key Scale: {}",
+                                        dc.uniforms.combine.key_scale
+                                    ));
+                                    self.text(format!(
+                                        "Prim LOD (Frac/Min): {}",
+                                        dc.uniforms.combine.prim_lod
+                                    ));
+                                    self.text(format!(
+                                        "Convert K4: {}",
+                                        dc.uniforms.combine.convert_k4
+                                    ));
+                                    self.text(format!(
+                                        "Convert K5: {}",
+                                        dc.uniforms.combine.convert_k5
+                                    ));
+                                    self.unindent();
+                                });
                             });
-                        });
                     }
                     self.unindent();
                 }
