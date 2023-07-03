@@ -57,11 +57,11 @@ impl HelixWindows for Ui {
                                 self.tree_node_config("Geometry Mode").build(|| {
                                     self.text(format!(
                                         "Lighting: {}",
-                                        geometry_mode_uses_lighting(dc.geometry_mode)
+                                        geometry_mode_uses_lighting(dc.shader_config.geometry_mode)
                                     ));
                                     self.text(format!(
                                         "Fog: {}",
-                                        geometry_mode_uses_fog(dc.geometry_mode)
+                                        geometry_mode_uses_fog(dc.shader_config.geometry_mode)
                                     ));
                                 });
 

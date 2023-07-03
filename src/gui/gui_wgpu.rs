@@ -349,11 +349,8 @@ impl<'a> Gui<'a> {
 
                 self.graphics_device.select_program(
                     &self.device,
-                    draw_call.shader_hash,
-                    draw_call.other_mode_h,
-                    draw_call.other_mode_l,
-                    draw_call.geometry_mode,
-                    draw_call.combine,
+                    draw_call.shader_id,
+                    draw_call.shader_config,
                 );
 
                 // loop through textures and bind them

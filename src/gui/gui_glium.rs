@@ -265,13 +265,10 @@ impl<'a> Gui<'a> {
             self.graphics_device.set_viewport(&draw_call.viewport);
             self.graphics_device.set_scissor(draw_call.scissor);
 
-            self.graphics_device.load_program(
+            self.graphics_device.select_program(
                 &self.display,
-                draw_call.shader_hash,
-                draw_call.other_mode_h,
-                draw_call.other_mode_l,
-                draw_call.geometry_mode,
-                draw_call.combine,
+                draw_call.shader_id,
+                draw_call.shader_config,
             );
 
             // loop through textures and bind them
