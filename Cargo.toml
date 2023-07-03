@@ -44,12 +44,11 @@ glutin = { version = "0.29.1", optional = true }
 wgpu = { version = "0.16", optional = true }
 spin_sleep = "1.1.1"
 arie = "0.2.0"
-fast3d = { version = "0.2.0", default-features = false }
-fast3d-glium-renderer = { version = "0.2.0", optional = true }
-fast3d-wgpu-renderer = { version = "0.2.0", optional = true }
+fast3d = { version = "0.3.0", default-features = false }
+fast3d-glium-renderer = { version = "0.3.0", optional = true }
+fast3d-wgpu-renderer = { version = "0.3.0", optional = true }
 
 [patch.crates-io]
-glium = { git = "https://github.com/retrofoundry/glium", branch = "helix" }
-fast3d = { git = "https://github.com/retrofoundry/fast3d-rs", rev = "a22c54f4" } # remove once we have our glium fix upstreamed
-fast3d-glium-renderer = { git = "https://github.com/retrofoundry/fast3d-rs", rev = "a22c54f4" } # remove once we have our glium fix upstreamed
-fast3d-wgpu-renderer = { git = "https://github.com/retrofoundry/fast3d-rs", rev = "a22c54f4" } # remove once we have our glium fix upstreamed
+#fast3d = { path = "../../fast3d-rs/fast3d" }
+#fast3d-glium-renderer = { path = "../../fast3d-rs/fast3d-glium-renderer" }
+#fast3d-wgpu-renderer = { path = "../../fast3d-rs/fast3d-wgpu-renderer" }

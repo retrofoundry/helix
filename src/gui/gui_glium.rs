@@ -297,6 +297,7 @@ impl<'a> Gui<'a> {
                 draw_call.projection_matrix,
                 &draw_call.fog,
                 &draw_call.vbo.vbo,
+                draw_call.vbo.num_tris,
                 &draw_call.uniforms,
             );
         }
