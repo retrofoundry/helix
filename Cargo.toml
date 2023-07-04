@@ -49,6 +49,6 @@ fast3d-glium-renderer = { version = "0.3.0", optional = true }
 fast3d-wgpu-renderer = { version = "0.3.0", optional = true }
 
 [patch.crates-io]
-fast3d = { path = "../../fast3d-rs/fast3d" }
-fast3d-glium-renderer = { path = "../../fast3d-rs/fast3d-glium-renderer" }
-fast3d-wgpu-renderer = { path = "../../fast3d-rs/fast3d-wgpu-renderer" }
+#fast3d = { path = "../../fast3d-rs/fast3d" }
+#fast3d-glium-renderer = { path = "../../fast3d-rs/fast3d-glium-renderer" }
+#fast3d-wgpu-renderer = { path = "../../fast3d-rs/fast3d-wgpu-renderer" }
