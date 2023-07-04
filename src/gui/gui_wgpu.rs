@@ -130,7 +130,7 @@ impl<'a> Gui<'a> {
         imgui.io_mut().config_flags |=
             imgui::ConfigFlags::VIEWPORTS_ENABLE | imgui::ConfigFlags::NO_MOUSE_CURSOR_CHANGE;
 
-        // Create the egui + winit platform
+        // Create the imgui + winit platform
         let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
         platform.attach_window(
             imgui.io_mut(),

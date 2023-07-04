@@ -1,12 +1,7 @@
 use imgui::{CollapsingHeader, Ui};
 
+use crate::gui::Gui;
 use fast3d::gbi::utils::{geometry_mode_uses_fog, geometry_mode_uses_lighting};
-
-#[cfg(feature = "opengl_renderer")]
-use super::gui_glium::Gui;
-
-#[cfg(feature = "wgpu_renderer")]
-use super::gui_wgpu::Gui;
 
 pub trait HelixWindows {
     fn show_profiler_window(&self, opened: &mut bool, gui: &mut Gui);
