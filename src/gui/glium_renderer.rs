@@ -1,5 +1,6 @@
 use crate::gui::{EventLoopWrapper, Frame};
 use fast3d::output::RCPOutput;
+use fast3d::rdp::OutputDimensions;
 use fast3d_glium_renderer::glium_device::GliumGraphicsDevice;
 
 pub struct Renderer<'a> {
@@ -100,12 +101,13 @@ impl<'a> Renderer<'a> {
         &mut self,
         frame: &mut Frame,
         rcp_output: &mut RCPOutput,
+        output_size: &OutputDimensions,
     ) -> anyhow::Result<()> {
         // Prepare the context device
         self.graphics_device.start_frame(frame);
 
         // Process the RCP output
-        self.render_game(frame, rcp_output)?;
+        self.render_game(frame, rcp_output, output_size)?;
 
         // Finish rendering
         self.graphics_device.end_frame();
@@ -129,7 +131,12 @@ impl<'a> Renderer<'a> {
 
     // MARK: - Helpers
 
-    fn render_game(&mut self, frame: &mut Frame, rcp_output: &mut RCPOutput) -> anyhow::Result<()> {
+    fn render_game(
+        &mut self,
+        frame: &mut Frame,
+        rcp_output: &mut RCPOutput,
+        _output_size: &OutputDimensions,
+    ) -> anyhow::Result<()> {
         // omit the last draw call, because we know we that's an extra from the last flush
         // for draw_call in &self.rcp_output.draw_calls[..self.rcp_output.draw_calls.len() - 1] {
         for draw_call in rcp_output

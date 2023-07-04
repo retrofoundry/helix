@@ -1,7 +1,8 @@
 use crate::gui::{EventLoopWrapper, Frame};
 use fast3d::output::RCPOutput;
+use fast3d::rdp::OutputDimensions;
+use fast3d_wgpu_renderer::defines::{PipelineConfig, PipelineId};
 use fast3d_wgpu_renderer::wgpu_device::WgpuGraphicsDevice;
-use std::marker::PhantomData;
 
 pub struct Renderer<'a> {
     window: winit::window::Window,
@@ -10,9 +11,8 @@ pub struct Renderer<'a> {
     queue: wgpu::Queue,
     surface_config: wgpu::SurfaceConfiguration,
     renderer: imgui_wgpu::Renderer,
-    graphics_device: WgpuGraphicsDevice,
+    graphics_device: WgpuGraphicsDevice<'a>,
     current_frame_texture: Option<wgpu::TextureView>,
-    phantom: PhantomData<&'a ()>,
 }
 
 impl<'a> Renderer<'a> {
@@ -92,7 +92,6 @@ impl<'a> Renderer<'a> {
             renderer,
             graphics_device,
             current_frame_texture: None,
-            phantom: PhantomData,
         })
     }
 
@@ -179,6 +178,7 @@ impl<'a> Renderer<'a> {
         &mut self,
         _frame: &mut Frame,
         rcp_output: &mut RCPOutput,
+        output_size: &OutputDimensions,
     ) -> anyhow::Result<()> {
         // Prepare the context device
         self.graphics_device.update_frame_count();
@@ -191,7 +191,7 @@ impl<'a> Renderer<'a> {
                 });
 
         // Process the RCP output
-        self.render_game(&mut encoder, rcp_output)?;
+        self.render_game(&mut encoder, rcp_output, output_size)?;
 
         // Finish game encoding and submit
         self.queue.submit(Some(encoder.finish()));
@@ -251,6 +251,7 @@ impl<'a> Renderer<'a> {
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
         rcp_output: &mut RCPOutput,
+        output_size: &OutputDimensions,
     ) -> anyhow::Result<()> {
         // omit the last draw call, because we know we that's an extra from the last flush
         // for draw_call in &self.rcp_output.draw_calls[..self.rcp_output.draw_calls.len() - 1] {
@@ -265,28 +266,31 @@ impl<'a> Renderer<'a> {
             self.graphics_device
                 .update_current_height(draw_call.viewport.w as i32);
 
+            // loop through textures and bind them
+            for (index, tex_cache_id) in draw_call.texture_indices.iter().enumerate() {
+                let sampler = draw_call.samplers[index];
+                assert_eq!(tex_cache_id.is_none(), sampler.is_none());
+
+                if let Some(tex_cache_id) = tex_cache_id {
+                    let texture = rcp_output.texture_cache.get_mut(*tex_cache_id).unwrap();
+                    let sampler = sampler.unwrap();
+
+                    self.graphics_device.bind_texture(
+                        &self.device,
+                        &self.queue,
+                        index,
+                        texture,
+                        &sampler,
+                    );
+                }
+            }
+
+            // select shader program
             self.graphics_device.select_program(
                 &self.device,
                 draw_call.shader_id,
                 draw_call.shader_config,
             );
-
-            // loop through textures and bind them
-            for (index, hash) in draw_call.texture_indices.iter().enumerate() {
-                if let Some(hash) = hash {
-                    let texture = rcp_output.texture_cache.get_mut(*hash).unwrap();
-                    self.graphics_device
-                        .bind_texture(&self.device, &self.queue, index, texture);
-                }
-            }
-
-            // loop through samplers and bind them
-            for (index, sampler) in draw_call.samplers.iter().enumerate() {
-                if let Some(sampler) = sampler {
-                    self.graphics_device
-                        .bind_sampler(&self.device, index, sampler);
-                }
-            }
 
             // set uniforms
             self.graphics_device.update_uniforms(
@@ -297,9 +301,18 @@ impl<'a> Renderer<'a> {
             );
 
             // create pipeline
-            let (texture_bind_group_layout, pipeline) = self.graphics_device.create_pipeline(
+            let pipeline_config = PipelineConfig {
+                shader: draw_call.shader_id,
+                blend_state: draw_call.blend_state,
+                cull_mode: draw_call.cull_mode,
+                depth_stencil: draw_call.stencil,
+            };
+            let pipeline_id = PipelineId(pipeline_config);
+
+            self.graphics_device.configure_pipeline(
                 &self.device,
                 self.surface_config.format,
+                pipeline_id,
                 draw_call.blend_state,
                 draw_call.cull_mode,
                 draw_call.stencil,
@@ -312,8 +325,8 @@ impl<'a> Renderer<'a> {
                 &self.device,
                 &self.queue,
                 encoder,
-                &pipeline,
-                &texture_bind_group_layout,
+                pipeline_id,
+                output_size,
                 &draw_call.viewport,
                 draw_call.scissor,
                 &draw_call.vbo.vbo,

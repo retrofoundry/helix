@@ -225,8 +225,11 @@ impl<'a> Gui<'a> {
         let mut frame = self.gfx_renderer.get_current_texture().unwrap();
 
         // Render RCP output
-        self.gfx_renderer
-            .process_rcp_output(&mut frame, &mut self.rcp_output)?;
+        self.gfx_renderer.process_rcp_output(
+            &mut frame,
+            &mut self.rcp_output,
+            &self.rcp.rdp.output_dimensions,
+        )?;
 
         // Render ImGui on top of any game content
         let ui = self.imgui.new_frame();
