@@ -80,7 +80,12 @@ impl<'a> Renderer<'a> {
 
     // Rendering Functions
 
+    pub fn window_size(&self) -> winit::dpi::PhysicalSize<u32> {
+        self.display.gl_window().window().inner_size()
+    }
+
     pub fn resize(&mut self, width: u32, height: u32) {
+        log::trace!("Resizing to {:?}x{:?}", width, height);
         self.display
             .gl_window()
             .resize(glutin::dpi::PhysicalSize::new(width, height));

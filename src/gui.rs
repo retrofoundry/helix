@@ -1,6 +1,7 @@
 use crate::gamepad::manager::GamepadManager;
 use fast3d::output::RCPOutput;
 use fast3d::rcp::RCP;
+use fast3d::rdp::OutputDimensions;
 use winit::platform::run_return::EventLoopExtRunReturn;
 
 pub mod windows;
@@ -75,13 +76,8 @@ impl<'a> Gui<'a> {
         // Setup ImGui
         let mut imgui = imgui::Context::create();
 
-        // Setup Renderer
-        let (width, height) = (800, 600);
-        let renderer = Renderer::new(width, height, title, event_loop_wrapper, &mut imgui)?;
-
         // Create the imgui + winit platform
         let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
-        renderer.attach_window(&mut platform, &mut imgui);
 
         // Setup Dear ImGui style
         imgui.set_ini_filename(None);
@@ -101,6 +97,11 @@ impl<'a> Gui<'a> {
                     ..Default::default()
                 }),
             }]);
+
+        // Setup Renderer
+        let (width, height) = (800, 600);
+        let renderer = Renderer::new(width, height, title, event_loop_wrapper, &mut imgui)?;
+        renderer.attach_window(&mut platform, &mut imgui);
 
         // Initial UI state
         let last_frame_time = std::time::Instant::now();
@@ -139,7 +140,14 @@ impl<'a> Gui<'a> {
                                 ..
                             },
                         ..
-                    } => self.gfx_renderer.resize(size.width, size.height),
+                    } => {
+                        self.gfx_renderer.resize(size.width, size.height);
+
+                        // TODO: Fix resizing on OpenGL
+                        #[cfg(feature = "wgpu_renderer")]
+                        self.gfx_renderer
+                            .handle_event(&mut self.platform, &mut self.imgui, &event);
+                    }
                     winit::event::Event::WindowEvent {
                         event: winit::event::WindowEvent::ModifiersChanged(modifiers),
                         ..
@@ -147,6 +155,9 @@ impl<'a> Gui<'a> {
                         if let Some(gamepad_manager) = self.gamepad_manager.as_mut() {
                             gamepad_manager.handle_modifiers_changed(modifiers);
                         }
+
+                        self.gfx_renderer
+                            .handle_event(&mut self.platform, &mut self.imgui, &event);
                     }
                     winit::event::Event::WindowEvent {
                         event: winit::event::WindowEvent::KeyboardInput { input, .. },
@@ -155,13 +166,15 @@ impl<'a> Gui<'a> {
                         if let Some(gamepad_manager) = self.gamepad_manager.as_mut() {
                             gamepad_manager.handle_keyboard_input(input);
                         }
-                    }
-                    _ => (),
-                }
 
-                // Forward events to ImGui
-                self.gfx_renderer
-                    .handle_event(&mut self.platform, &mut self.imgui, &event);
+                        self.gfx_renderer
+                            .handle_event(&mut self.platform, &mut self.imgui, &event);
+                    }
+                    event => {
+                        self.gfx_renderer
+                            .handle_event(&mut self.platform, &mut self.imgui, &event)
+                    }
+                }
             });
     }
 
@@ -184,10 +197,7 @@ impl<'a> Gui<'a> {
         self.ui_state.last_frame_time = now;
     }
 
-    pub fn start_frame(
-        &mut self,
-        event_loop_wrapper: &mut EventLoopWrapper,
-    ) -> anyhow::Result<Option<Frame>> {
+    pub fn start_frame(&mut self, event_loop_wrapper: &mut EventLoopWrapper) -> anyhow::Result<()> {
         // Handle events
         self.handle_events(event_loop_wrapper);
 
@@ -195,13 +205,24 @@ impl<'a> Gui<'a> {
         self.gfx_renderer
             .prepare_frame(&mut self.platform, &mut self.imgui)?;
 
-        // Grab the frame
-        Ok(self.gfx_renderer.get_current_texture())
+        Ok(())
     }
 
-    pub fn process_draw_lists(&mut self, mut frame: Frame, commands: usize) -> anyhow::Result<()> {
+    pub fn process_draw_lists(&mut self, commands: usize) -> anyhow::Result<()> {
+        // Set RDP output dimensions
+        let size = self.gfx_renderer.window_size();
+        let dimensions = OutputDimensions {
+            width: size.width,
+            height: size.height,
+            aspect_ratio: size.width as f32 / size.height as f32,
+        };
+        self.rcp.rdp.output_dimensions = dimensions;
+
         // Run the RCP
         self.rcp.run(&mut self.rcp_output, commands);
+
+        // Grab the frame
+        let mut frame = self.gfx_renderer.get_current_texture().unwrap();
 
         // Render RCP output
         self.gfx_renderer
@@ -230,9 +251,8 @@ impl<'a> Gui<'a> {
         Ok(())
     }
 
-    pub fn end_frame(&mut self) -> anyhow::Result<()> {
+    pub fn end_frame(&mut self) {
         self.sync_frame_rate();
-        Ok(())
     }
 }
 
@@ -279,30 +299,23 @@ pub unsafe extern "C" fn GUICreate<'a>(
 }
 
 #[no_mangle]
-pub extern "C" fn GUIStartFrame(
-    gui: Option<&mut Gui>,
-    event_loop: Option<&mut EventLoopWrapper>,
-) -> Box<Option<Frame>> {
+pub extern "C" fn GUIStartFrame(gui: Option<&mut Gui>, event_loop: Option<&mut EventLoopWrapper>) {
     let gui = gui.unwrap();
     let event_loop = event_loop.unwrap();
-    match gui.start_frame(event_loop) {
-        Ok(frame) => Box::new(frame),
-        Err(_) => Box::new(None),
-    }
+    gui.start_frame(event_loop).unwrap();
 }
 
 #[no_mangle]
-pub extern "C" fn GUIDrawLists(gui: Option<&mut Gui>, frame: Option<Box<Frame>>, commands: u64) {
+pub extern "C" fn GUIDrawLists(gui: Option<&mut Gui>, commands: u64) {
     let gui = gui.unwrap();
-    let frame = frame.unwrap();
-    gui.process_draw_lists(*frame, commands.try_into().unwrap())
+    gui.process_draw_lists(commands.try_into().unwrap())
         .unwrap();
 }
 
 #[no_mangle]
 pub extern "C" fn GUIEndFrame(gui: Option<&mut Gui>) {
     let gui = gui.unwrap();
-    gui.end_frame().unwrap();
+    gui.end_frame();
 }
 
 #[no_mangle]
