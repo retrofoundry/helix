@@ -40,11 +40,11 @@ void HLXDisplaySetup(const char* title, void (*draw_menu)(void*), void (*draw_wi
 }
 
 void HLXDisplayStartFrame() {
-    _frame = GUIStartFrame(_gui, _event_loop);
+    GUIStartFrame(_gui, _event_loop);
 }
 
 void HLXDisplayProcessDrawLists(u64* commands) {
-    GUIDrawLists(_gui, _frame, commands);
+    GUIDrawLists(_gui, commands);
 }
 
 void HLXDisplayEndFrame() {

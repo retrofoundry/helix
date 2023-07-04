@@ -9,7 +9,7 @@ pub mod speech;
 pub use arie;
 
 // Check for invalid feature combinations
-#[cfg(all(feature = "opengl", feature = "wgpu"))]
+#[cfg(all(feature = "opengl_renderer", feature = "wgpu_renderer"))]
 compile_error!("Cannot enable both OpenGL and WGPU rendering");
 
 pub fn init() {
