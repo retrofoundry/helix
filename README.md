@@ -4,16 +4,23 @@ Helix is a library written in Rust providing core features for getting your N64 
 
 ## Features Provided
 
-- [x] Window, GUI & Rendering (gui)
-- [x] Audio Playback (audio)
+- [x] Window Management (gui)
+- [x] Processing of N64 RDP commands via [fast3d-rs](https://github.com/retrofoundry/fast3d-rs) (gui)
+  - [x] OpenGL Rendering
+  - [ ] WGPU Rendering
+- [x] GUI Rendering via [imgui-rs](https://docs.rs/imgui/latest/imgui/) (gui)
+- [x] Input Handling (gamepad)
+- [x] Audio Rendering via [arie](https://github.com/retrofoundry/arie) (audio)
+
+### Optional Features
 - [x] Speech Synthesis (speech)
 - [x] TCP Stream (network)
 
-For details on each of the features provided please see our [documentation](https://retrofoundry.github.io/helix/).
+For details on each of the features provided please see our [documentation](https://retrofoundry.github.io/helix/dev/).
 
 ## How to setup?
 
-For setup and more in-depth information please see our [documentation](https://retrofoundry.github.io/helix/).
+For setup and more in-depth information please see our [documentation](https://retrofoundry.github.io/helix/dev/).
 
 ## Community
 
