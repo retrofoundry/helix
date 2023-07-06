@@ -233,8 +233,12 @@ impl<'a> Renderer<'a> {
         self.graphics_device.update_frame_count();
 
         // Process the RCP output
-        self.graphics_device
-            .process_rcp_output(&self.device, &self.queue, self.surface_config.format, rcp_output);
+        self.graphics_device.process_rcp_output(
+            &self.device,
+            &self.queue,
+            self.surface_config.format,
+            rcp_output,
+        );
 
         // Draw the RCP output
         self.graphics_device.draw(&mut rpass);

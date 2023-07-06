@@ -236,11 +236,8 @@ impl<'a> Gui<'a> {
 
         // Render RCPOutput and ImGui content
         let draw_data = self.imgui.render();
-        self.gfx_renderer.draw_content(
-            &mut frame,
-            &mut self.rcp_output,
-            draw_data,
-        )?;
+        self.gfx_renderer
+            .draw_content(&mut frame, &mut self.rcp_output, draw_data)?;
 
         // Clear the draw calls
         self.rcp_output.clear_draw_calls();
