@@ -97,11 +97,12 @@ impl<'a> Renderer<'a> {
         Some(frame)
     }
 
-    pub fn process_rcp_output(
+    pub fn draw_content(
         &mut self,
         frame: &mut Frame,
         rcp_output: &mut RCPOutput,
         output_size: &OutputDimensions,
+        imgui_draw_data: &imgui::DrawData,
     ) -> anyhow::Result<()> {
         // Prepare the context device
         self.graphics_device.start_frame(frame);
@@ -109,18 +110,9 @@ impl<'a> Renderer<'a> {
         // Process the RCP output
         self.render_game(frame, rcp_output, output_size)?;
 
-        // Finish rendering
-        self.graphics_device.end_frame();
+        // Render the ImGui content
+        self.renderer.render(frame, imgui_draw_data)?;
 
-        Ok(())
-    }
-
-    pub fn draw_imgui_content(
-        &mut self,
-        frame: &mut Frame,
-        draw_data: &imgui::DrawData,
-    ) -> anyhow::Result<()> {
-        self.renderer.render(frame, draw_data)?;
         Ok(())
     }
 

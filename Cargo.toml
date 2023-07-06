@@ -8,7 +8,7 @@ name = "helix"
 crate-type = ["lib", "staticlib"]
 
 [features]
-default = ["f3dex2", "opengl_renderer"]
+default = ["f3dex2", "wgpu_renderer"]
 
 # Graphics Features
 f3dex2 = ["fast3d/f3dex2"]
@@ -47,6 +47,7 @@ arie = "0.2.0"
 fast3d = { version = "0.3.1", default-features = false }
 fast3d-glium-renderer = { version = "0.3.1", optional = true }
 fast3d-wgpu-renderer = { version = "0.3.1", optional = true }
+rustc-hash = "1.1.0"
 
 [patch.crates-io]
 #fast3d = { path = "../../fast3d-rs/fast3d" }

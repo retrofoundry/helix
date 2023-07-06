@@ -224,14 +224,7 @@ impl<'a> Gui<'a> {
         // Grab the frame
         let mut frame = self.gfx_renderer.get_current_texture().unwrap();
 
-        // Render RCP output
-        self.gfx_renderer.process_rcp_output(
-            &mut frame,
-            &mut self.rcp_output,
-            &self.rcp.rdp.output_dimensions,
-        )?;
-
-        // Render ImGui on top of any game content
+        // Draw the UI
         let ui = self.imgui.new_frame();
         ui.main_menu_bar(|| (self.draw_menu_callback)(ui));
         (self.draw_windows_callback)(ui);
@@ -241,9 +234,14 @@ impl<'a> Gui<'a> {
             self.gfx_renderer.prepare_render(&mut self.platform, ui);
         }
 
+        // Render RCPOutput and ImGui content
         let draw_data = self.imgui.render();
-        self.gfx_renderer
-            .draw_imgui_content(&mut frame, draw_data)?;
+        self.gfx_renderer.draw_content(
+            &mut frame,
+            &mut self.rcp_output,
+            &self.rcp.rdp.output_dimensions,
+            draw_data,
+        )?;
 
         // Clear the draw calls
         self.rcp_output.clear_draw_calls();
