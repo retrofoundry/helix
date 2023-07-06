@@ -178,8 +178,7 @@ impl<'a> Renderer<'a> {
         self.surface_config.height = height.max(1);
         self.surface.configure(&self.device, &self.surface_config);
         self.depth_texture = create_depth_texture(&self.surface_config, &self.device);
-        self.graphics_device
-            .resize(&self.surface_config, &self.device);
+        self.graphics_device.resize([width, height]);
     }
 
     pub fn get_current_texture(&mut self) -> Option<Frame> {
@@ -198,7 +197,6 @@ impl<'a> Renderer<'a> {
         &mut self,
         frame: &mut Frame,
         rcp_output: &mut RCPOutput,
-        output_size: &OutputDimensions,
         imgui_draw_data: &imgui::DrawData,
     ) -> anyhow::Result<()> {
         let frame_texture = frame
@@ -239,7 +237,7 @@ impl<'a> Renderer<'a> {
             .process_rcp_output(&self.device, &self.queue, self.surface_config.format, rcp_output);
 
         // Draw the RCP output
-        self.graphics_device.draw(output_size, &mut rpass);
+        self.graphics_device.draw(&mut rpass);
 
         // Drop the render pass
         drop(rpass);

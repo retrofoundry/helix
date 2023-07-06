@@ -239,7 +239,6 @@ impl<'a> Gui<'a> {
         self.gfx_renderer.draw_content(
             &mut frame,
             &mut self.rcp_output,
-            &self.rcp.rdp.output_dimensions,
             draw_data,
         )?;
 
