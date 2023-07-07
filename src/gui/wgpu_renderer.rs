@@ -100,6 +100,7 @@ impl<'a> Renderer<'a> {
         // Create Renderer
         let renderer_config = imgui_wgpu::RendererConfig {
             texture_format: surface_config.format,
+            fragment_shader_entry_point: Some("fs_main_srgb"),
             ..Default::default()
         };
 
