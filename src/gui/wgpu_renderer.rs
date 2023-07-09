@@ -107,7 +107,7 @@ impl<'a> Renderer<'a> {
         let renderer = imgui_wgpu::Renderer::new(imgui, &device, &queue, renderer_config);
 
         // Create graphics device
-        let graphics_device = WgpuGraphicsDevice::new(&device);
+        let graphics_device = WgpuGraphicsDevice::new(&device, [size.width, size.height]);
 
         Ok(Self {
             window,
