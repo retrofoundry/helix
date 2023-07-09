@@ -101,14 +101,13 @@ impl<'a> Renderer<'a> {
         &mut self,
         frame: &mut Frame,
         rcp_output: &mut RCPOutput,
-        output_size: &OutputDimensions,
         imgui_draw_data: &imgui::DrawData,
     ) -> anyhow::Result<()> {
         // Prepare the context device
         self.graphics_device.start_frame(frame);
 
         // Process the RCP output
-        self.render_game(frame, rcp_output, output_size)?;
+        self.render_game(frame, rcp_output)?;
 
         // Render the ImGui content
         self.renderer.render(frame, imgui_draw_data)?;
@@ -127,7 +126,6 @@ impl<'a> Renderer<'a> {
         &mut self,
         frame: &mut Frame,
         rcp_output: &mut RCPOutput,
-        _output_size: &OutputDimensions,
     ) -> anyhow::Result<()> {
         // omit the last draw call, because we know we that's an extra from the last flush
         // for draw_call in &self.rcp_output.draw_calls[..self.rcp_output.draw_calls.len() - 1] {
