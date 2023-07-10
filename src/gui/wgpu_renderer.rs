@@ -61,7 +61,7 @@ impl<'a> Renderer<'a> {
                 .with_resizable(true)
                 .build(&event_loop_wrapper.event_loop)?;
 
-            let size = window.outer_size();
+            let size = window.inner_size();
 
             let surface = unsafe { instance.create_surface(&window) }?;
 
@@ -163,7 +163,7 @@ impl<'a> Renderer<'a> {
 
     // Rendering Functions
 
-    pub fn window_size(&self) -> winit::dpi::PhysicalSize<u32> {
+    pub fn content_size(&self) -> winit::dpi::PhysicalSize<u32> {
         self.window.inner_size()
     }
 

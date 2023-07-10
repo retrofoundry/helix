@@ -81,7 +81,7 @@ impl<'a> Renderer<'a> {
 
     // Rendering Functions
 
-    pub fn window_size(&self) -> winit::dpi::PhysicalSize<u32> {
+    pub fn content_size(&self) -> winit::dpi::PhysicalSize<u32> {
         self.display.gl_window().window().inner_size()
     }
 

@@ -210,7 +210,7 @@ impl<'a> Gui<'a> {
 
     pub fn process_draw_lists(&mut self, commands: usize) -> anyhow::Result<()> {
         // Set RDP output dimensions
-        let size = self.gfx_renderer.window_size();
+        let size = self.gfx_renderer.content_size();
         let dimensions = OutputDimensions {
             width: size.width,
             height: size.height,
