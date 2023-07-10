@@ -1,7 +1,6 @@
 use crate::gui::{EventLoopWrapper, Frame};
 use fast3d::output::RCPOutput;
-use fast3d::rdp::OutputDimensions;
-use fast3d_wgpu_renderer::defines::{PipelineConfig, PipelineId};
+
 use fast3d_wgpu_renderer::wgpu_device::WgpuGraphicsDevice;
 
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;

@@ -40,6 +40,12 @@ impl EventLoopWrapper {
     }
 }
 
+impl Default for EventLoopWrapper {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct Gui<'a> {
     // imgui
     imgui: imgui::Context,
@@ -259,7 +265,7 @@ type OnDraw = unsafe extern "C" fn(ui: &imgui::Ui);
 
 #[no_mangle]
 pub extern "C" fn GUICreateEventLoop() -> Box<EventLoopWrapper> {
-    let event_loop = EventLoopWrapper::new();
+    let event_loop = EventLoopWrapper::default();
     Box::new(event_loop)
 }
 
