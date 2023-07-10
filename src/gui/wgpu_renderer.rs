@@ -204,32 +204,6 @@ impl<'a> Renderer<'a> {
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        let mut encoder: wgpu::CommandEncoder =
-            self.device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Game Render Pass Command Encoder"),
-                });
-
-        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Game Render Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &frame_texture,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: true,
-                },
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: &self.depth_texture,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: true,
-                }),
-                stencil_ops: None,
-            }),
-        });
-
         // Prepare the context device
         self.graphics_device.update_frame_count();
 
@@ -241,11 +215,36 @@ impl<'a> Renderer<'a> {
             rcp_output,
         );
 
-        // Draw the RCP output
-        self.graphics_device.draw(&mut rpass);
+        let mut encoder: wgpu::CommandEncoder =
+            self.device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Game Render Pass Command Encoder"),
+                });
 
-        // Drop the render pass
-        drop(rpass);
+        {
+            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Game Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &frame_texture,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_texture,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: true,
+                    }),
+                    stencil_ops: None,
+                }),
+            });
+
+            // Draw the RCP output
+            self.graphics_device.draw(&mut rpass);
+        }
 
         // Finish encoding and submit
         self.queue.submit(Some(encoder.finish()));
@@ -263,25 +262,24 @@ impl<'a> Renderer<'a> {
                     label: Some("ImGui Render Pass Command Encoder"),
                 });
 
-        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("ImGui Render Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &frame_texture,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: true,
-                },
-            })],
-            depth_stencil_attachment: None,
-        });
+        {
+            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("ImGui Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &frame_texture,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: None,
+            });
 
-        // Render the ImGui content
-        self.renderer
-            .render(imgui_draw_data, &self.queue, &self.device, &mut rpass)?;
-
-        // Drop the render pass
-        drop(rpass);
+            // Render the ImGui content
+            self.renderer
+                .render(imgui_draw_data, &self.queue, &self.device, &mut rpass)?;
+        }
 
         // Finish encoding and submit
         self.queue.submit(Some(encoder.finish()));

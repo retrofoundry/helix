@@ -122,11 +122,7 @@ impl<'a> Renderer<'a> {
 
     // MARK: - Helpers
 
-    fn render_game(
-        &mut self,
-        frame: &mut Frame,
-        rcp_output: &mut RCPOutput,
-    ) -> anyhow::Result<()> {
+    fn render_game(&mut self, frame: &mut Frame, rcp_output: &mut RCPOutput) -> anyhow::Result<()> {
         // omit the last draw call, because we know we that's an extra from the last flush
         // for draw_call in &self.rcp_output.draw_calls[..self.rcp_output.draw_calls.len() - 1] {
         for draw_call in rcp_output

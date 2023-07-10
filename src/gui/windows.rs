@@ -122,5 +122,5 @@ pub extern "C" fn GUIShowProfilerWindow(ui: &Ui, gui: Option<&mut Gui>, opened: 
         return;
     }
 
-    ui.show_profiler_window(opened as &mut bool, gui);
+    ui.show_profiler_window(opened, gui);
 }
