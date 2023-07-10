@@ -1,7 +1,7 @@
 use crate::gui::{EventLoopWrapper, Frame};
-use fast3d::output::RCPOutput;
+use fast3d::RCPOutputCollector;
 
-use fast3d_wgpu_renderer::wgpu_device::WgpuGraphicsDevice;
+use fast3d_wgpu_renderer::WgpuRenderer;
 
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
@@ -35,7 +35,7 @@ pub struct Renderer<'a> {
     surface_config: wgpu::SurfaceConfiguration,
     depth_texture: wgpu::TextureView,
     renderer: imgui_wgpu::Renderer,
-    graphics_device: WgpuGraphicsDevice<'a>,
+    fast3d_renderer: WgpuRenderer<'a>,
 }
 
 impl<'a> Renderer<'a> {
@@ -106,7 +106,7 @@ impl<'a> Renderer<'a> {
         let renderer = imgui_wgpu::Renderer::new(imgui, &device, &queue, renderer_config);
 
         // Create graphics device
-        let graphics_device = WgpuGraphicsDevice::new(&device, [size.width, size.height]);
+        let fast3d_renderer = WgpuRenderer::new(&device, [size.width, size.height]);
 
         Ok(Self {
             window,
@@ -116,7 +116,7 @@ impl<'a> Renderer<'a> {
             surface_config,
             depth_texture,
             renderer,
-            graphics_device,
+            fast3d_renderer,
         })
     }
 
@@ -178,7 +178,7 @@ impl<'a> Renderer<'a> {
         self.surface_config.height = height.max(1);
         self.surface.configure(&self.device, &self.surface_config);
         self.depth_texture = create_depth_texture(&self.surface_config, &self.device);
-        self.graphics_device.resize([width, height]);
+        self.fast3d_renderer.resize([width, height]);
     }
 
     pub fn get_current_texture(&mut self) -> Option<Frame> {
@@ -196,7 +196,7 @@ impl<'a> Renderer<'a> {
     pub fn draw_content(
         &mut self,
         frame: &mut Frame,
-        rcp_output: &mut RCPOutput,
+        rcp_output_collector: &mut RCPOutputCollector,
         imgui_draw_data: &imgui::DrawData,
     ) -> anyhow::Result<()> {
         let frame_texture = frame
@@ -204,14 +204,14 @@ impl<'a> Renderer<'a> {
             .create_view(&wgpu::TextureViewDescriptor::default());
 
         // Prepare the context device
-        self.graphics_device.update_frame_count();
+        self.fast3d_renderer.update_frame_count();
 
         // Process the RCP output
-        self.graphics_device.process_rcp_output(
+        self.fast3d_renderer.process_rcp_output(
             &self.device,
             &self.queue,
             self.surface_config.format,
-            rcp_output,
+            rcp_output_collector,
         );
 
         let mut encoder: wgpu::CommandEncoder =
@@ -242,7 +242,7 @@ impl<'a> Renderer<'a> {
             });
 
             // Draw the RCP output
-            self.graphics_device.draw(&mut rpass);
+            self.fast3d_renderer.draw(&mut rpass);
         }
 
         // Finish encoding and submit

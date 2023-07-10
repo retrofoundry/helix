@@ -1,7 +1,6 @@
 use crate::gamepad::manager::GamepadManager;
-use fast3d::output::RCPOutput;
-use fast3d::rcp::RCP;
 use fast3d::rdp::OutputDimensions;
+use fast3d::{RCPOutputCollector, RCP};
 use winit::platform::run_return::EventLoopExtRunReturn;
 
 pub mod windows;
@@ -63,7 +62,7 @@ pub struct Gui<'a> {
 
     // game renderer
     rcp: RCP,
-    rcp_output: RCPOutput,
+    rcp_output_collector: RCPOutputCollector,
     gfx_renderer: Renderer<'a>,
 }
 
@@ -123,7 +122,7 @@ impl<'a> Gui<'a> {
             draw_windows_callback: Box::new(draw_windows),
             gamepad_manager,
             rcp: RCP::new(),
-            rcp_output: RCPOutput::new(),
+            rcp_output_collector: RCPOutputCollector::new(),
             gfx_renderer: renderer,
         })
     }
@@ -225,7 +224,7 @@ impl<'a> Gui<'a> {
         self.rcp.rdp.output_dimensions = dimensions;
 
         // Run the RCP
-        self.rcp.run(&mut self.rcp_output, commands);
+        self.rcp.run(&mut self.rcp_output_collector, commands);
 
         // Grab the frame
         let mut frame = self.gfx_renderer.get_current_texture().unwrap();
@@ -243,10 +242,10 @@ impl<'a> Gui<'a> {
         // Render RCPOutput and ImGui content
         let draw_data = self.imgui.render();
         self.gfx_renderer
-            .draw_content(&mut frame, &mut self.rcp_output, draw_data)?;
+            .draw_content(&mut frame, &mut self.rcp_output_collector, draw_data)?;
 
         // Clear the draw calls
-        self.rcp_output.clear_draw_calls();
+        self.rcp_output_collector.clear_draw_calls();
 
         // Swap buffers
         self.gfx_renderer.finish_render(frame)?;
