@@ -1,5 +1,6 @@
 use crate::gui::{EventLoopWrapper, Frame};
 use fast3d::output::RCPOutput;
+use fast3d::rdp::OutputDimensions;
 use fast3d_glium_renderer::glium_device::GliumGraphicsDevice;
 
 pub struct Renderer<'a> {
@@ -31,10 +32,14 @@ impl<'a> Renderer<'a> {
         // Create the renderer
         let renderer = imgui_glium_renderer::Renderer::init(imgui, &display)?;
 
+        // Create graphics device
+        let size = display.gl_window().window().inner_size();
+        let graphics_device = GliumGraphicsDevice::new([size.width, size.height]);
+
         Ok(Self {
             display,
             renderer,
-            graphics_device: GliumGraphicsDevice::default(),
+            graphics_device,
         })
     }
 
@@ -80,15 +85,21 @@ impl<'a> Renderer<'a> {
 
     // Rendering Functions
 
-    pub fn window_size(&self) -> winit::dpi::PhysicalSize<u32> {
+    pub fn content_size(&self) -> winit::dpi::PhysicalSize<u32> {
         self.display.gl_window().window().inner_size()
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
+        // there's a bug where at first the size is u32::MAX so we just ignore it
+        if width == u32::MAX || height == u32::MAX {
+            return;
+        }
+
         log::trace!("Resizing to {:?}x{:?}", width, height);
         self.display
             .gl_window()
             .resize(glutin::dpi::PhysicalSize::new(width, height));
+        self.graphics_device.resize([width, height]);
     }
 
     pub fn get_current_texture(&self) -> Option<Frame> {
@@ -96,10 +107,11 @@ impl<'a> Renderer<'a> {
         Some(frame)
     }
 
-    pub fn process_rcp_output(
+    pub fn draw_content(
         &mut self,
         frame: &mut Frame,
         rcp_output: &mut RCPOutput,
+        imgui_draw_data: &imgui::DrawData,
     ) -> anyhow::Result<()> {
         // Prepare the context device
         self.graphics_device.start_frame(frame);
@@ -107,18 +119,9 @@ impl<'a> Renderer<'a> {
         // Process the RCP output
         self.render_game(frame, rcp_output)?;
 
-        // Finish rendering
-        self.graphics_device.end_frame();
+        // Render the ImGui content
+        self.renderer.render(frame, imgui_draw_data)?;
 
-        Ok(())
-    }
-
-    pub fn draw_imgui_content(
-        &mut self,
-        frame: &mut Frame,
-        draw_data: &imgui::DrawData,
-    ) -> anyhow::Result<()> {
-        self.renderer.render(frame, draw_data)?;
         Ok(())
     }
 

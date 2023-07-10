@@ -1,7 +1,31 @@
 use crate::gui::{EventLoopWrapper, Frame};
 use fast3d::output::RCPOutput;
+
 use fast3d_wgpu_renderer::wgpu_device::WgpuGraphicsDevice;
-use std::marker::PhantomData;
+
+const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+
+fn create_depth_texture(
+    config: &wgpu::SurfaceConfiguration,
+    device: &wgpu::Device,
+) -> wgpu::TextureView {
+    let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
+        size: wgpu::Extent3d {
+            width: config.width,
+            height: config.height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: DEPTH_FORMAT,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        label: None,
+        view_formats: &[],
+    });
+
+    depth_texture.create_view(&wgpu::TextureViewDescriptor::default())
+}
 
 pub struct Renderer<'a> {
     window: winit::window::Window,
@@ -9,10 +33,9 @@ pub struct Renderer<'a> {
     device: wgpu::Device,
     queue: wgpu::Queue,
     surface_config: wgpu::SurfaceConfiguration,
+    depth_texture: wgpu::TextureView,
     renderer: imgui_wgpu::Renderer,
-    graphics_device: WgpuGraphicsDevice,
-    current_frame_texture: Option<wgpu::TextureView>,
-    phantom: PhantomData<&'a ()>,
+    graphics_device: WgpuGraphicsDevice<'a>,
 }
 
 impl<'a> Renderer<'a> {
@@ -37,7 +60,7 @@ impl<'a> Renderer<'a> {
                 .with_resizable(true)
                 .build(&event_loop_wrapper.event_loop)?;
 
-            let size = window.outer_size();
+            let size = window.inner_size();
 
             let surface = unsafe { instance.create_surface(&window) }?;
 
@@ -66,22 +89,24 @@ impl<'a> Renderer<'a> {
         let mut surface_config = surface
             .get_default_config(&adapter, size.width, size.height)
             .ok_or(anyhow::anyhow!("Failed to get default surface config"))?;
-
-        let surface_view_format = surface_config.format.add_srgb_suffix();
-        surface_config.view_formats.push(surface_view_format);
+        surface_config.format = wgpu::TextureFormat::Bgra8Unorm;
 
         surface.configure(&device, &surface_config);
+
+        // Create the depth texture
+        let depth_texture = create_depth_texture(&surface_config, &device);
 
         // Create Renderer
         let renderer_config = imgui_wgpu::RendererConfig {
             texture_format: surface_config.format,
+            fragment_shader_entry_point: Some("fs_main_srgb"),
             ..Default::default()
         };
 
         let renderer = imgui_wgpu::Renderer::new(imgui, &device, &queue, renderer_config);
 
         // Create graphics device
-        let graphics_device = WgpuGraphicsDevice::new(&surface_config, &device);
+        let graphics_device = WgpuGraphicsDevice::new(&device, [size.width, size.height]);
 
         Ok(Self {
             window,
@@ -89,10 +114,9 @@ impl<'a> Renderer<'a> {
             device,
             queue,
             surface_config,
+            depth_texture,
             renderer,
             graphics_device,
-            current_frame_texture: None,
-            phantom: PhantomData,
         })
     }
 
@@ -138,7 +162,7 @@ impl<'a> Renderer<'a> {
 
     // Rendering Functions
 
-    pub fn window_size(&self) -> winit::dpi::PhysicalSize<u32> {
+    pub fn content_size(&self) -> winit::dpi::PhysicalSize<u32> {
         self.window.inner_size()
     }
 
@@ -153,8 +177,8 @@ impl<'a> Renderer<'a> {
         self.surface_config.width = width.max(1);
         self.surface_config.height = height.max(1);
         self.surface.configure(&self.device, &self.surface_config);
-        self.graphics_device
-            .resize(&self.surface_config, &self.device);
+        self.depth_texture = create_depth_texture(&self.surface_config, &self.device);
+        self.graphics_device.resize([width, height]);
     }
 
     pub fn get_current_texture(&mut self) -> Option<Frame> {
@@ -166,47 +190,67 @@ impl<'a> Renderer<'a> {
             }
         };
 
-        self.current_frame_texture = Some(
-            frame
-                .texture
-                .create_view(&wgpu::TextureViewDescriptor::default()),
-        );
-
         Some(frame)
     }
 
-    pub fn process_rcp_output(
+    pub fn draw_content(
         &mut self,
-        _frame: &mut Frame,
+        frame: &mut Frame,
         rcp_output: &mut RCPOutput,
+        imgui_draw_data: &imgui::DrawData,
     ) -> anyhow::Result<()> {
+        let frame_texture = frame
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
         // Prepare the context device
         self.graphics_device.update_frame_count();
 
-        // Setup encoder that the RDP will use
+        // Process the RCP output
+        self.graphics_device.process_rcp_output(
+            &self.device,
+            &self.queue,
+            self.surface_config.format,
+            rcp_output,
+        );
+
         let mut encoder: wgpu::CommandEncoder =
             self.device
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Game Draw Command Encoder"),
+                    label: Some("Game Render Pass Command Encoder"),
                 });
 
-        // Process the RCP output
-        self.render_game(&mut encoder, rcp_output)?;
+        {
+            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Game Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &frame_texture,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_texture,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: true,
+                    }),
+                    stencil_ops: None,
+                }),
+            });
 
-        // Finish game encoding and submit
+            // Draw the RCP output
+            self.graphics_device.draw(&mut rpass);
+        }
+
+        // Finish encoding and submit
         self.queue.submit(Some(encoder.finish()));
 
-        Ok(())
-    }
-
-    pub fn draw_imgui_content(
-        &mut self,
-        _frame: &mut Frame,
-        draw_data: &imgui::DrawData,
-    ) -> anyhow::Result<()> {
         // due to bug in macos or imgui-wgpu, we need to check for wrong texture size
-        let fb_width = draw_data.display_size[0] * draw_data.framebuffer_scale[0];
-        let fb_height = draw_data.display_size[1] * draw_data.framebuffer_scale[1];
+        let fb_width = imgui_draw_data.display_size[0] * imgui_draw_data.framebuffer_scale[0];
+        let fb_height = imgui_draw_data.display_size[1] * imgui_draw_data.framebuffer_scale[1];
         if fb_width as u32 == u32::MAX || fb_height as u32 == u32::MAX {
             return Ok(());
         }
@@ -214,26 +258,29 @@ impl<'a> Renderer<'a> {
         let mut encoder: wgpu::CommandEncoder =
             self.device
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("ImGui Command Encoder"),
+                    label: Some("ImGui Render Pass Command Encoder"),
                 });
 
-        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("ImGui Render Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &self.current_frame_texture.as_ref().unwrap(),
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: true,
-                },
-            })],
-            depth_stencil_attachment: None,
-        });
+        {
+            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("ImGui Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &frame_texture,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: None,
+            });
 
-        self.renderer
-            .render(draw_data, &self.queue, &self.device, &mut rpass)?;
+            // Render the ImGui content
+            self.renderer
+                .render(imgui_draw_data, &self.queue, &self.device, &mut rpass)?;
+        }
 
-        drop(rpass);
+        // Finish encoding and submit
         self.queue.submit(Some(encoder.finish()));
 
         Ok(())
@@ -241,86 +288,6 @@ impl<'a> Renderer<'a> {
 
     pub fn finish_render(&mut self, frame: Frame) -> anyhow::Result<()> {
         frame.present();
-        self.current_frame_texture = None;
-        Ok(())
-    }
-
-    // MARK: - Helpers
-
-    fn render_game(
-        &mut self,
-        encoder: &mut wgpu::CommandEncoder,
-        rcp_output: &mut RCPOutput,
-    ) -> anyhow::Result<()> {
-        // omit the last draw call, because we know we that's an extra from the last flush
-        // for draw_call in &self.rcp_output.draw_calls[..self.rcp_output.draw_calls.len() - 1] {
-        for (index, draw_call) in rcp_output
-            .draw_calls
-            .iter()
-            .take(rcp_output.draw_calls.len() - 1)
-            .enumerate()
-        {
-            assert!(!draw_call.vbo.vbo.is_empty());
-
-            self.graphics_device
-                .update_current_height(draw_call.viewport.w as i32);
-
-            self.graphics_device.select_program(
-                &self.device,
-                draw_call.shader_id,
-                draw_call.shader_config,
-            );
-
-            // loop through textures and bind them
-            for (index, hash) in draw_call.texture_indices.iter().enumerate() {
-                if let Some(hash) = hash {
-                    let texture = rcp_output.texture_cache.get_mut(*hash).unwrap();
-                    self.graphics_device
-                        .bind_texture(&self.device, &self.queue, index, texture);
-                }
-            }
-
-            // loop through samplers and bind them
-            for (index, sampler) in draw_call.samplers.iter().enumerate() {
-                if let Some(sampler) = sampler {
-                    self.graphics_device
-                        .bind_sampler(&self.device, index, sampler);
-                }
-            }
-
-            // set uniforms
-            self.graphics_device.update_uniforms(
-                &self.queue,
-                draw_call.projection_matrix,
-                &draw_call.fog,
-                &draw_call.uniforms,
-            );
-
-            // create pipeline
-            let (texture_bind_group_layout, pipeline) = self.graphics_device.create_pipeline(
-                &self.device,
-                self.surface_config.format,
-                draw_call.blend_state,
-                draw_call.cull_mode,
-                draw_call.stencil,
-            );
-
-            // render triangles to texture
-            self.graphics_device.draw_triangles(
-                index,
-                &self.current_frame_texture.as_ref().unwrap(),
-                &self.device,
-                &self.queue,
-                encoder,
-                &pipeline,
-                &texture_bind_group_layout,
-                &draw_call.viewport,
-                draw_call.scissor,
-                &draw_call.vbo.vbo,
-                draw_call.vbo.num_tris,
-            );
-        }
-
         Ok(())
     }
 }

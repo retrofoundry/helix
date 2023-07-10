@@ -40,6 +40,12 @@ impl EventLoopWrapper {
     }
 }
 
+impl Default for EventLoopWrapper {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct Gui<'a> {
     // imgui
     imgui: imgui::Context,
@@ -210,7 +216,7 @@ impl<'a> Gui<'a> {
 
     pub fn process_draw_lists(&mut self, commands: usize) -> anyhow::Result<()> {
         // Set RDP output dimensions
-        let size = self.gfx_renderer.window_size();
+        let size = self.gfx_renderer.content_size();
         let dimensions = OutputDimensions {
             width: size.width,
             height: size.height,
@@ -224,11 +230,7 @@ impl<'a> Gui<'a> {
         // Grab the frame
         let mut frame = self.gfx_renderer.get_current_texture().unwrap();
 
-        // Render RCP output
-        self.gfx_renderer
-            .process_rcp_output(&mut frame, &mut self.rcp_output)?;
-
-        // Render ImGui on top of any game content
+        // Draw the UI
         let ui = self.imgui.new_frame();
         ui.main_menu_bar(|| (self.draw_menu_callback)(ui));
         (self.draw_windows_callback)(ui);
@@ -238,9 +240,10 @@ impl<'a> Gui<'a> {
             self.gfx_renderer.prepare_render(&mut self.platform, ui);
         }
 
+        // Render RCPOutput and ImGui content
         let draw_data = self.imgui.render();
         self.gfx_renderer
-            .draw_imgui_content(&mut frame, draw_data)?;
+            .draw_content(&mut frame, &mut self.rcp_output, draw_data)?;
 
         // Clear the draw calls
         self.rcp_output.clear_draw_calls();
@@ -262,7 +265,7 @@ type OnDraw = unsafe extern "C" fn(ui: &imgui::Ui);
 
 #[no_mangle]
 pub extern "C" fn GUICreateEventLoop() -> Box<EventLoopWrapper> {
-    let event_loop = EventLoopWrapper::new();
+    let event_loop = EventLoopWrapper::default();
     Box::new(event_loop)
 }
 
