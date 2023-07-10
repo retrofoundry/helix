@@ -202,6 +202,10 @@ impl<'a> Gui<'a> {
         self.ui_state.last_frame_time = now;
     }
 
+    pub fn renderer_name(&self) -> String {
+        self.gfx_renderer.name()
+    }
+
     pub fn start_frame(&mut self, event_loop_wrapper: &mut EventLoopWrapper) -> anyhow::Result<()> {
         // Handle events
         self.handle_events(event_loop_wrapper);

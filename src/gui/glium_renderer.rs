@@ -85,6 +85,10 @@ impl<'a> Renderer<'a> {
 
     // Rendering Functions
 
+    pub fn name(&self) -> String {
+        format!("Glium | OpenGL")
+    }
+
     pub fn content_size(&self) -> winit::dpi::PhysicalSize<u32> {
         self.display.gl_window().window().inner_size()
     }

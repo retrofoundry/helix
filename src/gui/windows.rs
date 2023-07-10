@@ -14,6 +14,7 @@ impl HelixWindows for Ui {
             .always_auto_resize(true)
             .build(|| {
                 self.text(format!("Helix {}", env!("CARGO_PKG_VERSION")));
+                self.text(format!("Renderer: {}", gui.renderer_name()));
 
                 self.text(format!(
                     "Application average {:.3} ms/frame ({:.1} FPS)",

@@ -30,6 +30,7 @@ fn create_depth_texture(
 pub struct Renderer<'a> {
     window: winit::window::Window,
     surface: wgpu::Surface,
+    adapter: wgpu::Adapter,
     device: wgpu::Device,
     queue: wgpu::Queue,
     surface_config: wgpu::SurfaceConfiguration,
@@ -111,6 +112,7 @@ impl<'a> Renderer<'a> {
         Ok(Self {
             window,
             surface,
+            adapter,
             device,
             queue,
             surface_config,
@@ -161,6 +163,10 @@ impl<'a> Renderer<'a> {
     }
 
     // Rendering Functions
+
+    pub fn name(&self) -> String {
+        format!("WGPU | {:?}", self.adapter.get_info().backend)
+    }
 
     pub fn content_size(&self) -> winit::dpi::PhysicalSize<u32> {
         self.window.inner_size()
