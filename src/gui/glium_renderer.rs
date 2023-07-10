@@ -32,10 +32,14 @@ impl<'a> Renderer<'a> {
         // Create the renderer
         let renderer = imgui_glium_renderer::Renderer::init(imgui, &display)?;
 
+        // Create graphics device
+        let size = display.gl_window().window().inner_size();
+        let graphics_device = GliumGraphicsDevice::new([size.width, size.height]);
+
         Ok(Self {
             display,
             renderer,
-            graphics_device: GliumGraphicsDevice::default(),
+            graphics_device,
         })
     }
 
@@ -86,10 +90,16 @@ impl<'a> Renderer<'a> {
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
+        // there's a bug where at first the size is u32::MAX so we just ignore it
+        if width == u32::MAX || height == u32::MAX {
+            return;
+        }
+
         log::trace!("Resizing to {:?}x{:?}", width, height);
         self.display
             .gl_window()
             .resize(glutin::dpi::PhysicalSize::new(width, height));
+        self.graphics_device.resize([width, height]);
     }
 
     pub fn get_current_texture(&self) -> Option<Frame> {
