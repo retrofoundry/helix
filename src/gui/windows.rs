@@ -1,7 +1,7 @@
+use fast3d::gbi::defines::GeometryModes;
 use imgui::{CollapsingHeader, Ui};
 
 use crate::gui::Gui;
-use fast3d::gbi::utils::{geometry_mode_uses_fog, geometry_mode_uses_lighting};
 
 pub trait HelixWindows {
     fn show_profiler_window(&self, opened: &mut bool, gui: &mut Gui);
@@ -53,11 +53,13 @@ impl HelixWindows for Ui {
                                 self.tree_node_config("Geometry Mode").build(|| {
                                     self.text(format!(
                                         "Lighting: {}",
-                                        geometry_mode_uses_lighting(dc.shader_config.geometry_mode)
+                                        dc.shader_config
+                                            .geometry_mode
+                                            .contains(GeometryModes::LIGHTING)
                                     ));
                                     self.text(format!(
                                         "Fog: {}",
-                                        geometry_mode_uses_fog(dc.shader_config.geometry_mode)
+                                        dc.shader_config.geometry_mode.contains(GeometryModes::FOG)
                                     ));
                                 });
 
