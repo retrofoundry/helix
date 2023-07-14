@@ -1,14 +1,15 @@
-use fast3d::gbi::defines::GeometryModes;
+use fast3d::fast3d_gbi::defines::GeometryModes;
+use fast3d::RenderData;
 use imgui::{CollapsingHeader, Ui};
 
 use crate::gui::Gui;
 
 pub trait HelixWindows {
-    fn show_profiler_window(&self, opened: &mut bool, gui: &mut Gui);
+    fn show_profiler_window(&self, opened: &mut bool, gui: &mut Gui, render_data: &RenderData);
 }
 
 impl HelixWindows for Ui {
-    fn show_profiler_window(&self, opened: &mut bool, gui: &mut Gui) {
+    fn show_profiler_window(&self, opened: &mut bool, gui: &mut Gui, render_data: &RenderData) {
         self.window("Profiler")
             .opened(opened)
             .always_auto_resize(true)
@@ -22,15 +23,14 @@ impl HelixWindows for Ui {
                     self.io().framerate
                 ));
 
-                let total_tris = gui
-                    .rcp_output_collector
+                let total_tris = render_data
                     .draw_calls
                     .iter()
                     .fold(0, |acc, draw_call| acc + draw_call.vbo.num_tris);
 
                 self.text(format!(
                     "{} draw calls, {} vertices ({} triangles)",
-                    gui.rcp_output_collector.draw_calls.len(),
+                    render_data.draw_calls.len(),
                     total_tris * 3,
                     total_tris,
                 ));
@@ -39,7 +39,7 @@ impl HelixWindows for Ui {
 
                 if CollapsingHeader::new("Draw Calls").build(self) {
                     self.indent();
-                    for (i, dc) in gui.rcp_output_collector.draw_calls.iter().enumerate() {
+                    for (i, dc) in render_data.draw_calls.iter().enumerate() {
                         self.tree_node_config(format!("Draw Call: {}", i))
                             .build(|| {
                                 self.text(format!("Viewport: {}", dc.viewport));
@@ -118,12 +118,13 @@ impl HelixWindows for Ui {
 // MARK: - C API
 
 #[no_mangle]
-pub extern "C" fn GUIShowProfilerWindow(ui: &Ui, gui: Option<&mut Gui>, opened: Option<&mut bool>) {
+pub extern "C" fn GUIShowProfilerWindow(ui: &Ui, gui: Option<&mut Gui>, render_data: Option<&RenderData>, opened: Option<&mut bool>) {
     let opened = opened.unwrap();
     let gui = gui.unwrap();
+    let render_data = render_data.unwrap();
     if !*opened {
         return;
     }
 
-    ui.show_profiler_window(opened, gui);
+    ui.show_profiler_window(opened, gui, render_data);
 }

@@ -1,5 +1,5 @@
+use fast3d::RenderData;
 use crate::gui::{EventLoopWrapper, Frame};
-use fast3d::RCPOutputCollector;
 
 use fast3d_wgpu_renderer::WgpuRenderer;
 
@@ -202,7 +202,7 @@ impl<'a> Renderer<'a> {
     pub fn draw_content(
         &mut self,
         frame: &mut Frame,
-        rcp_output_collector: &mut RCPOutputCollector,
+        render_data: &mut RenderData,
         imgui_draw_data: &imgui::DrawData,
     ) -> anyhow::Result<()> {
         let frame_texture = frame
@@ -217,7 +217,7 @@ impl<'a> Renderer<'a> {
             &self.device,
             &self.queue,
             self.surface_config.format,
-            rcp_output_collector,
+            render_data,
         );
 
         let mut encoder: wgpu::CommandEncoder =

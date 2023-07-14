@@ -1,6 +1,6 @@
 use crate::gamepad::manager::GamepadManager;
 use fast3d::rdp::OutputDimensions;
-use fast3d::{RCPOutputCollector, RCP};
+use fast3d::{RCP, RenderData};
 use winit::platform::run_return::EventLoopExtRunReturn;
 
 pub mod windows;
@@ -55,14 +55,13 @@ pub struct Gui<'a> {
 
     // draw callbacks
     draw_menu_callback: Box<dyn Fn(&imgui::Ui) + 'a>,
-    draw_windows_callback: Box<dyn Fn(&imgui::Ui) + 'a>,
+    draw_windows_callback: Box<dyn Fn(&imgui::Ui, &RenderData) + 'a>,
 
     // gamepad
     gamepad_manager: Option<&'a mut GamepadManager>,
 
     // game renderer
     rcp: RCP,
-    rcp_output_collector: RCPOutputCollector,
     gfx_renderer: Renderer<'a>,
 }
 
@@ -76,7 +75,7 @@ impl<'a> Gui<'a> {
     ) -> anyhow::Result<Self>
     where
         D: Fn(&imgui::Ui) + 'static,
-        W: Fn(&imgui::Ui) + 'static,
+        W: Fn(&imgui::Ui, &RenderData) + 'static,
     {
         // Setup ImGui
         let mut imgui = imgui::Context::create();
@@ -122,7 +121,6 @@ impl<'a> Gui<'a> {
             draw_windows_callback: Box::new(draw_windows),
             gamepad_manager,
             rcp: RCP::new(),
-            rcp_output_collector: RCPOutputCollector::new(),
             gfx_renderer: renderer,
         })
     }
@@ -228,7 +226,7 @@ impl<'a> Gui<'a> {
         self.rcp.rdp.output_dimensions = dimensions;
 
         // Run the RCP
-        self.rcp.run(&mut self.rcp_output_collector, commands);
+        let mut render_data = self.rcp.process_dl(commands);
 
         // Grab the frame
         let mut frame = self.gfx_renderer.get_current_texture().unwrap();
@@ -236,7 +234,7 @@ impl<'a> Gui<'a> {
         // Draw the UI
         let ui = self.imgui.new_frame();
         ui.main_menu_bar(|| (self.draw_menu_callback)(ui));
-        (self.draw_windows_callback)(ui);
+        (self.draw_windows_callback)(ui, &render_data);
 
         if self.ui_state.last_cursor != ui.mouse_cursor() {
             self.ui_state.last_cursor = ui.mouse_cursor();
@@ -246,10 +244,7 @@ impl<'a> Gui<'a> {
         // Render RCPOutput and ImGui content
         let draw_data = self.imgui.render();
         self.gfx_renderer
-            .draw_content(&mut frame, &mut self.rcp_output_collector, draw_data)?;
-
-        // Clear the draw calls
-        self.rcp_output_collector.clear_draw_calls();
+            .draw_content(&mut frame, &mut render_data, draw_data)?;
 
         // Swap buffers
         self.gfx_renderer.finish_render(frame)?;
@@ -264,7 +259,8 @@ impl<'a> Gui<'a> {
 
 // MARK: - C API
 
-type OnDraw = unsafe extern "C" fn(ui: &imgui::Ui);
+type OnDrawMenu = unsafe extern "C" fn(ui: &imgui::Ui);
+type OnDrawWindows = unsafe extern "C" fn(ui: &imgui::Ui, render_data: &RenderData);
 
 #[no_mangle]
 pub extern "C" fn GUICreateEventLoop() -> Box<EventLoopWrapper> {
@@ -276,8 +272,8 @@ pub extern "C" fn GUICreateEventLoop() -> Box<EventLoopWrapper> {
 pub unsafe extern "C" fn GUICreate<'a>(
     title_raw: *const i8,
     event_loop: Option<&'a mut EventLoopWrapper>,
-    draw_menu: Option<OnDraw>,
-    draw_windows: Option<OnDraw>,
+    draw_menu: Option<OnDrawMenu>,
+    draw_windows: Option<OnDrawWindows>,
     gamepad_manager: Option<&'a mut GamepadManager>,
 ) -> Box<Gui<'a>> {
     let title_str: &std::ffi::CStr = unsafe { std::ffi::CStr::from_ptr(title_raw) };
@@ -292,9 +288,9 @@ pub unsafe extern "C" fn GUICreate<'a>(
                 draw_menu(ui);
             }
         },
-        move |ui| unsafe {
+        move |ui, render_data| unsafe {
             if let Some(draw_windows) = draw_windows {
-                draw_windows(ui);
+                draw_windows(ui, render_data);
             }
         },
         gamepad_manager,
