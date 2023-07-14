@@ -11,11 +11,11 @@ crate-type = ["lib", "staticlib"]
 default = ["f3dex2", "wgpu_renderer"]
 
 # Graphics Features
-f3dex2 = ["fast3d/f3dex2"]
-f3dex2e = ["gbifloats", "f3dex2", "fast3d/f3dex2e"]
+f3dex2 = ["fast3d/f3dex2", "fast3d-gbi/f3dex2"]
+f3dex2e = ["gbifloats", "f3dex2", "fast3d/f3dex2e", "fast3d-gbi/f3dex2e"]
 f3dzex2 = ["f3dex2", "fast3d/f3dzex2"]
 
-gbifloats = ["fast3d/gbifloats"]
+gbifloats = ["fast3d/gbifloats", "fast3d-gbi/gbifloats"]
 
 # Renderer Backend
 wgpu_renderer = ["wgpu", "imgui-wgpu", "fast3d-wgpu-renderer"]
@@ -45,6 +45,7 @@ wgpu = { version = "0.16", optional = true }
 spin_sleep = "1.1.1"
 arie = "0.2.0"
 fast3d = { version = "0.4.2", default-features = false }
+fast3d-gbi = { path = "../../fast3d-rs/fast3d-gbi", default-features = false }
 fast3d-glium-renderer = { version = "0.4.2", optional = true }
 fast3d-wgpu-renderer = { version = "0.4.2", optional = true }
 rustc-hash = "1.1.0"
