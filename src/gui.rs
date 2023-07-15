@@ -1,6 +1,6 @@
 use crate::gamepad::manager::GamepadManager;
 use fast3d::rdp::OutputDimensions;
-use fast3d::{RCP, RenderData};
+use fast3d::{RenderData, RCP};
 use winit::platform::run_return::EventLoopExtRunReturn;
 
 pub mod windows;

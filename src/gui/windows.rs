@@ -118,7 +118,12 @@ impl HelixWindows for Ui {
 // MARK: - C API
 
 #[no_mangle]
-pub extern "C" fn GUIShowProfilerWindow(ui: &Ui, gui: Option<&mut Gui>, render_data: Option<&RenderData>, opened: Option<&mut bool>) {
+pub extern "C" fn GUIShowProfilerWindow(
+    ui: &Ui,
+    gui: Option<&mut Gui>,
+    render_data: Option<&RenderData>,
+    opened: Option<&mut bool>,
+) {
     let opened = opened.unwrap();
     let gui = gui.unwrap();
     let render_data = render_data.unwrap();

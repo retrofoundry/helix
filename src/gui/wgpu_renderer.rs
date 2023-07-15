@@ -1,5 +1,5 @@
-use fast3d::RenderData;
 use crate::gui::{EventLoopWrapper, Frame};
+use fast3d::RenderData;
 
 use fast3d_wgpu_renderer::WgpuRenderer;
 
