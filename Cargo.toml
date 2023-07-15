@@ -44,13 +44,14 @@ glutin = { version = "0.29.1", optional = true }
 wgpu = { version = "0.16", optional = true }
 spin_sleep = "1.1.1"
 arie = "0.2.0"
-fast3d = { version = "0.4.2", default-features = false }
-fast3d-gbi = { path = "../../fast3d-rs/fast3d-gbi", default-features = false }
-fast3d-glium-renderer = { version = "0.4.2", optional = true }
-fast3d-wgpu-renderer = { version = "0.4.2", optional = true }
+fast3d = { version = "0.4.3", default-features = false }
+fast3d-gbi = { version = "0.4.3", default-features = false }
+fast3d-glium-renderer = { version = "0.4.3", optional = true }
+fast3d-wgpu-renderer = { version = "0.4.3", optional = true }
 rustc-hash = "1.1.0"
 
 [patch.crates-io]
 #fast3d = { path = "../../fast3d-rs/fast3d" }
+#fast3d-gbi = { path = "../../fast3d-rs/fast3d-gbi" }
 #fast3d-glium-renderer = { path = "../../fast3d-rs/fast3d-glium-renderer" }
 #fast3d-wgpu-renderer = { path = "../../fast3d-rs/fast3d-wgpu-renderer" }
