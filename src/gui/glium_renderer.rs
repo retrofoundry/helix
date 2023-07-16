@@ -1,6 +1,5 @@
 use crate::gui::{EventLoopWrapper, Frame};
-use fast3d::rdp::OutputDimensions;
-use fast3d::RCPOutputCollector;
+use fast3d::RenderData;
 use fast3d_glium_renderer::GliumRenderer;
 
 pub struct Renderer<'a> {
@@ -114,7 +113,7 @@ impl<'a> Renderer<'a> {
     pub fn draw_content(
         &mut self,
         frame: &mut Frame,
-        rcp_output_collector: &mut RCPOutputCollector,
+        render_data: &mut RenderData,
         imgui_draw_data: &imgui::DrawData,
     ) -> anyhow::Result<()> {
         // Prepare the context device
@@ -122,7 +121,7 @@ impl<'a> Renderer<'a> {
 
         // Process the RCP output
         self.fast3d_renderer
-            .render_rcp_output(rcp_output_collector, &self.display, frame);
+            .render_rcp_output(render_data, &self.display, frame);
 
         // Render the ImGui content
         self.renderer.render(frame, imgui_draw_data)?;
