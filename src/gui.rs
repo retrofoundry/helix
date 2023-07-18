@@ -247,6 +247,7 @@ impl<'a> Gui<'a> {
         let draw_data = self.imgui.render();
         self.gfx_renderer
             .draw_content(&mut frame, &mut self.render_data, draw_data)?;
+        self.render_data.clear_draw_calls();
 
         // Swap buffers
         self.gfx_renderer.finish_render(frame)?;
