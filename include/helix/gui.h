@@ -16,7 +16,7 @@ void HLXDisplayProcessDrawLists(u64* commands);
 void HLXDisplayEndFrame();
 float HLXDisplayGetAspectRatio();
 
-void HLXShowProfilerWindow(void* ui, void* render_data, bool* opened);
+void HLXShowProfilerWindow(void* ui, bool* opened);
 
 #ifdef __cplusplus
 }

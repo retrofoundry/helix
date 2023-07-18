@@ -55,13 +55,14 @@ pub struct Gui<'a> {
 
     // draw callbacks
     draw_menu_callback: Box<dyn Fn(&imgui::Ui) + 'a>,
-    draw_windows_callback: Box<dyn Fn(&imgui::Ui, &RenderData) + 'a>,
+    draw_windows_callback: Box<dyn Fn(&imgui::Ui) + 'a>,
 
     // gamepad
     gamepad_manager: Option<&'a mut GamepadManager>,
 
     // game renderer
     rcp: RCP,
+    render_data: RenderData,
     gfx_renderer: Renderer<'a>,
 }
 
@@ -75,7 +76,7 @@ impl<'a> Gui<'a> {
     ) -> anyhow::Result<Self>
     where
         D: Fn(&imgui::Ui) + 'static,
-        W: Fn(&imgui::Ui, &RenderData) + 'static,
+        W: Fn(&imgui::Ui) + 'static,
     {
         // Setup ImGui
         let mut imgui = imgui::Context::create();
@@ -121,6 +122,7 @@ impl<'a> Gui<'a> {
             draw_windows_callback: Box::new(draw_windows),
             gamepad_manager,
             rcp: RCP::new(),
+            render_data: RenderData::default(),
             gfx_renderer: renderer,
         })
     }
@@ -226,7 +228,7 @@ impl<'a> Gui<'a> {
         self.rcp.rdp.output_dimensions = dimensions;
 
         // Run the RCP
-        let mut render_data = self.rcp.process_dl(commands);
+        self.rcp.process_dl(commands, &mut self.render_data);
 
         // Grab the frame
         let mut frame = self.gfx_renderer.get_current_texture().unwrap();
@@ -234,7 +236,7 @@ impl<'a> Gui<'a> {
         // Draw the UI
         let ui = self.imgui.new_frame();
         ui.main_menu_bar(|| (self.draw_menu_callback)(ui));
-        (self.draw_windows_callback)(ui, &render_data);
+        (self.draw_windows_callback)(ui);
 
         if self.ui_state.last_cursor != ui.mouse_cursor() {
             self.ui_state.last_cursor = ui.mouse_cursor();
@@ -244,7 +246,7 @@ impl<'a> Gui<'a> {
         // Render RCPOutput and ImGui content
         let draw_data = self.imgui.render();
         self.gfx_renderer
-            .draw_content(&mut frame, &mut render_data, draw_data)?;
+            .draw_content(&mut frame, &mut self.render_data, draw_data)?;
 
         // Swap buffers
         self.gfx_renderer.finish_render(frame)?;
@@ -259,8 +261,7 @@ impl<'a> Gui<'a> {
 
 // MARK: - C API
 
-type OnDrawMenu = unsafe extern "C" fn(ui: &imgui::Ui);
-type OnDrawWindows = unsafe extern "C" fn(ui: &imgui::Ui, render_data: &RenderData);
+type OnDrawUi = unsafe extern "C" fn(ui: &imgui::Ui);
 
 #[no_mangle]
 pub extern "C" fn GUICreateEventLoop() -> Box<EventLoopWrapper> {
@@ -272,8 +273,8 @@ pub extern "C" fn GUICreateEventLoop() -> Box<EventLoopWrapper> {
 pub unsafe extern "C" fn GUICreate<'a>(
     title_raw: *const i8,
     event_loop: Option<&'a mut EventLoopWrapper>,
-    draw_menu: Option<OnDrawMenu>,
-    draw_windows: Option<OnDrawWindows>,
+    draw_menu: Option<OnDrawUi>,
+    draw_windows: Option<OnDrawUi>,
     gamepad_manager: Option<&'a mut GamepadManager>,
 ) -> Box<Gui<'a>> {
     let title_str: &std::ffi::CStr = unsafe { std::ffi::CStr::from_ptr(title_raw) };
@@ -288,9 +289,9 @@ pub unsafe extern "C" fn GUICreate<'a>(
                 draw_menu(ui);
             }
         },
-        move |ui, render_data| unsafe {
+        move |ui| unsafe {
             if let Some(draw_windows) = draw_windows {
-                draw_windows(ui, render_data);
+                draw_windows(ui);
             }
         },
         gamepad_manager,

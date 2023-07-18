@@ -35,7 +35,7 @@ void HLXAudioPlayBuffer(const uint8_t* buf, size_t len) {
 }
 
 // Window & Graphics
-void HLXDisplaySetup(const char* title, void (*draw_menu)(void*), void (*draw_windows)(void*, void*)) {
+void HLXDisplaySetup(const char* title, void (*draw_menu)(void*), void (*draw_windows)(void*)) {
     _gui = GUICreate(title, _event_loop, draw_menu, draw_windows, _gamepad_manager); // pass in a possible keyboard observing object
 }
 
@@ -55,6 +55,6 @@ f32 HLXDisplayGetAspectRatio() {
     return GUIGetAspectRatio(_gui);
 }
 
-void HLXShowProfilerWindow(void* ui, void* render_data, bool* opened) {
-    GUIShowProfilerWindow(ui, _gui, render_data, opened);
+void HLXShowProfilerWindow(void* ui, bool* opened) {
+    GUIShowProfilerWindow(ui, _gui, opened);
 }
