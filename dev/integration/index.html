@@ -436,7 +436,7 @@
 </ol>
 <p><strong>NOTE: If you get a build error that certain header methods are not implemented, you&rsquo;re likely not building with that feature enabled.</strong></p>
 <p>Example:
-<div class="highlight"><pre><span></span><code><span class="n">corrosion_import_crate</span><span class="p">(</span><span class="n">MANIFEST_PATH</span><span class="w"> </span><span class="n">$</span><span class="p">{</span><span class="n">CMAKE_CURRENT_SOURCE_DIR</span><span class="p">}</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">helix</span><span class="o">/</span><span class="n">Cargo</span><span class="p">.</span><span class="n">toml</span><span class="w"> </span><span class="n">FEATURES</span><span class="w"> </span><span class="n">f3dex2e</span><span class="w"> </span><span class="n">network</span><span class="p">)</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">corrosion_import_crate</span><span class="p">(</span><span class="n">MANIFEST_PATH</span><span class="w"> </span><span class="n">$</span><span class="p">{</span><span class="n">CMAKE_CURRENT_SOURCE_DIR</span><span class="p">}</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">helix</span><span class="o">/</span><span class="n">Cargo</span><span class="p">.</span><span class="n">toml</span><span class="w"> </span><span class="n">FEATURES</span><span class="w"> </span><span class="n">network</span><span class="p">)</span><span class="w"></span>
 <span class="cp"># methods in these headers will work:</span>
 <span class="cp">#</span><span class="w"> </span><span class="cp">include</span><span class="w"> </span><span class="cpf">&lt;helix/network.h&gt;</span><span class="c1">, &lt;helix/audio.h&gt;</span><span class="cp"></span>
 <span class="cp"># methods in these headers won&#39;t work:</span>
@@ -449,7 +449,7 @@
 
 <span class="nb">add_subdirectory</span><span class="p">(</span><span class="s">./corrosion</span><span class="p">)</span>
 
-<span class="nb">corrosion_import_crate</span><span class="p">(</span><span class="s">MANIFEST_PATH</span><span class="w"> </span><span class="s">./helix/Cargo.toml</span><span class="w"> </span><span class="s">FEATURES</span><span class="w"> </span><span class="s">f3dex2e</span><span class="p">)</span>
+<span class="nb">corrosion_import_crate</span><span class="p">(</span><span class="s">MANIFEST_PATH</span><span class="w"> </span><span class="s">./helix/Cargo.toml</span><span class="p">)</span>
 
 <span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">sm64.</span><span class="o">${</span><span class="nv">VERSION</span><span class="o">}</span><span class="w"> </span><span class="s">PRIVATE</span><span class="w"> </span><span class="s">helix</span><span class="p">)</span>
 <span class="nb">target_include_directories</span><span class="p">(</span><span class="s">sm64.</span><span class="o">${</span><span class="nv">VERSION</span><span class="o">}</span><span class="w"> </span><span class="s">PRIVATE</span><span class="w"> </span><span class="s">./helix/include</span><span class="p">)</span>
