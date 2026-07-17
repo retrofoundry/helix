@@ -408,52 +408,12 @@
 </code></pre></div>
 <p>The following API is provided:</p>
 <div class="highlight"><pre><span></span><code><span class="cm">/**</span>
-<span class="cm"> * Creates and sets up the window, passes in a function that is to be called to draw the menu bar</span>
-<span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="w"> </span><span class="nf">HLXDisplaySetup</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">title</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">draw_menu</span><span class="p">)(),</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">draw_windows</span><span class="p">)());</span><span class="w"></span>
-
-<span class="cm">/**</span>
-<span class="cm"> * Used to start a frame and prepare for drawing</span>
-<span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="w"> </span><span class="nf">HLXDisplayStartFrame</span><span class="p">();</span><span class="w"></span>
-
-<span class="cm">/**</span>
-<span class="cm"> * N64 Gfx commands are passed in to be drawn to the screen</span>
-<span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="w"> </span><span class="nf">HLXDisplayProcessDrawLists</span><span class="p">(</span><span class="n">u64</span><span class="o">*</span><span class="w"> </span><span class="n">commands</span><span class="p">);</span><span class="w"></span>
-
-<span class="cm">/**</span>
-<span class="cm"> * Marks the end of the frame</span>
-<span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="w"> </span><span class="nf">HLXDisplayEndFrame</span><span class="p">();</span><span class="w"></span>
-
-<span class="cm">/**</span>
 <span class="cm"> * Can be used to get the display&#39;s aspect ratio</span>
 <span class="cm">**/</span><span class="w"></span>
 <span class="kt">float</span><span class="w"> </span><span class="nf">HLXDisplayGetAspectRatio</span><span class="p">();</span><span class="w"></span>
 </code></pre></div>
 <h2 id="audio">Audio<a class="headerlink" href="#audio" title="Permanent link">&para;</a></h2>
-<p>Helix provides functionality for audio playback. Audio playback is simple and Helix provides the following API:</p>
-<div class="highlight"><pre><span></span><code><span class="cm">/**</span>
-<span class="cm"> * Creates and sets up the audio player, returning a pointer to the instance or nullptr if creation failed</span>
-<span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="w"> </span><span class="nf">HLXAudioSetup</span><span class="p">(</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">sampleRate</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">channels</span><span class="p">);</span><span class="w"></span>
-
-<span class="cm">/**</span>
-<span class="cm"> * Returns the number of samples currently buffered</span>
-<span class="cm">**/</span><span class="w"></span>
-<span class="kt">size_t</span><span class="w"> </span><span class="nf">HLXAudioGetBufferredSampleCount</span><span class="p">();</span><span class="w"></span>
-
-<span class="cm">/**</span>
-<span class="cm"> * Returns the size of the available buffer</span>
-<span class="cm">**/</span><span class="w"></span>
-<span class="kt">size_t</span><span class="w"> </span><span class="nf">HLXAudioGetBufferSize</span><span class="p">();</span><span class="w"></span>
-
-<span class="cm">/**</span>
-<span class="cm"> * Plays the audio from the given buffer - resampling if necessary for audio output device.</span>
-<span class="cm">**/</span><span class="w"></span>
-<span class="kt">void</span><span class="w"> </span><span class="nf">HLXAudioPlayBuffer</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="o">*</span><span class="w"> </span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">len</span><span class="p">);</span><span class="w"></span>
-</code></pre></div>
+<p>Helix provides functionality for audio playback.</p>
 <h2 id="speech">Speech<a class="headerlink" href="#speech" title="Permanent link">&para;</a></h2>
 <p>Helix provides an API for text-to-speech (TTS):</p>
 <div class="highlight"><pre><span></span><code><span class="cm">/**</span>
