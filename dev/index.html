@@ -424,9 +424,10 @@
 
 
 <h1 id="helix">Helix<a class="headerlink" href="#helix" title="Permanent link">&para;</a></h1>
-<p>Helix is a library written in Rust providing core features for getting your N64 software running on PC and other systems.</p>
+<p>Helix is a Rust library for running N64 software on PC and other systems. It provides a faithful libultra runtime alongside a modern renderer, audio, and input, so a decompilation runs on its original threading and <code>main.c</code> with minimal change.</p>
 <h2 id="features-provided">Features Provided<a class="headerlink" href="#features-provided" title="Permanent link">&para;</a></h2>
 <ul>
+<li>[x] Libultra runtime (ultra) — real threads, message queues + events, a 60 Hz VI clock, an RCP task engine (graphics → fast3d, audio → an HLE Acmd interpreter), PI/DMA, timers, and EEPROM save, all over native pointers</li>
 <li>[x] Window Management (gui)</li>
 <li>[x] N64 RDP command processing and rendering via <a href="https://github.com/retrofoundry/fast3d-rs">fast3d-rs</a> on wgpu (gui)</li>
 <li>[x] Input Handling (gamepad)</li>
