@@ -7,7 +7,7 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-jobs:    
+jobs:
   rustfmt-check:
     runs-on: ubuntu-latest
     steps:
@@ -24,18 +24,12 @@ jobs:
       run: cargo clippy --all --
   macos-check:
     runs-on: macos-latest
-    strategy:
-      matrix:
-        renderer: [opengl_renderer, wgpu_renderer]
     steps:
     - uses: actions/checkout@v2
     - name: Test
-      run: cargo test --features "speech, network, ${{ matrix.renderer }}, f3dex2" --no-default-features
+      run: cargo test --features "speech, network"
   ubuntu-check:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        renderer: [opengl_renderer, wgpu_renderer]
     steps:
     - uses: actions/checkout@v2
     - name: Update apt
@@ -45,13 +39,10 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y $(cat .github/workflows/apt-deps.txt)
     - name: Test
-      run: cargo test --features "speech, network, ${{ matrix.renderer }}, f3dex2" --no-default-features
+      run: cargo test --features "speech, network"
   windows-check:
     runs-on: windows-latest
-    strategy:
-      matrix:
-        renderer: [opengl_renderer, wgpu_renderer]
     steps:
     - uses: actions/checkout@v2
     - name: Test
-      run: cargo test --features "speech, network, ${{ matrix.renderer }}, f3dex2" --no-default-features
+      run: cargo test --features "speech, network"

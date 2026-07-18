@@ -10,13 +10,7 @@
 extern "C" {
 #endif
 
-void HLXDisplaySetup(const char* title, void (*draw_menu)(), void (*draw_windows)());
-void HLXDisplayStartFrame();
-void HLXDisplayProcessDrawLists(u64* commands);
-void HLXDisplayEndFrame();
 float HLXDisplayGetAspectRatio();
-
-void HLXShowProfilerWindow(void* ui, bool* opened);
 
 #ifdef __cplusplus
 }

@@ -14,7 +14,7 @@ __NOTE: If you get a build error that certain header methods are not implemented
 
 Example:
 ```cpp
-corrosion_import_crate(MANIFEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../helix/Cargo.toml FEATURES f3dex2e network)
+corrosion_import_crate(MANIFEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../helix/Cargo.toml FEATURES network)
 # methods in these headers will work:
 # include <helix/network.h>, <helix/audio.h>
 # methods in these headers won't work:
@@ -29,7 +29,7 @@ Advanced Example:
 
 add_subdirectory(./corrosion)
 
-corrosion_import_crate(MANIFEST_PATH ./helix/Cargo.toml FEATURES f3dex2e)
+corrosion_import_crate(MANIFEST_PATH ./helix/Cargo.toml)
 
 target_link_libraries(sm64.${VERSION} PRIVATE helix)
 target_include_directories(sm64.${VERSION} PRIVATE ./helix/include)

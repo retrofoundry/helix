@@ -1,20 +1,8 @@
 #ifndef ARIE_LIB_AUDIO_H
 #define ARIE_LIB_AUDIO_H
 
-#include <stdint.h>
-#include <stddef.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-void HLXAudioSetup(uint32_t sampleRate, uint16_t channels);
-size_t HLXAudioGetBufferredSampleCount();
-size_t HLXAudioGetBufferSize();
-void HLXAudioPlayBuffer(const uint8_t* buf, size_t len);
-
-#ifdef __cplusplus
-}
-#endif
+// The Helix audio C boundary now lives in <helix/internal.h> (HLXAudioResult and the
+// HLXAudio* functions). This header is retained only so existing #includes keep parsing;
+// it declares nothing of its own.
 
 #endif /* ARIE_LIB_AUDIO_H */

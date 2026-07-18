@@ -1,40 +1,25 @@
+use std::sync::Arc;
+
 use crate::gamepad::manager::GamepadManager;
-use fast3d::rdp::OutputDimensions;
-use fast3d::{RenderData, RCP};
-use winit::platform::run_return::EventLoopExtRunReturn;
 
-pub mod windows;
+use winit::application::ApplicationHandler;
+use winit::dpi::LogicalSize;
+use winit::event::WindowEvent;
+use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::platform::pump_events::{EventLoopExtPumpEvents, PumpStatus};
+use winit::window::{Window, WindowAttributes, WindowId};
 
-#[cfg(feature = "opengl_renderer")]
-mod glium_renderer;
-#[cfg(feature = "opengl_renderer")]
-pub use glium_renderer::Renderer;
-#[cfg(feature = "opengl_renderer")]
-pub type Frame = glium::Frame;
-
-#[cfg(feature = "wgpu_renderer")]
-mod wgpu_renderer;
-#[cfg(feature = "wgpu_renderer")]
-pub use wgpu_renderer::Renderer;
-#[cfg(feature = "wgpu_renderer")]
-pub type Frame = wgpu::SurfaceTexture;
-
-/// Represents the state of the UI.
-pub struct UIState {
-    last_frame_time: std::time::Instant,
-    last_cursor: Option<imgui::MouseCursor>,
-}
-
-/// Wrapper around winit's event loop to allow for
-/// the creation of the imgui context.
+/// Wrapper around winit's event loop. The event loop lives separately from the
+/// `Gui` so that the per-frame entry can hold a `&mut EventLoop` (for
+/// `pump_app_events`) while passing the `Gui` as the `ApplicationHandler`.
 pub struct EventLoopWrapper {
-    event_loop: winit::event_loop::EventLoop<()>,
+    event_loop: EventLoop<()>,
 }
 
 impl EventLoopWrapper {
     pub fn new() -> Self {
         Self {
-            event_loop: winit::event_loop::EventLoop::new(),
+            event_loop: EventLoop::new().expect("failed to create event loop"),
         }
     }
 }
@@ -45,224 +30,176 @@ impl Default for EventLoopWrapper {
     }
 }
 
+/// Main-thread half of the split: owns the winit window, pumps events, and drives the (`!Send`)
+/// gamepad manager. On `resumed` it creates the wgpu surface and hands it off to the render
+/// thread (`crate::render::spawn`), which owns `fast3d::Renderer` and does all consume/present
+/// from then on — this struct never touches a `Renderer`.
 pub struct Gui<'a> {
-    // imgui
-    imgui: imgui::Context,
-    platform: imgui_winit_support::WinitPlatform,
-
-    // ui state
-    ui_state: UIState,
-
-    // draw callbacks
-    draw_menu_callback: Box<dyn Fn(&imgui::Ui) + 'a>,
-    draw_windows_callback: Box<dyn Fn(&imgui::Ui) + 'a>,
-
-    // gamepad
+    title: String,
+    width: u32,
+    height: u32,
+    window: Option<Arc<Window>>,
+    render: Option<crate::render::RenderHandle>,
     gamepad_manager: Option<&'a mut GamepadManager>,
-
-    // game renderer
-    rcp: RCP,
-    render_data: RenderData,
-    gfx_renderer: Renderer<'a>,
 }
 
 impl<'a> Gui<'a> {
-    pub fn new<D, W>(
+    pub fn new(
         title: &str,
-        event_loop_wrapper: &EventLoopWrapper,
-        draw_menu: D,
-        draw_windows: W,
         gamepad_manager: Option<&'a mut GamepadManager>,
-    ) -> anyhow::Result<Self>
-    where
-        D: Fn(&imgui::Ui) + 'static,
-        W: Fn(&imgui::Ui) + 'static,
-    {
-        // Setup ImGui
-        let mut imgui = imgui::Context::create();
-
-        // Create the imgui + winit platform
-        let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
-
-        // Setup Dear ImGui style
-        imgui.set_ini_filename(None);
-
-        // Imgui Setup fonts
-        let hidpi_factor = platform.hidpi_factor();
-        let font_size = (13.0 * hidpi_factor) as f32;
-        imgui.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
-
-        imgui
-            .fonts()
-            .add_font(&[imgui::FontSource::DefaultFontData {
-                config: Some(imgui::FontConfig {
-                    oversample_h: 1,
-                    pixel_snap_h: true,
-                    size_pixels: font_size,
-                    ..Default::default()
-                }),
-            }]);
-
-        // Setup Renderer
-        let (width, height) = (800, 600);
-        let renderer = Renderer::new(width, height, title, event_loop_wrapper, &mut imgui)?;
-        renderer.attach_window(&mut platform, &mut imgui);
-
-        // Initial UI state
-        let last_frame_time = std::time::Instant::now();
-
+    ) -> anyhow::Result<Self> {
         Ok(Self {
-            imgui,
-            platform,
-            ui_state: UIState {
-                last_frame_time,
-                last_cursor: None,
-            },
-            draw_menu_callback: Box::new(draw_menu),
-            draw_windows_callback: Box::new(draw_windows),
+            title: title.to_string(),
+            width: 800,
+            height: 600,
+            window: None,
+            render: None,
             gamepad_manager,
-            rcp: RCP::new(),
-            render_data: RenderData::default(),
-            gfx_renderer: renderer,
         })
     }
 
-    fn handle_events(&mut self, event_loop_wrapper: &mut EventLoopWrapper) {
-        event_loop_wrapper
-            .event_loop
-            .run_return(|event, _, control_flow| {
-                match event {
-                    winit::event::Event::MainEventsCleared => control_flow.set_exit(),
-                    winit::event::Event::WindowEvent {
-                        event: winit::event::WindowEvent::CloseRequested,
-                        ..
-                    } => std::process::exit(0),
-                    winit::event::Event::WindowEvent {
-                        event:
-                            winit::event::WindowEvent::Resized(size)
-                            | winit::event::WindowEvent::ScaleFactorChanged {
-                                new_inner_size: &mut size,
-                                ..
-                            },
-                        ..
-                    } => {
-                        self.gfx_renderer.resize(size.width, size.height);
+    /// Create the window (once), seed the widescreen aspect from its initial physical size, then
+    /// create the wgpu surface and hand it off to a freshly spawned render thread.
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if self.window.is_some() {
+            return;
+        }
+        let window = Arc::new(
+            event_loop
+                .create_window(
+                    WindowAttributes::default()
+                        .with_title(&self.title)
+                        .with_inner_size(LogicalSize::new(self.width, self.height))
+                        .with_resizable(true),
+                )
+                .expect("create window"),
+        );
+        let size = window.inner_size();
+        crate::render::set_aspect_from_size(size.width, size.height); // seed from initial physical size
 
-                        // TODO: Fix resizing on OpenGL
-                        #[cfg(feature = "wgpu_renderer")]
-                        self.gfx_renderer
-                            .handle_event(&mut self.platform, &mut self.imgui, &event);
-                    }
-                    winit::event::Event::WindowEvent {
-                        event: winit::event::WindowEvent::ModifiersChanged(modifiers),
-                        ..
-                    } => {
-                        if let Some(gamepad_manager) = self.gamepad_manager.as_mut() {
-                            gamepad_manager.handle_modifiers_changed(modifiers);
-                        }
+        // `Arc<Window>` satisfies `Into<SurfaceTarget<'static>>` (carries its own display handle).
+        let instance = wgpu::Instance::default(); // match fast3d Renderer::new exactly
+        let surface = instance
+            .create_surface(window.clone())
+            .expect("create_surface on main");
+        let handle = crate::render::spawn(crate::render::SurfaceHandoff {
+            instance,
+            surface,
+            width: size.width.max(1),
+            height: size.height.max(1),
+        });
 
-                        self.gfx_renderer
-                            .handle_event(&mut self.platform, &mut self.imgui, &event);
-                    }
-                    winit::event::Event::WindowEvent {
-                        event: winit::event::WindowEvent::KeyboardInput { input, .. },
-                        ..
-                    } => {
-                        if let Some(gamepad_manager) = self.gamepad_manager.as_mut() {
-                            gamepad_manager.handle_keyboard_input(input);
-                        }
-
-                        self.gfx_renderer
-                            .handle_event(&mut self.platform, &mut self.imgui, &event);
-                    }
-                    event => {
-                        self.gfx_renderer
-                            .handle_event(&mut self.platform, &mut self.imgui, &event)
-                    }
-                }
-            });
+        self.window = Some(window);
+        self.render = Some(handle);
     }
 
-    fn sync_frame_rate(&mut self) {
-        const FRAME_INTERVAL_MS: u64 = 1000 / 30;
-
-        let frame_duration = self.ui_state.last_frame_time.elapsed();
-        if frame_duration < std::time::Duration::from_millis(FRAME_INTERVAL_MS) {
-            let sleep_duration =
-                std::time::Duration::from_millis(FRAME_INTERVAL_MS) - frame_duration;
-            spin_sleep::sleep(sleep_duration);
+    fn window_event(
+        &mut self,
+        _event_loop: &ActiveEventLoop,
+        _window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        match event {
+            WindowEvent::CloseRequested => {
+                // Request graceful shutdown only; HLXRunEventLoop's pump loop observes it, wakes
+                // the render thread with RenderMsg::Shutdown, joins it, then runs ultra::teardown()
+                // (flushes EEPROM). No event_loop.exit() here — shutdown is centralized there.
+                crate::ultra::request_shutdown();
+            }
+            WindowEvent::Resized(size) => {
+                self.forward_resize(size.width, size.height);
+            }
+            WindowEvent::ScaleFactorChanged { .. } => {
+                if let Some(w) = self.window.as_ref() {
+                    let size = w.inner_size();
+                    self.forward_resize(size.width, size.height);
+                }
+            }
+            WindowEvent::ModifiersChanged(modifiers) => {
+                if let Some(gamepad_manager) = self.gamepad_manager.as_mut() {
+                    gamepad_manager.handle_modifiers_changed(modifiers.state());
+                }
+            }
+            WindowEvent::KeyboardInput { event, .. } => {
+                if let Some(gamepad_manager) = self.gamepad_manager.as_mut() {
+                    gamepad_manager.handle_keyboard_input(&event);
+                }
+            }
+            _ => {}
         }
+    }
 
-        let now = std::time::Instant::now();
+    /// Update the main-fed widescreen aspect and forward the new physical size to the render
+    /// thread for a surface reconfigure. Ignores winit's transient `u32::MAX` size and a
+    /// minimized (zero-dimension) window.
+    fn forward_resize(&self, width: u32, height: u32) {
+        if crate::render::valid_surface_size(width, height).is_none() {
+            return;
+        }
+        crate::render::set_aspect_from_size(width, height);
+        crate::ultra::rcp::send_render_control(crate::ultra::rcp::RenderMsg::Resize {
+            width,
+            height,
+        });
+    }
 
-        self.imgui
-            .io_mut()
-            .update_delta_time(now - self.ui_state.last_frame_time);
-
-        self.ui_state.last_frame_time = now;
+    /// Take the render-thread handle so the caller can send `RenderMsg::Shutdown` and join it.
+    /// `None` if the window (and thus the render thread) never came up.
+    pub fn take_render_handle(&mut self) -> Option<crate::render::RenderHandle> {
+        self.render.take()
     }
 
     pub fn renderer_name(&self) -> String {
-        self.gfx_renderer.name()
+        "WGPU".to_string()
     }
 
-    pub fn start_frame(&mut self, event_loop_wrapper: &mut EventLoopWrapper) -> anyhow::Result<()> {
-        // Handle events
-        self.handle_events(event_loop_wrapper);
-
-        // Prepare for drawing
-        self.gfx_renderer
-            .prepare_frame(&mut self.platform, &mut self.imgui)?;
-
-        Ok(())
-    }
-
-    pub fn process_draw_lists(&mut self, commands: usize) -> anyhow::Result<()> {
-        // Set RDP output dimensions
-        let size = self.gfx_renderer.content_size();
-        let dimensions = OutputDimensions {
-            width: size.width,
-            height: size.height,
-            aspect_ratio: size.width as f32 / size.height as f32,
-        };
-        self.rcp.rdp.output_dimensions = dimensions;
-
-        // Run the RCP
-        self.rcp.process_dl(commands, &mut self.render_data);
-
-        // Grab the frame
-        let mut frame = self.gfx_renderer.get_current_texture().unwrap();
-
-        // Draw the UI
-        let ui = self.imgui.new_frame();
-        ui.main_menu_bar(|| (self.draw_menu_callback)(ui));
-        (self.draw_windows_callback)(ui);
-
-        if self.ui_state.last_cursor != ui.mouse_cursor() {
-            self.ui_state.last_cursor = ui.mouse_cursor();
-            self.gfx_renderer.prepare_render(&mut self.platform, ui);
+    /// Pump winit. Waits (blocking, no timeout) for `resumed()` to create the window on the very
+    /// first pass, then pumps with a bounded ~2ms timeout so this thread never spins a core nor
+    /// stalls guest threads for long. A winit `PumpStatus::Exit` at any point (including before
+    /// the window exists) is returned to the caller so it can request shutdown.
+    pub fn pump(&mut self, w: &mut EventLoopWrapper) -> PumpStatus {
+        while self.window.is_none() {
+            if let PumpStatus::Exit(code) = w.event_loop.pump_app_events(None, self) {
+                return PumpStatus::Exit(code);
+            }
         }
-
-        // Render RCPOutput and ImGui content
-        let draw_data = self.imgui.render();
-        self.gfx_renderer
-            .draw_content(&mut frame, &mut self.render_data, draw_data)?;
-        self.render_data.clear_draw_calls();
-
-        // Swap buffers
-        self.gfx_renderer.finish_render(frame)?;
-
-        Ok(())
+        w.event_loop
+            .pump_app_events(Some(std::time::Duration::from_millis(2)), self)
     }
 
-    pub fn end_frame(&mut self) {
-        self.sync_frame_rate();
+    /// Main-thread-only: pump the (`!Send`) gamepad manager and publish a `Send + Sync` snapshot
+    /// for the libultra runtime's thread5 to read via `HLXControllerInit`/`HLXControllerRead`.
+    /// The manager NEVER leaves this thread; only the plain snapshot crosses threads. Called each
+    /// frame from `HLXRunEventLoop` (after `pump`, which drains winit keyboard input into the
+    /// manager) and once during `HLXRuntimeInit` to seed the snapshot before threads start.
+    pub fn sample_gamepads_into_snapshot(&mut self) {
+        if let Some(manager) = self.gamepad_manager.as_mut() {
+            let snapshot = manager.sample_snapshot();
+            crate::gamepad::snapshot::publish(snapshot);
+        }
+    }
+}
+
+impl<'a> ApplicationHandler for Gui<'a> {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        Gui::resumed(self, event_loop);
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        Gui::window_event(self, event_loop, window_id, event);
+    }
+
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        // Frame pacing is driven by the decomp game loop, not winit.
     }
 }
 
 // MARK: - C API
-
-type OnDrawUi = unsafe extern "C" fn(ui: &imgui::Ui);
 
 #[no_mangle]
 pub extern "C" fn GUICreateEventLoop() -> Box<EventLoopWrapper> {
@@ -273,57 +210,13 @@ pub extern "C" fn GUICreateEventLoop() -> Box<EventLoopWrapper> {
 #[no_mangle]
 pub unsafe extern "C" fn GUICreate<'a>(
     title_raw: *const i8,
-    event_loop: Option<&'a mut EventLoopWrapper>,
-    draw_menu: Option<OnDrawUi>,
-    draw_windows: Option<OnDrawUi>,
+    _event_loop: Option<&'a mut EventLoopWrapper>,
     gamepad_manager: Option<&'a mut GamepadManager>,
 ) -> Box<Gui<'a>> {
     let title_str: &std::ffi::CStr = unsafe { std::ffi::CStr::from_ptr(title_raw) };
     let title: &str = std::str::from_utf8(title_str.to_bytes()).unwrap();
 
-    let event_loop = event_loop.unwrap();
-    let gui = Gui::new(
-        title,
-        event_loop,
-        move |ui| unsafe {
-            if let Some(draw_menu) = draw_menu {
-                draw_menu(ui);
-            }
-        },
-        move |ui| unsafe {
-            if let Some(draw_windows) = draw_windows {
-                draw_windows(ui);
-            }
-        },
-        gamepad_manager,
-    )
-    .unwrap();
+    let gui = Gui::new(title, gamepad_manager).unwrap();
 
     Box::new(gui)
-}
-
-#[no_mangle]
-pub extern "C" fn GUIStartFrame(gui: Option<&mut Gui>, event_loop: Option<&mut EventLoopWrapper>) {
-    let gui = gui.unwrap();
-    let event_loop = event_loop.unwrap();
-    gui.start_frame(event_loop).unwrap();
-}
-
-#[no_mangle]
-pub extern "C" fn GUIDrawLists(gui: Option<&mut Gui>, commands: u64) {
-    let gui = gui.unwrap();
-    gui.process_draw_lists(commands.try_into().unwrap())
-        .unwrap();
-}
-
-#[no_mangle]
-pub extern "C" fn GUIEndFrame(gui: Option<&mut Gui>) {
-    let gui = gui.unwrap();
-    gui.end_frame();
-}
-
-#[no_mangle]
-pub extern "C" fn GUIGetAspectRatio(gui: Option<&mut Gui>) -> f32 {
-    let gui = gui.unwrap();
-    gui.rcp.rdp.output_dimensions.aspect_ratio
 }

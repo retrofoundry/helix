@@ -13,15 +13,34 @@ void _osContInternalSetup(void* gamepad_manager) {
 
 // MARK: - Methods from libultra
 
+// Runtime-active (HLXRuntimeActive()) vs not — see helix/src/gamepad/snapshot.rs.
+// Runtime: this is thread5, which must NEVER touch the `!Send` GamepadManager. Input is pumped
+//   and published as a plain snapshot on the winit main thread; thread5 reads the snapshot.
+// Otherwise: keep the direct GamepadManager path.
+
 s32 osContInit(OSMesgQueue *mq, u8 *controller_bits, OSContStatus *status) {
+    if (HLXRuntimeActive()) {
+        return HLXControllerInit(controller_bits);
+    }
     return GamepadManagerInit(_ref_gamepad_manager, controller_bits);
 }
 
 s32 osContStartReadData(OSMesgQueue *mesg) {
-    GamepadManagerProcessEvents(_ref_gamepad_manager);
+    if (HLXRuntimeActive()) {
+        // Runtime: the main thread already pumps input, so DROP GamepadManagerProcessEvents here.
+        // Just unblock thread5's osRecvMesg(&gSIEventMesgQueue) so read_controller_inputs proceeds.
+        HLXEventPost(OS_EVENT_SI);
+    } else {
+        // Not runtime-active: sample directly on the (single) calling thread; no SI post.
+        GamepadManagerProcessEvents(_ref_gamepad_manager);
+    }
     return 0;
 }
 
 void osContGetReadData(OSContPad *pad) {
-    return GamepadManagerGetReadData(_ref_gamepad_manager, pad);
+    if (HLXRuntimeActive()) {
+        HLXControllerRead(pad);
+        return;
+    }
+    GamepadManagerGetReadData(_ref_gamepad_manager, pad);
 }

@@ -1,10 +1,11 @@
 use crate::gamepad::providers::{Gamepad, GamepadProvider, GamepadService};
 use crate::gamepad::types::{N64Button, OSControllerPad};
 use crate::gamepad::utils::MAX_N64_AXIS_RANGE;
-use winit::event::VirtualKeyCode;
+use winit::event::{ElementState, KeyEvent};
+use winit::keyboard::{KeyCode, PhysicalKey};
 
 pub struct KeyboardGamepadProvider {
-    pub keys: Vec<VirtualKeyCode>,
+    pub keys: Vec<KeyCode>,
 }
 
 impl KeyboardGamepadProvider {
@@ -29,71 +30,75 @@ impl GamepadProvider for KeyboardGamepadProvider {
 
     unsafe fn read(&self, _controllers: &Gamepad, pad: *mut OSControllerPad) {
         unsafe {
-            if self.keys.contains(&VirtualKeyCode::X) {
+            if self.keys.contains(&KeyCode::KeyX) {
                 (*pad).button |= N64Button::A as u16;
             }
-            if self.keys.contains(&VirtualKeyCode::C) {
+            if self.keys.contains(&KeyCode::KeyC) {
                 (*pad).button |= N64Button::B as u16;
             }
-            if self.keys.contains(&VirtualKeyCode::Z) {
+            if self.keys.contains(&KeyCode::KeyZ) {
                 (*pad).button |= N64Button::Z as u16;
             }
-            if self.keys.contains(&VirtualKeyCode::Space) {
+            if self.keys.contains(&KeyCode::Space) {
                 (*pad).button |= N64Button::Start as u16;
             }
-            if self.keys.contains(&VirtualKeyCode::W) {
+            if self.keys.contains(&KeyCode::KeyW) {
                 (*pad).stick_y = MAX_N64_AXIS_RANGE as i8;
             }
-            if self.keys.contains(&VirtualKeyCode::A) {
+            if self.keys.contains(&KeyCode::KeyA) {
                 (*pad).stick_x = (-MAX_N64_AXIS_RANGE) as i8;
             }
-            if self.keys.contains(&VirtualKeyCode::S) {
+            if self.keys.contains(&KeyCode::KeyS) {
                 (*pad).stick_y = (-MAX_N64_AXIS_RANGE) as i8;
             }
-            if self.keys.contains(&VirtualKeyCode::D) {
+            if self.keys.contains(&KeyCode::KeyD) {
                 (*pad).stick_x = MAX_N64_AXIS_RANGE as i8;
             }
-            if self.keys.contains(&VirtualKeyCode::Up) {
+            if self.keys.contains(&KeyCode::ArrowUp) {
                 (*pad).button |= N64Button::CUp as u16;
             }
-            if self.keys.contains(&VirtualKeyCode::Left) {
+            if self.keys.contains(&KeyCode::ArrowLeft) {
                 (*pad).button |= N64Button::CLeft as u16;
             }
-            if self.keys.contains(&VirtualKeyCode::Down) {
+            if self.keys.contains(&KeyCode::ArrowDown) {
                 (*pad).button |= N64Button::CDown as u16;
             }
-            if self.keys.contains(&VirtualKeyCode::Right) {
+            if self.keys.contains(&KeyCode::ArrowRight) {
                 (*pad).button |= N64Button::CRight as u16;
             }
-            if self.keys.contains(&VirtualKeyCode::T) {
+            if self.keys.contains(&KeyCode::KeyT) {
                 (*pad).button |= N64Button::DUp as u16;
             }
-            if self.keys.contains(&VirtualKeyCode::F) {
+            if self.keys.contains(&KeyCode::KeyF) {
                 (*pad).button |= N64Button::DLeft as u16;
             }
-            if self.keys.contains(&VirtualKeyCode::G) {
+            if self.keys.contains(&KeyCode::KeyG) {
                 (*pad).button |= N64Button::DDown as u16;
             }
-            if self.keys.contains(&VirtualKeyCode::H) {
+            if self.keys.contains(&KeyCode::KeyH) {
                 (*pad).button |= N64Button::DRight as u16;
             }
-            if self.keys.contains(&VirtualKeyCode::R) {
+            if self.keys.contains(&KeyCode::KeyR) {
                 (*pad).button |= N64Button::L as u16;
             }
-            if self.keys.contains(&VirtualKeyCode::Y) {
+            if self.keys.contains(&KeyCode::KeyY) {
                 (*pad).button |= N64Button::R as u16;
             }
         }
     }
 
-    fn handle_modifiers_changed(&mut self, _modifiers: winit::event::ModifiersState) {}
+    fn handle_modifiers_changed(&mut self, _modifiers: winit::keyboard::ModifiersState) {}
 
-    fn handle_keyboard_input(&mut self, input: winit::event::KeyboardInput) {
-        if input.state == winit::event::ElementState::Pressed {
-            if let Some(key) = input.virtual_keycode {
+    fn handle_keyboard_input(&mut self, input: &KeyEvent) {
+        let PhysicalKey::Code(key) = input.physical_key else {
+            return;
+        };
+
+        if input.state == ElementState::Pressed {
+            if !self.keys.contains(&key) {
                 self.keys.push(key);
             }
-        } else if let Some(key) = input.virtual_keycode {
+        } else {
             self.keys.retain(|&k| k != key);
         }
     }

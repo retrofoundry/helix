@@ -16,55 +16,13 @@ The following API is provided:
 
 ```cpp
 /**
- * Creates and sets up the window, passes in a function that is to be called to draw the menu bar
-**/
-void HLXDisplaySetup(const char* title, void (*draw_menu)(), void (*draw_windows)());
-
-/**
- * Used to start a frame and prepare for drawing
-**/
-void HLXDisplayStartFrame();
-
-/**
- * N64 Gfx commands are passed in to be drawn to the screen
-**/
-void HLXDisplayProcessDrawLists(u64* commands);
-
-/**
- * Marks the end of the frame
-**/
-void HLXDisplayEndFrame();
-
-/**
  * Can be used to get the display's aspect ratio
 **/
 float HLXDisplayGetAspectRatio();
 ```
 
 ## Audio
-Helix provides functionality for audio playback. Audio playback is simple and Helix provides the following API:
-
-```cpp
-/**
- * Creates and sets up the audio player, returning a pointer to the instance or nullptr if creation failed
-**/
-void HLXAudioSetup(uint32_t sampleRate, uint16_t channels);
-
-/**
- * Returns the number of samples currently buffered
-**/
-size_t HLXAudioGetBufferredSampleCount();
-
-/**
- * Returns the size of the available buffer
-**/
-size_t HLXAudioGetBufferSize();
-
-/**
- * Plays the audio from the given buffer - resampling if necessary for audio output device.
-**/
-void HLXAudioPlayBuffer(const uint8_t* buf, size_t len);
-```
+Helix provides functionality for audio playback.
 
 ## Speech
 Helix provides an API for text-to-speech (TTS):

@@ -13,3 +13,5 @@ Cargo.lock
 .DS_Store
 examples/rust/target
 /.idea
+cpp/audio/REVERT_NOTES.md
+.devenv/

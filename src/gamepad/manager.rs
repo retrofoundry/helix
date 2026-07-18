@@ -1,9 +1,11 @@
-use winit::event::{KeyboardInput, ModifiersState};
+use winit::event::KeyEvent;
+use winit::keyboard::ModifiersState;
 
 use super::providers::gilrs::GirlsGamepadProvider;
 use super::types::{GamepadBits, OSControllerPad};
 use crate::gamepad::providers::keyboard::KeyboardGamepadProvider;
 use crate::gamepad::providers::{Gamepad, GamepadProvider};
+use crate::gamepad::snapshot::GamepadSnapshot;
 
 use std::ptr::null_mut;
 
@@ -47,6 +49,32 @@ impl GamepadManager {
         }
     }
 
+    /// Main-thread-only: pump input and produce a plain, `Send + Sync` snapshot for the libultra
+    /// runtime. The `!Send` manager stays on this thread; only the returned snapshot crosses to
+    /// thread5 (via `gamepad::snapshot`). Never touches `self.gamepad_bits` — in the runtime path
+    /// `init()` is never called, so that pointer is null; the controller-bits are derived from
+    /// the live scan instead.
+    pub fn sample_snapshot(&mut self) -> GamepadSnapshot {
+        self.process_events();
+
+        let mut pad = OSControllerPad {
+            button: 0,
+            stick_x: 0,
+            stick_y: 0,
+            errno: 0,
+        };
+        // SAFETY: `pad` is a valid, uniquely-owned local live for the whole call.
+        unsafe { self.read(&mut pad as *mut OSControllerPad) };
+
+        GamepadSnapshot {
+            button: pad.button,
+            stick_x: pad.stick_x,
+            stick_y: pad.stick_y,
+            errno: pad.errno,
+            bits: if self.gamepads.is_empty() { 0 } else { 1 },
+        }
+    }
+
     pub unsafe fn read(&mut self, pad: *mut OSControllerPad) {
         // TODO: Handle current slot?
 
@@ -71,13 +99,19 @@ impl GamepadManager {
             }
         }
 
-        unsafe {
-            *self.gamepad_bits = if !self.gamepads.is_empty() { 1 } else { 0 };
+        // In the libultra runtime the manager is sampled (via `sample_snapshot`) before `init()`
+        // ever runs, so `gamepad_bits` can be null here; only write through a real pointer. When
+        // the runtime isn't active, osContInit always calls `init()` first, so this guard is
+        // inert there.
+        if !self.gamepad_bits.is_null() {
+            unsafe {
+                *self.gamepad_bits = if !self.gamepads.is_empty() { 1 } else { 0 };
+            }
         }
     }
 
     // Keyboard Handlind Methods (from Window)
-    pub fn handle_keyboard_input(&mut self, input: KeyboardInput) {
+    pub fn handle_keyboard_input(&mut self, input: &KeyEvent) {
         for provider in &mut self.providers {
             provider.handle_keyboard_input(input);
         }

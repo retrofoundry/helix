@@ -1,16 +1,19 @@
+// The `#[no_mangle] extern "C"` entry points take raw pointers the C caller owns; the C ABI is the
+// unsafe boundary, so `not_unsafe_ptr_arg_deref` (which asks for a Rust `unsafe` marker) is noise here.
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
+
 use env_logger::Builder;
+pub mod audio;
 pub mod gamepad;
 pub mod gui;
 #[cfg(feature = "network")]
 pub mod network;
+pub mod render;
 #[cfg(feature = "speech")]
 pub mod speech;
+pub mod ultra;
 
 pub use arie;
-
-// Check for invalid feature combinations
-#[cfg(all(feature = "opengl_renderer", feature = "wgpu_renderer"))]
-compile_error!("Cannot enable both OpenGL and WGPU rendering");
 
 pub fn init() {
     let mut builder = Builder::from_default_env();
