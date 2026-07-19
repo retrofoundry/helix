@@ -6,6 +6,7 @@ pub mod event;
 pub mod mesg;
 pub mod pi;
 pub mod rcp;
+pub mod rom;
 pub mod save;
 pub mod sched;
 pub mod thread;

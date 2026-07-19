@@ -69,6 +69,26 @@ s32  HLXMesgRecv(void* mq, void** msg_out, s32 flag);
 void HLXEventSetMesg(s32 event, void* mq, void* msg);
 void HLXEventPost(s32 event);
 s32  HLXPiStartDma(void* mb, s32 dir, size_t devAddr, void* vAddr, size_t nbytes, void* mq);
+
+// Cart ROM device (helix/src/ultra/rom.rs). The guest-facing os_pi.c EPI shim classifies the device
+// and routes cart reads here; HLXRomLoad installs a validated host-endian native image at startup.
+typedef int32_t HlxStatus;
+enum {
+    HLX_OK = 0,
+    HLX_ERR_NO_ROM = -1,
+    HLX_ERR_RANGE = -2,
+    HLX_ERR_UNSUPPORTED_DEVICE = -3,
+    HLX_ERR_BAD_ARG = -4,
+    HLX_ERR_QUEUE = -5,
+    HLX_ERR_BAD_IMAGE = -6,
+    HLX_ERR_INTERNAL = -7
+};
+typedef int32_t HlxDevKind;
+enum { HLX_DEV_CART = 0, HLX_DEV_DRIVE = 1, HLX_DEV_SRAM = 2, HLX_DEV_DEBUG = 3 };
+HlxStatus HLXRomLoad(const uint8_t* container, size_t len);
+HlxStatus HLXEPiDma(void* mb, HlxDevKind kind, uint32_t base, uint32_t devAddr, void* dram,
+                    size_t size, s32 dir, void* retQueue);
+HlxStatus HLXEPiReadIo(HlxDevKind kind, uint32_t base, uint32_t devAddr, uint32_t* out);
 bool HLXRuntimeActive(void); // true only while the libultra runtime is live (RUNTIME_ACTIVE)
 
 // VI (video interface / retrace clock) — ultra/vi.rs
