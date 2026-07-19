@@ -73,7 +73,7 @@ pub extern "C" fn HLXAspectRatio() -> f32 {
     aspect_ratio()
 }
 
-/// Graphics microcode the guest declares (from its GRUCODE build) via `HLXRenderSetMicrocode`;
+/// Graphics microcode the guest declares via `HLXRenderSetMicrocode` (from its own build);
 /// `consume_dl` hands it to fast3d so the renderer matches the ROM. 0 = F3dex2 (fast3d's
 /// default), 1 = F3d — kept in sync with `HLXMicrocode` in runtime.h.
 static MICROCODE: AtomicU32 = AtomicU32::new(0);
@@ -100,15 +100,15 @@ fn microcode() -> fast3d::Microcode {
     }
 }
 
-/// C-facing microcode selector (create_gfx_task_structure declares it next to task.t.ucode).
+/// C-facing microcode selector: the guest declares its build's microcode before the first gfx task.
 #[no_mangle]
 pub extern "C" fn HLXRenderSetMicrocode(microcode: u32) {
     MICROCODE.store(microcode, Ordering::Relaxed);
 }
 
-/// Guest vertex/matrix layout (`GBI_FLOATS`), declared via `HLXRenderSetDataFormat`; fast3d treats
-/// it as orthogonal to the microcode, so `consume_dl` applies it before each frame. 0 = Fixed (N64
-/// s16, fast3d's default), 1 = Float — kept in sync with `HLXDataFormat` in runtime.h.
+/// Guest vertex/matrix layout (fixed N64 s16 vs float), declared via `HLXRenderSetDataFormat`;
+/// fast3d treats it as orthogonal to the microcode, so `consume_dl` applies it before each frame.
+/// 0 = Fixed (fast3d's default), 1 = Float — kept in sync with `HLXDataFormat` in runtime.h.
 static DATA_FORMAT: AtomicU32 = AtomicU32::new(0);
 
 fn data_format() -> fast3d::DataFormat {
@@ -122,7 +122,7 @@ fn data_format() -> fast3d::DataFormat {
     }
 }
 
-/// C-facing data-format selector (create_gfx_task_structure declares it from the GBI_FLOATS build).
+/// C-facing data-format selector: the guest declares its build's vertex layout before the first gfx task.
 #[no_mangle]
 pub extern "C" fn HLXRenderSetDataFormat(format: u32) {
     DATA_FORMAT.store(format, Ordering::Relaxed);
