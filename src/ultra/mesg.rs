@@ -49,6 +49,37 @@ fn lookup(key: usize) -> Arc<Mutex<Queue>> {
         .clone()
 }
 
+/// Poison-safe atomic "fill-then-post" for a DMA completion: if the queue exists and has a free
+/// slot, run `fill` (the bounded DMA copy) and enqueue `msg` under the queue lock, then wake a
+/// blocked receiver. Returns 0 = filled+posted, -1 = full, -2 = missing/poisoned.
+///
+/// `fill` runs ONLY once a slot is guaranteed, so a full/invalid queue leaves NO side effect; and
+/// because the room check, the copy, and the post are one locked section, no tokenless producer can
+/// consume the slot between the check and the post (this closes the has_room/try_post TOCTOU: there
+/// is no window in which data is copied but the completion then fails to enqueue). No `unwrap`/
+/// `expect`, so a missing/poisoned queue returns an error instead of unwinding across the FFI
+/// boundary. `fill` must not itself lock a mesg queue (it runs under this queue's lock).
+pub(crate) fn post_with<F: FnOnce()>(key: usize, msg: usize, fill: F) -> i32 {
+    let q = match registry().lock().ok().and_then(|r| r.get(&key).cloned()) {
+        Some(q) => q,
+        None => return -2,
+    };
+    let mut g = match q.lock() {
+        Ok(g) => g,
+        Err(_) => return -2,
+    };
+    if g.valid < g.cap {
+        fill();
+        g.push_tail(msg);
+        if let Some(w) = g.recv_waiters.pop_front() {
+            sched::wake(w);
+        }
+        0
+    } else {
+        -1
+    }
+}
+
 pub(crate) fn create(key: usize, count: i32) {
     let cap = (count.max(1)) as usize;
     let q = Queue {
