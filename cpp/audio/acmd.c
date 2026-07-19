@@ -1,6 +1,5 @@
 #include <stdint.h>
-#include <ultra64.h>
-#include <PR/abi.h>
+#include <libultra/ultra64.h>
 #include "mixer.h"
 #include "acmd.h"
 

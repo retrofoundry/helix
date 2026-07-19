@@ -1,5 +1,4 @@
-#include <PR/os_vi.h>
-#include <PR/libultra.h>
+#include <libultra/os_vi.h>   // OSViMode, TV_TYPE_*, osTvType/osViModeTable, osVi* decls
 
 #include <helix/internal.h>
 

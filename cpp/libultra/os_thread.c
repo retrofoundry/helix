@@ -1,5 +1,4 @@
-#include <ultra64.h>
-#include "macros.h"
+#include <libultra/ultra64.h>   // provides UNUSED, OSThread/OSId/OSPri/OSPageMask
 #include <helix/runtime.h>
 
 /* Runtime is already bootstrapped by HLXRuntimeInit() in host_main.c. */

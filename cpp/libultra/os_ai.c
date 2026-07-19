@@ -1,6 +1,5 @@
-#include <ultra64.h>
+#include <libultra/ultra64.h>   // VI_*_CLOCK, AI_STATUS_*, osTvType
 #include <helix/internal.h>
-#include <PR/rcp.h>   // VI_NTSC_CLOCK / VI_PAL_CLOCK / VI_MPAL_CLOCK
 
 // libultra Audio Interface (AI) shim over the Helix-owned HLXAudio* boundary.
 //

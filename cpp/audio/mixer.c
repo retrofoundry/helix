@@ -1,7 +1,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <ultra64.h>
+#include <libultra/ultra64.h>
 
 #include "mixer.h"
 
