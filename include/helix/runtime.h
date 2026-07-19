@@ -16,6 +16,23 @@ void HLXThreadCreate(void *t, s32 id, void (*entry)(void *), void *arg, void *sp
 void HLXThreadStart(void *t);
 void HLXThreadSetPri(void *t, s32 pri); /* t == NULL means the calling thread */
 void HLXThreadStop(void *t);
+void HLXThreadYield(void); /* osYieldThread: cooperative reschedule point */
+
+/* Graphics microcode (helix/src/render.rs). The guest declares its GRUCODE build so the
+   renderer matches the ROM; values must stay in sync with render.rs's MICROCODE mapping. */
+typedef enum {
+    HLX_MICROCODE_F3DEX2 = 0,
+    HLX_MICROCODE_F3D = 1,
+} HLXMicrocode;
+void HLXRenderSetMicrocode(u32 microcode);
+
+/* Guest vertex/matrix layout (GBI_FLOATS), orthogonal to the microcode in fast3d. Values must
+   stay in sync with render.rs's DATA_FORMAT mapping. */
+typedef enum {
+    HLX_DATAFMT_FIXED = 0,
+    HLX_DATAFMT_FLOAT = 1,
+} HLXDataFormat;
+void HLXRenderSetDataFormat(u32 format);
 
 #ifdef __cplusplus
 }

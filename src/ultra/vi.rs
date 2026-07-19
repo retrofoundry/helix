@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
-use crate::ultra::mesg::HLXMesgSend;
+use crate::ultra::mesg;
 
 /// N64 retrace rates. NTSC/MPAL pace at 60 Hz; PAL at 50 Hz.
 pub const REFRESH_NTSC_HZ: u32 = 60;
@@ -318,11 +318,9 @@ fn post_retrace() {
     ev.remaining = ev.remaining.saturating_sub(1);
     if ev.remaining == 0 {
         ev.remaining = ev.retrace.max(1);
-        let mq = ev.mq as *mut c_void;
-        let msg = ev.msg as *mut c_void;
-        // NOBLOCK send == host injector: tail-insert MESG_VI_VBLANK, mark the
-        // waiter (thread3) READY, wake the scheduler.
-        HLXMesgSend(mq, msg, 0);
+        // Coalescing send: at most one retrace is ever queued, so the free-running clock can't
+        // fill gIntrMesgQueue and drop the SP/DP completions.
+        mesg::send_coalescing(ev.mq, ev.msg);
     }
 }
 

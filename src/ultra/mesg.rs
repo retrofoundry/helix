@@ -27,6 +27,11 @@ impl Queue {
         self.valid -= 1;
         m
     }
+    /// Is message `m` already sitting unconsumed in the ring? Used by the VI
+    /// coalescing send to bound outstanding retraces to one.
+    fn contains(&self, m: usize) -> bool {
+        (0..self.valid).any(|k| self.buf[(self.first + k) % self.cap] == m)
+    }
 }
 
 static QUEUES: OnceLock<Mutex<HashMap<usize, Arc<Mutex<Queue>>>>> = OnceLock::new();
@@ -72,10 +77,8 @@ pub(crate) fn send(key: usize, msg: usize, flag: i32) -> i32 {
             return 0;
         }
         if flag != OS_MESG_BLOCK {
-            // Full ring + NOBLOCK: the send is dropped and reported to the caller.
-            // This is the ordinary osSendMesg(OS_MESG_NOBLOCK) contract; the guest
-            // (thread3's interrupt handler) tolerates a coalesced/dropped retrace,
-            // so this is not logged (it can occur in bursts under host-render load).
+            // Full ring + NOBLOCK: ordinary osSendMesg drop. Retraces are coalesced at the VI
+            // source (send_coalescing), so they can't fill the ring and drop SP/DP completions.
             return -1; // full + NOBLOCK
         }
         // full + BLOCK: enqueue self and park until a recv frees a slot
@@ -86,6 +89,26 @@ pub(crate) fn send(key: usize, msg: usize, flag: i32) -> i32 {
         sched::park_self();
         // loop: retry the tail-insert
     }
+}
+
+/// Coalescing NOBLOCK send for the VI retrace: if `msg` is already pending in the ring, suppress
+/// this post so at most one retrace is ever queued; otherwise send normally. Keeps the free-running
+/// VI clock from filling `gIntrMesgQueue` and dropping the non-droppable SP/DP completions. The
+/// check+insert is under the queue lock, so it can't race a concurrent post/recv.
+pub(crate) fn send_coalescing(key: usize, msg: usize) -> i32 {
+    let q = lookup(key);
+    let mut g = q.lock().unwrap();
+    if g.contains(msg) {
+        return 0; // a retrace is already pending: coalesce (drop at source)
+    }
+    if g.valid < g.cap {
+        g.push_tail(msg);
+        if let Some(w) = g.recv_waiters.pop_front() {
+            sched::wake(w);
+        }
+        return 0;
+    }
+    -1 // full of non-retrace messages (rare): ordinary NOBLOCK drop
 }
 
 pub(crate) fn recv(key: usize, flag: i32) -> (i32, usize) {
@@ -307,6 +330,76 @@ mod tests {
         assert_eq!(send(key, 3, 0), 0); // wraps into slot 0
         assert_eq!(recv(key, 0), (0, 2));
         assert_eq!(recv(key, 0), (0, 3));
+    }
+
+    // gIntrMesgQueue message values (src/game/main.c). The retrace is coalesced by the VI
+    // clock; SP/DP completions are posted NOBLOCK from the consumer and must never drop.
+    const VI: usize = 102; // MESG_VI_VBLANK
+    const SP: usize = 100; // MESG_SP_COMPLETE
+    const DP: usize = 101; // MESG_DP_COMPLETE
+
+    #[test]
+    fn vi_coalesces_to_one_outstanding() {
+        // Two coalescing retrace posts leave exactly ONE retrace queued (the second is
+        // suppressed, reported as success, not a drop).
+        let mut backing = [0u8; 64];
+        let key = qkey(&mut backing);
+        create(key, 8);
+        assert_eq!(send_coalescing(key, VI), 0);
+        assert_eq!(send_coalescing(key, VI), 0, "suppressed post still reports success");
+        assert_eq!(recv(key, 0), (0, VI));
+        assert_eq!(recv(key, 0), (-1, 0), "only one retrace was ever queued");
+    }
+
+    #[test]
+    fn completions_never_dropped_under_vi_saturation() {
+        // The real failure: VI spam must not crowd out SP+DP. Coalescing bounds retraces to 1,
+        // so both completions always enqueue behind the single retrace.
+        let mut backing = [0u8; 256];
+        let key = qkey(&mut backing);
+        create(key, 16);
+        for _ in 0..100 {
+            assert_eq!(send_coalescing(key, VI), 0);
+        }
+        assert_eq!(send(key, SP, 0), 0, "SP_COMPLETE must not drop");
+        assert_eq!(send(key, DP, 0), 0, "DP_COMPLETE must not drop");
+        // Exactly one retrace, then both completions, then empty.
+        assert_eq!(recv(key, 0), (0, VI));
+        assert_eq!(recv(key, 0), (0, SP));
+        assert_eq!(recv(key, 0), (0, DP));
+        assert_eq!(recv(key, 0), (-1, 0));
+    }
+
+    #[test]
+    fn vi_reenqueues_after_consume() {
+        // Liveness: once the consumer drains the pending retrace, the next tick enqueues a
+        // fresh one (so thread3 keeps getting woken).
+        let mut backing = [0u8; 64];
+        let key = qkey(&mut backing);
+        create(key, 4);
+        assert_eq!(send_coalescing(key, VI), 0);
+        assert_eq!(send_coalescing(key, VI), 0); // suppressed while one is pending
+        assert_eq!(recv(key, 0), (0, VI)); // consume it
+        assert_eq!(send_coalescing(key, VI), 0); // now a fresh retrace enqueues
+        assert_eq!(recv(key, 0), (0, VI));
+        assert_eq!(recv(key, 0), (-1, 0));
+    }
+
+    #[test]
+    fn concurrent_vi_between_completions_is_coalesced() {
+        // A retrace attempt landing between an SP and its DP is coalesced away (a retrace is
+        // already pending), so it never displaces the DP and never reorders the completions.
+        let mut backing = [0u8; 256];
+        let key = qkey(&mut backing);
+        create(key, 16);
+        assert_eq!(send_coalescing(key, VI), 0); // retrace pending
+        assert_eq!(send(key, SP, 0), 0);
+        assert_eq!(send_coalescing(key, VI), 0); // concurrent tick: suppressed
+        assert_eq!(send(key, DP, 0), 0);
+        assert_eq!(recv(key, 0), (0, VI));
+        assert_eq!(recv(key, 0), (0, SP));
+        assert_eq!(recv(key, 0), (0, DP));
+        assert_eq!(recv(key, 0), (-1, 0), "no second retrace slipped in");
     }
 
     #[test]

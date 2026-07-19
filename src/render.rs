@@ -2,7 +2,7 @@
 //! hands it here; this thread consumes DLs and presents. Aspect ratio is a main-fed global the C HUD reads.
 
 use crate::ultra::rcp::{take_render_receiver, RenderMsg};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::Receiver;
 use std::thread::JoinHandle;
 
@@ -34,36 +34,6 @@ impl fast3d::DiagSink for DedupLogSink {
         if seen.insert(msg.clone()) {
             log::warn!("hle diag @ {:#x}: {}", d.at, msg);
         }
-    }
-}
-
-/// Logs the `DlSummary` rollup from `process_dl`. Vertex/geom-mode/bbox detail is intentionally
-/// dropped — the `HELIX_DL_PROBE` path doesn't need it.
-pub(crate) fn dl_probe_summary(summary: &fast3d::DlSummary) {
-    log::warn!(
-        "[probe] summary: {} commands, {} tris, warns={}, errors={}, dropped_runs={}, renderable={}",
-        summary.commands, summary.tris, summary.warns, summary.errors, summary.dropped_runs,
-        summary.renderable
-    );
-}
-
-pub(crate) const PROBE_FRAMES: u32 = 3;
-
-pub(crate) fn probe_on() -> bool {
-    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var("HELIX_DL_PROBE").is_ok())
-}
-
-pub(crate) fn dl_probe_peek(frame: u32, commands: usize) {
-    log::warn!("[probe f{frame}] data_ptr = {commands:#018x}");
-    if commands == 0 {
-        log::warn!("[probe] data_ptr is NULL");
-        return;
-    }
-    let p = commands as *const u32;
-    for i in 0..16 {
-        let w = unsafe { std::ptr::read_unaligned(p.add(i)) };
-        log::warn!("[probe]   word[{i:2}] = {w:#010x}");
     }
 }
 
@@ -103,6 +73,61 @@ pub extern "C" fn HLXAspectRatio() -> f32 {
     aspect_ratio()
 }
 
+/// Graphics microcode the guest declares (from its GRUCODE build) via `HLXRenderSetMicrocode`;
+/// `consume_dl` hands it to fast3d so the renderer matches the ROM. 0 = F3dex2 (fast3d's
+/// default), 1 = F3d — kept in sync with `HLXMicrocode` in runtime.h.
+static MICROCODE: AtomicU32 = AtomicU32::new(0);
+
+/// An FFI enum id had no match: the C header and this file's mapping have drifted. Panics in dev
+/// (debug_assert) and logs once in release (where debug_assert is compiled out) so drift is never
+/// silent; the caller falls back to a safe default.
+fn warn_id_drift(what: &str, id: u32) {
+    debug_assert!(false, "unknown {what} id {id} (runtime.h/render.rs drift)");
+    static WARNED: AtomicBool = AtomicBool::new(false);
+    if !WARNED.swap(true, Ordering::Relaxed) {
+        log::error!("unknown {what} id {id}; using default (runtime.h/render.rs drift)");
+    }
+}
+
+fn microcode() -> fast3d::Microcode {
+    match MICROCODE.load(Ordering::Relaxed) {
+        0 => fast3d::Microcode::F3dex2,
+        1 => fast3d::Microcode::F3d,
+        other => {
+            warn_id_drift("microcode", other);
+            fast3d::Microcode::F3dex2
+        }
+    }
+}
+
+/// C-facing microcode selector (create_gfx_task_structure declares it next to task.t.ucode).
+#[no_mangle]
+pub extern "C" fn HLXRenderSetMicrocode(microcode: u32) {
+    MICROCODE.store(microcode, Ordering::Relaxed);
+}
+
+/// Guest vertex/matrix layout (`GBI_FLOATS`), declared via `HLXRenderSetDataFormat`; fast3d treats
+/// it as orthogonal to the microcode, so `consume_dl` applies it before each frame. 0 = Fixed (N64
+/// s16, fast3d's default), 1 = Float — kept in sync with `HLXDataFormat` in runtime.h.
+static DATA_FORMAT: AtomicU32 = AtomicU32::new(0);
+
+fn data_format() -> fast3d::DataFormat {
+    match DATA_FORMAT.load(Ordering::Relaxed) {
+        0 => fast3d::DataFormat::Fixed,
+        1 => fast3d::DataFormat::Float,
+        other => {
+            warn_id_drift("data format", other);
+            fast3d::DataFormat::Fixed
+        }
+    }
+}
+
+/// C-facing data-format selector (create_gfx_task_structure declares it from the GBI_FLOATS build).
+#[no_mangle]
+pub extern "C" fn HLXRenderSetDataFormat(format: u32) {
+    DATA_FORMAT.store(format, Ordering::Relaxed);
+}
+
 pub(crate) const SURFACE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 
 /// The surface config helix pins, matching fast3d `Renderer::new` for `Some(Bgra8Unorm)`. `with_device`
@@ -129,7 +154,6 @@ pub struct SurfaceHandoff {
 
 pub struct RenderContext {
     renderer: fast3d::Renderer,
-    probe_frame: u32,
 }
 
 impl RenderContext {
@@ -184,28 +208,18 @@ impl RenderContext {
                 power_preference: wgpu::PowerPreference::HighPerformance,
             },
         );
-        RenderContext {
-            renderer,
-            probe_frame: 0,
-        }
+        RenderContext { renderer }
     }
 
     pub fn consume_dl(&mut self, data_ptr: usize) {
-        let do_probe = probe_on() && self.probe_frame < PROBE_FRAMES;
-        if do_probe {
-            self.probe_frame += 1;
-            dl_probe_peek(self.probe_frame, data_ptr);
-        }
+        self.renderer.set_data_format(data_format());
         self.renderer.begin_frame();
-        let summary = self.renderer.process_dl(
+        let _ = self.renderer.process_dl(
             &HelixHardware,
             data_ptr as u64,
-            fast3d::Microcode::F3dex2e,
+            microcode(),
             &mut DedupLogSink,
         );
-        if do_probe {
-            dl_probe_summary(&summary);
-        }
     }
 
     pub fn present(&mut self) {

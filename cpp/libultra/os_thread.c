@@ -23,6 +23,10 @@ void osStopThread(OSThread *thread) {
     HLXThreadStop(thread);
 }
 
+void osYieldThread(void) {
+    HLXThreadYield();
+}
+
 /* TLB + cache are meaningless on the native-pointer runtime. */
 void osMapTLB(UNUSED s32 index, UNUSED OSPageMask mask, UNUSED void *vaddr,
               UNUSED u32 odd, UNUSED u32 even, UNUSED s32 asid) {

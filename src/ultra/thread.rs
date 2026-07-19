@@ -108,6 +108,12 @@ pub extern "C" fn HLXThreadSetPri(t: *mut c_void, pri: i32) {
 }
 
 #[no_mangle]
+pub extern "C" fn HLXThreadYield() {
+    // osYieldThread: cooperative reschedule point (see Scheduler::reschedule_yield).
+    scheduler().reschedule_yield(current_id());
+}
+
+#[no_mangle]
 pub extern "C" fn HLXThreadStop(t: *mut c_void) {
     let key = t as usize;
     scheduler().set_pri(key, 0);
