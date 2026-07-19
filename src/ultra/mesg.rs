@@ -210,6 +210,85 @@ mod tests {
         );
     }
 
+    static BS_QKEY: AtomicUsize = AtomicUsize::new(0);
+    static BS_SENT: AtomicBool = AtomicBool::new(false);
+
+    extern "C" fn bs_sender(_arg: *mut std::os::raw::c_void) {
+        // Queue is full: this BLOCK send must park until the driver frees a slot, then
+        // tail-insert and return success.
+        let ret = send(BS_QKEY.load(Ordering::SeqCst), 0x22, 1); // BLOCK
+        assert_eq!(ret, 0);
+        BS_SENT.store(true, Ordering::SeqCst);
+    }
+
+    #[test]
+    fn block_send_parks_until_slot_frees_then_fifo() {
+        // Exercises the full+BLOCK send park path (mesg::send): unreached by SM64 (it issues no
+        // blocking sends), but a core primitive for guests that use osSendMesg(OS_MESG_BLOCK).
+        // cap-2 so the tail-insert is observable — a retained older message must precede the woken
+        // sender's.
+        use crate::ultra::sched::{is_blocked, TEST_EXITED};
+
+        let mut backing = [0u8; 64];
+        let key = backing.as_mut_ptr() as usize;
+        create(key, 2);
+        assert_eq!(send(key, 0x11, 0), 0, "fills slot 1");
+        assert_eq!(send(key, 0x44, 0), 0, "fills slot 2 — queue now full");
+        assert_eq!(send(key, 0x33, 0), -1, "NOBLOCK send now fails: queue full");
+
+        BS_QKEY.store(key, Ordering::SeqCst);
+        BS_SENT.store(false, Ordering::SeqCst);
+
+        let mut tstore = [0u8; 128];
+        let t = tstore.as_mut_ptr() as *mut std::os::raw::c_void;
+        let sender_key = t as usize;
+        crate::ultra::thread::HLXThreadCreate(t, 5, bs_sender, ptr::null_mut(), ptr::null_mut(), 10);
+        crate::ultra::thread::HLXThreadStart(t);
+
+        // Deterministically wait until the sender has actually PARKED in the full+BLOCK branch
+        // (set_blocked) before freeing a slot — otherwise it could take the non-full fast path
+        // after the drain and the test would pass without ever exercising the park.
+        let mut parked = false;
+        for _ in 0..400 {
+            if is_blocked(sender_key) {
+                parked = true;
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert!(parked, "BLOCK send never parked on the full queue");
+        assert!(!BS_SENT.load(Ordering::SeqCst), "a parked send must not have completed");
+
+        // Free one slot. FIFO: 0x11 (head) drains first; 0x44 stays queued.
+        let (ret, m) = recv(key, 0);
+        assert_eq!(ret, 0);
+        assert_eq!(m, 0x11, "FIFO head drains first");
+
+        // The parked sender wakes and TAIL-inserts 0x22 (after the retained 0x44).
+        for _ in 0..200 {
+            if BS_SENT.load(Ordering::SeqCst) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert!(BS_SENT.load(Ordering::SeqCst), "parked sender never woke after a slot freed");
+
+        let (r1, m1) = recv(key, 0);
+        assert_eq!(r1, 0);
+        assert_eq!(m1, 0x44, "retained older message drains before the woken sender's");
+        let (r2, m2) = recv(key, 0);
+        assert_eq!(r2, 0);
+        assert_eq!(m2, 0x22, "woken sender's message was tail-inserted, after 0x44");
+
+        // Teardown: wait for the sender to retire so its stack-derived key leaves the registries.
+        for _ in 0..200 {
+            if TEST_EXITED.lock().unwrap().contains(&sender_key) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    }
+
     static F3_Q: AtomicUsize = AtomicUsize::new(0);
     static F3_Q2: AtomicUsize = AtomicUsize::new(0);
     static F3_SEQ: AtomicUsize = AtomicUsize::new(0);

@@ -158,7 +158,9 @@ pub extern "C" fn HLXSpTaskStartGo(task: *mut c_void) {
             unsafe { hlx_acmd_process(t.data_ptr as *const c_void, num_cmds) };
             event::post(OS_EVENT_SP);
         }
-        _ => {}
+        // Any other forwarded task (e.g. M_NJPEGTASK) still runs on the RSP, so it must post SP
+        // or the guest scheduler blocks forever on completion. SP only — only gfx drives the RDP.
+        _ => event::post(OS_EVENT_SP),
     }
 }
 
