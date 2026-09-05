@@ -73,7 +73,9 @@ pub(crate) static TEST_YIELD_TIMEOUT_MS: std::sync::atomic::AtomicU64 =
     std::sync::atomic::AtomicU64::new(2);
 #[cfg(test)]
 fn yield_wait_timeout() -> std::time::Duration {
-    std::time::Duration::from_millis(TEST_YIELD_TIMEOUT_MS.load(std::sync::atomic::Ordering::SeqCst))
+    std::time::Duration::from_millis(
+        TEST_YIELD_TIMEOUT_MS.load(std::sync::atomic::Ordering::SeqCst),
+    )
 }
 /// Test-only: times a thread has entered the sole-runnable wait, so a test can wait until the
 /// caller is provably parked before injecting a wake.
@@ -379,7 +381,13 @@ mod tests {
         // Nothing else at/above the caller's priority: the yield keeps the caller.
         let mut m = HashMap::new();
         m.insert(5usize, e(10));
-        m.insert(3usize, SchedEntry { pri: 100, ready: false }); // higher but blocked
+        m.insert(
+            3usize,
+            SchedEntry {
+                pri: 100,
+                ready: false,
+            },
+        ); // higher but blocked
         assert_eq!(pick_next_yield(&m, 5), Some(5));
     }
 
@@ -394,6 +402,7 @@ mod tests {
         assert_eq!(pick_next_yield(&m, 5), Some(6));
         assert_eq!(pick_next_yield(&m, 6), Some(7));
         assert_eq!(pick_next_yield(&m, 7), Some(5)); // wrap
+
         // Contrast: the non-yield pick keeps the running thread on a tie.
         assert_eq!(pick_next(&m, Some(5)), Some(5));
     }
@@ -485,7 +494,10 @@ mod tests {
         let before = s.inner.lock().unwrap().wake_gen;
         wake(key);
         let after = s.inner.lock().unwrap().wake_gen;
-        assert_ne!(before, after, "wake() must bump wake_gen to release a sole-runnable yielder");
+        assert_ne!(
+            before, after,
+            "wake() must bump wake_gen to release a sole-runnable yielder"
+        );
     }
 
     static RY_PEER_Q: AtomicUsize = AtomicUsize::new(0);
@@ -535,7 +547,12 @@ mod tests {
         let pt = ps.as_mut_ptr() as *mut std::os::raw::c_void;
         let peer_key = pt as usize;
         crate::ultra::thread::HLXThreadCreate(
-            pt, 200, ry_peer, std::ptr::null_mut(), std::ptr::null_mut(), 100,
+            pt,
+            200,
+            ry_peer,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            100,
         );
         crate::ultra::thread::HLXThreadStart(pt);
 
@@ -558,7 +575,12 @@ mod tests {
         let ct = cs.as_mut_ptr() as *mut std::os::raw::c_void;
         let caller_key = ct as usize;
         crate::ultra::thread::HLXThreadCreate(
-            ct, 201, ry_caller, std::ptr::null_mut(), std::ptr::null_mut(), 10,
+            ct,
+            201,
+            ry_caller,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            10,
         );
         crate::ultra::thread::HLXThreadStart(ct);
 
@@ -574,7 +596,10 @@ mod tests {
         }
         assert!(armed, "caller never entered the sole-wait branch");
         // Armed + 10s timeout ⇒ it is provably parked in the condvar wait, not busy-completing.
-        assert!(!RY_CALLER_DONE.load(Ordering::SeqCst), "caller not blocked in the sole-wait");
+        assert!(
+            !RY_CALLER_DONE.load(Ordering::SeqCst),
+            "caller not blocked in the sole-wait"
+        );
 
         // Tokenless waker: send() wakes the peer; the caller must be released by that wake, hand
         // off to it, and finish — well within the ~1s budget (vs the 10s timeout).

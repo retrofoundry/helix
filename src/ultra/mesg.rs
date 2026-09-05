@@ -242,7 +242,14 @@ mod tests {
         let mut tstore = [0u8; 128];
         let t = tstore.as_mut_ptr() as *mut std::os::raw::c_void;
         let sender_key = t as usize;
-        crate::ultra::thread::HLXThreadCreate(t, 5, bs_sender, ptr::null_mut(), ptr::null_mut(), 10);
+        crate::ultra::thread::HLXThreadCreate(
+            t,
+            5,
+            bs_sender,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            10,
+        );
         crate::ultra::thread::HLXThreadStart(t);
 
         // Deterministically wait until the sender has actually PARKED in the full+BLOCK branch
@@ -257,7 +264,10 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_millis(5));
         }
         assert!(parked, "BLOCK send never parked on the full queue");
-        assert!(!BS_SENT.load(Ordering::SeqCst), "a parked send must not have completed");
+        assert!(
+            !BS_SENT.load(Ordering::SeqCst),
+            "a parked send must not have completed"
+        );
 
         // Free one slot. FIFO: 0x11 (head) drains first; 0x44 stays queued.
         let (ret, m) = recv(key, 0);
@@ -271,14 +281,23 @@ mod tests {
             }
             std::thread::sleep(std::time::Duration::from_millis(5));
         }
-        assert!(BS_SENT.load(Ordering::SeqCst), "parked sender never woke after a slot freed");
+        assert!(
+            BS_SENT.load(Ordering::SeqCst),
+            "parked sender never woke after a slot freed"
+        );
 
         let (r1, m1) = recv(key, 0);
         assert_eq!(r1, 0);
-        assert_eq!(m1, 0x44, "retained older message drains before the woken sender's");
+        assert_eq!(
+            m1, 0x44,
+            "retained older message drains before the woken sender's"
+        );
         let (r2, m2) = recv(key, 0);
         assert_eq!(r2, 0);
-        assert_eq!(m2, 0x22, "woken sender's message was tail-inserted, after 0x44");
+        assert_eq!(
+            m2, 0x22,
+            "woken sender's message was tail-inserted, after 0x44"
+        );
 
         // Teardown: wait for the sender to retire so its stack-derived key leaves the registries.
         for _ in 0..200 {
@@ -425,7 +444,11 @@ mod tests {
         let key = qkey(&mut backing);
         create(key, 8);
         assert_eq!(send_coalescing(key, VI), 0);
-        assert_eq!(send_coalescing(key, VI), 0, "suppressed post still reports success");
+        assert_eq!(
+            send_coalescing(key, VI),
+            0,
+            "suppressed post still reports success"
+        );
         assert_eq!(recv(key, 0), (0, VI));
         assert_eq!(recv(key, 0), (-1, 0), "only one retrace was ever queued");
     }
