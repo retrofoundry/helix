@@ -152,8 +152,63 @@ pub struct SurfaceHandoff {
     pub height: u32,
 }
 
+struct CaptureSelection {
+    directory: std::path::PathBuf,
+    frames: std::collections::BTreeSet<u64>,
+}
+
+impl CaptureSelection {
+    fn parse(
+        directory: Option<std::ffi::OsString>,
+        frames: Option<String>,
+    ) -> Result<Option<Self>, String> {
+        let Some(directory) = directory else {
+            return Ok(None);
+        };
+        if directory.is_empty() {
+            return Err("FAST3D_CAPTURE_DIR is empty".into());
+        }
+        let frames = frames.ok_or("FAST3D_CAPTURE_FRAMES is required with FAST3D_CAPTURE_DIR")?;
+        let frames = frames
+            .split(',')
+            .map(|s| {
+                s.trim()
+                    .parse::<u64>()
+                    .map_err(|_| format!("invalid capture frame serial: {s:?}"))
+            })
+            .collect::<Result<_, _>>()?;
+        Ok(Some(Self {
+            directory: directory.into(),
+            frames,
+        }))
+    }
+
+    fn write(&self, fixture: &fast3d::capture::Fixture) -> Result<(), Box<dyn std::error::Error>> {
+        use std::io::Write;
+        let bytes = fixture.to_bytes()?;
+        std::fs::create_dir_all(&self.directory)?;
+        let path = self
+            .directory
+            .join(format!("frame-{:06}.f3dcap", fixture.frame.serial));
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)?;
+        file.write_all(&bytes)?;
+        log::info!(
+            "captured frame {} to {}",
+            fixture.frame.serial,
+            path.display()
+        );
+        Ok(())
+    }
+}
+
 pub struct RenderContext {
     renderer: fast3d::Renderer,
+    frame_serial: u64,
+    capture_selection: Option<CaptureSelection>,
+    capture_frame: Option<fast3d::capture::CaptureFrame>,
 }
 
 impl RenderContext {
@@ -208,25 +263,84 @@ impl RenderContext {
                 power_preference: wgpu::PowerPreference::HighPerformance,
             },
         );
-        RenderContext { renderer }
+        let capture_selection = match CaptureSelection::parse(
+            std::env::var_os("FAST3D_CAPTURE_DIR"),
+            std::env::var("FAST3D_CAPTURE_FRAMES").ok(),
+        ) {
+            Ok(selection) => selection,
+            Err(e) => {
+                log::warn!("capture disabled: {e}");
+                None
+            }
+        };
+        RenderContext {
+            renderer,
+            frame_serial: 0,
+            capture_selection,
+            capture_frame: None,
+        }
     }
 
     pub fn consume_dl(&mut self, data_ptr: usize) {
-        self.renderer.set_data_format(data_format());
-        self.renderer.begin_frame();
-        let _ = self.renderer.process_dl(
-            &HelixHardware,
-            data_ptr as u64,
-            microcode(),
-            &mut DedupLogSink,
-        );
+        let serial = self.frame_serial;
+        self.frame_serial += 1;
+        if self
+            .capture_selection
+            .as_ref()
+            .is_some_and(|selection| selection.frames.contains(&serial))
+        {
+            let mut capture = fast3d::capture::CaptureFrame::begin(
+                &mut self.renderer,
+                serial,
+                0,
+                fast3d::capture::Provenance {
+                    decomp_revision: std::env::var("FAST3D_CAPTURE_REVISION")
+                        .unwrap_or_else(|_| "unknown".into()),
+                    source_symbols: std::env::var("FAST3D_CAPTURE_SYMBOLS")
+                        .unwrap_or_else(|_| "unknown (live task)".into()),
+                    command_vector: format!("helix/frame/{serial}"),
+                    synthetic_data: "none; live guest memory".into(),
+                },
+            );
+            if let Err(e) = capture.process_dl(
+                &mut self.renderer,
+                &HelixHardware,
+                data_ptr as u64,
+                microcode(),
+                data_format(),
+                &mut DedupLogSink,
+            ) {
+                log::warn!("capture frame {serial}: {e}");
+            }
+            self.capture_frame = Some(capture);
+        } else {
+            self.renderer.set_data_format(data_format());
+            self.renderer.begin_frame();
+            let _ = self.renderer.process_dl(
+                &HelixHardware,
+                data_ptr as u64,
+                microcode(),
+                &mut DedupLogSink,
+            );
+        }
     }
 
     pub fn present(&mut self) {
-        match self.renderer.present(&HelixHardware) {
-            Ok(()) => {}
-            Err(fast3d::PresentError::SurfaceLost) => {}
-            Err(e) => log::warn!("present: {e:?}"),
+        if let Some(capture) = self.capture_frame.take() {
+            match capture.present(&mut self.renderer, &HelixHardware) {
+                Ok(fixture) => {
+                    if let Err(e) = self.capture_selection.as_ref().unwrap().write(&fixture) {
+                        log::warn!("write capture frame {}: {e}", fixture.frame.serial);
+                    }
+                }
+                Err(e) => log::warn!("capture present: {e}"),
+            }
+        } else {
+            match self.renderer.present(&HelixHardware) {
+                Ok(()) => {}
+                Err(fast3d::PresentError::SurfaceLost) => {}
+                Err(e) => log::warn!("present: {e:?}"),
+            }
         }
     }
 
@@ -308,6 +422,33 @@ pub fn spawn(handoff: SurfaceHandoff) -> RenderHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn capture_selection_requires_explicit_valid_serials() {
+        assert!(CaptureSelection::parse(None, Some("broken".into()))
+            .unwrap()
+            .is_none());
+        let selection = CaptureSelection::parse(Some("frames".into()), Some("0, 5,19,5".into()))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            selection.frames.into_iter().collect::<Vec<_>>(),
+            vec![0, 5, 19]
+        );
+        for frames in [
+            None,
+            Some(""),
+            Some("1,"),
+            Some("-1"),
+            Some("1,abc"),
+            Some("18446744073709551616"),
+        ] {
+            assert!(
+                CaptureSelection::parse(Some("frames".into()), frames.map(str::to_owned)).is_err()
+            );
+        }
+        assert!(CaptureSelection::parse(Some("".into()), Some("0".into())).is_err());
+    }
 
     #[test]
     fn valid_surface_size_rejects_sentinels_and_zeros() {
