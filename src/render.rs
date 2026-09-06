@@ -6,21 +6,6 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::Receiver;
 use std::thread::JoinHandle;
 
-/// helix's N64-machine boundary. `rdram()` returns a `HostRam` reader over the live game memory: the
-/// DL entry (`commands as u64`, passed to `process_dl`) and everything it reaches are raw host
-/// pointers into the running sm64 process. The `'a` witness on `HostRam` is inert `PhantomData`, so
-/// the safety contract holds at runtime: the submitting guest blocks (run token held) for the whole
-/// consume, so it cannot free or rebuild the single-buffered DL while the render thread reads it.
-/// `vi()` defaults to `None`, so `present` scans out the last-rendered framebuffer (helix has no live
-/// VI registers).
-pub(crate) struct HelixHardware;
-impl fast3d::Hardware for HelixHardware {
-    fn rdram(&self) -> impl fast3d::Rdram + '_ {
-        // SAFETY: see the type doc above — the host-pointer lifetime contract is runtime-enforced.
-        unsafe { fast3d::HostRam::new(&[]) }
-    }
-}
-
 /// Dedup-then-log diagnostics: a message is logged at most once per process lifetime, keyed on
 /// `d.kind`'s `Display` string.
 pub(crate) struct DedupLogSink;
@@ -214,16 +199,17 @@ impl RenderContext {
     pub fn consume_dl(&mut self, data_ptr: usize) {
         self.renderer.set_data_format(data_format());
         self.renderer.begin_frame();
-        let _ = self.renderer.process_dl(
-            &HelixHardware,
-            data_ptr as u64,
-            microcode(),
-            &mut DedupLogSink,
-        );
+        let ram = fast3d::HostRam::new(&[]);
+        // SAFETY: the guest stays blocked until consume_dl returns, so every span the walk
+        // reads remains live and stable in the guest's native layout.
+        let _ = unsafe {
+            self.renderer
+                .process_dl_host(ram, data_ptr as u64, microcode(), &mut DedupLogSink)
+        };
     }
 
     pub fn present(&mut self) {
-        match self.renderer.present(&HelixHardware) {
+        match self.renderer.present_last() {
             Ok(()) => {}
             Err(fast3d::PresentError::SurfaceLost) => {}
             Err(e) => log::warn!("present: {e:?}"),
