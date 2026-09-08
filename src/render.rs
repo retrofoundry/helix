@@ -6,6 +6,8 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::Receiver;
 use std::thread::JoinHandle;
 
+mod capture;
+
 /// Dedup-then-log diagnostics: a message is logged at most once per process lifetime, keyed on
 /// `d.kind`'s `Display` string.
 pub(crate) struct DedupLogSink;
@@ -139,6 +141,11 @@ pub struct SurfaceHandoff {
 
 pub struct RenderContext {
     renderer: fast3d::Renderer,
+    frame_serial: u64,
+    capture_selection: Option<capture::FrameSelection>,
+    capture_frame: Option<fast3d::capture::CaptureFrame>,
+    capture_sequence: Option<capture::SequenceRecording>,
+    deferred_resize: Option<(u32, u32)>,
 }
 
 impl RenderContext {
@@ -146,6 +153,10 @@ impl RenderContext {
     /// device setup verbatim (`with_device` adopts a caller-made device and does not configure the
     /// surface — spec §6). Panics here are caught by `spawn` (fatal-on-panic).
     pub fn from_handoff(h: SurfaceHandoff) -> RenderContext {
+        let selection = capture::Selection::from_env().expect("helix capture configuration");
+        if let Some(selection) = &selection {
+            selection.install_shutdown_handler();
+        }
         let SurfaceHandoff {
             instance,
             surface,
@@ -180,7 +191,7 @@ impl RenderContext {
         let config = surface_config(width, height);
         surface.configure(&device, &config);
 
-        let renderer = fast3d::Renderer::with_device(
+        let mut renderer = fast3d::Renderer::with_device(
             device,
             queue,
             fast3d::PresentTarget::Surface { surface, config },
@@ -193,22 +204,130 @@ impl RenderContext {
                 power_preference: wgpu::PowerPreference::HighPerformance,
             },
         );
-        RenderContext { renderer }
+        let (capture_selection, capture_sequence) = match selection {
+            Some(capture::Selection::Frames(selection)) => {
+                log::info!(
+                    "per-frame capture enabled; selections use renderer serials starting at one"
+                );
+                (Some(selection), None)
+            }
+            Some(capture::Selection::Sequence(selection)) => (
+                None,
+                Some(
+                    capture::SequenceRecording::begin(&mut renderer, selection)
+                        .expect("helix capture: begin sequence"),
+                ),
+            ),
+            None => (None, None),
+        };
+        RenderContext {
+            renderer,
+            frame_serial: 0,
+            capture_selection,
+            capture_frame: None,
+            capture_sequence,
+            deferred_resize: None,
+        }
     }
 
     pub fn consume_dl(&mut self, data_ptr: usize) {
-        self.renderer.set_data_format(data_format());
-        self.renderer.begin_frame();
+        self.frame_serial += 1;
+        let capture = if let Some(sequence) = &mut self.capture_sequence {
+            if let Err(error) = sequence
+                .recorder
+                .begin_frame(&mut self.renderer, capture::provenance(self.frame_serial))
+            {
+                log::error!(
+                    "capture sequence begin frame {}: {error}; shutting down",
+                    self.frame_serial
+                );
+                crate::ultra::request_shutdown();
+                return;
+            }
+            Some(
+                sequence
+                    .recorder
+                    .frame_mut()
+                    .expect("capture frame just begun"),
+            )
+        } else if self
+            .capture_selection
+            .as_ref()
+            .is_some_and(|selection| selection.contains(self.frame_serial))
+        {
+            self.capture_frame = Some(fast3d::capture::CaptureFrame::begin(
+                &mut self.renderer,
+                self.frame_serial,
+                0,
+                capture::provenance(self.frame_serial),
+            ));
+            self.capture_frame.as_mut()
+        } else {
+            self.renderer.set_data_format(data_format());
+            self.renderer.begin_frame();
+            None
+        };
         let ram = fast3d::HostRam::new(&[]);
         // SAFETY: the guest stays blocked until consume_dl returns, so every span the walk
         // reads remains live and stable in the guest's native layout.
-        let _ = unsafe {
-            self.renderer
-                .process_dl_host(ram, data_ptr as u64, microcode(), &mut DedupLogSink)
+        let result = unsafe {
+            if let Some(capture) = capture {
+                capture
+                    .process_dl_host(
+                        &mut self.renderer,
+                        ram,
+                        data_ptr as u64,
+                        microcode(),
+                        data_format(),
+                        &mut DedupLogSink,
+                    )
+                    .map(|_| ())
+            } else {
+                let _ = self.renderer.process_dl_host(
+                    ram,
+                    data_ptr as u64,
+                    microcode(),
+                    &mut DedupLogSink,
+                );
+                Ok(())
+            }
         };
+        if let Err(error) = result {
+            log::error!(
+                "capture frame {}: {error}; shutting down",
+                self.frame_serial
+            );
+            crate::ultra::request_shutdown();
+        }
     }
 
     pub fn present(&mut self) {
+        if let Some(sequence) = &mut self.capture_sequence {
+            match sequence.present(&mut self.renderer) {
+                Ok(true) => self.finish_capture("requested range complete"),
+                Ok(false) => {}
+                Err(error) => {
+                    log::error!("capture sequence present: {error}; shutting down");
+                    self.finish_capture("capture error");
+                    crate::ultra::request_shutdown();
+                }
+            }
+            return;
+        }
+        if let Some(capture) = self.capture_frame.take() {
+            let result = capture
+                .present_last(&mut self.renderer)
+                .map_err(anyhow::Error::from)
+                .and_then(|fixture| self.capture_selection.as_ref().unwrap().write(&fixture));
+            if let Err(error) = result {
+                log::error!(
+                    "capture frame {}: {error:#}; shutting down",
+                    self.frame_serial
+                );
+                crate::ultra::request_shutdown();
+            }
+            return;
+        }
         match self.renderer.present_last() {
             Ok(()) => {}
             Err(fast3d::PresentError::SurfaceLost) => {}
@@ -218,7 +337,26 @@ impl RenderContext {
 
     pub fn resize(&mut self, width: u32, height: u32) {
         if let Some((w, h)) = valid_surface_size(width, height) {
+            if self.capture_sequence.is_some() {
+                if self.deferred_resize.is_none() {
+                    log::warn!("deferring renderer resize until sequence capture finishes");
+                }
+                self.deferred_resize = Some((w, h));
+                return;
+            }
             self.renderer.resize(w, h);
+        }
+    }
+
+    fn finish_capture(&mut self, reason: &str) {
+        if let Some(sequence) = self.capture_sequence.take() {
+            if let Err(error) = sequence.finish(reason) {
+                log::error!("save capture sequence: {error:#}; shutting down");
+                crate::ultra::request_shutdown();
+            }
+            if let Some((w, h)) = self.deferred_resize.take() {
+                self.renderer.resize(w, h);
+            }
         }
     }
 }
@@ -281,6 +419,7 @@ pub fn spawn(handoff: SurfaceHandoff) -> RenderHandle {
             let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 let mut ctx = RenderContext::from_handoff(handoff);
                 render_loop_on(&mut ctx, rx);
+                ctx.finish_capture("shutdown");
             }));
             if outcome.is_err() {
                 log::error!("helix render thread failed; shutting down");

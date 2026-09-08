@@ -16,6 +16,7 @@ network = ["dep:tokio"]
 
 [dependencies]
 anyhow = "1.0.70"
+ctrlc = { version = "3.5.2", features = ["termination"] }
 env_logger = "0.10.0"
 gilrs = { version = "0.10.2", features = ["serde", "serde-serialize"] }
 winit = { version = "0.30", features = ["x11", "wayland", "wayland-dlopen", "wayland-csd-adwaita"] }
@@ -28,7 +29,7 @@ wgpu = { version = "29" }
 spin_sleep = "1.1.1"
 arie = "0.3.0"
 # Pinned: fast3d may change its API between commits; bump this deliberately and fix up the render path with it.
-fast3d = { git = "https://github.com/retrofoundry/fast3d-rs", rev = "44d2d1b", default-features = false }
+fast3d = { git = "https://github.com/retrofoundry/fast3d-rs", rev = "44d2d1b", default-features = false, features = ["capture"] }
 rustc-hash = "1.1.0"
 
 # For local development, uncomment to build against local checkouts of fast3d and
