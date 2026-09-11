@@ -20,6 +20,8 @@ For details on each of the features provided please see our [documentation](http
 
 For setup and more in-depth information please see our [documentation](https://retrofoundry.github.io/helix/dev/).
 
+For display-list fixtures and continuous recordings, see [fast3d capture](docs/capture.md).
+
 ## Community
 
 [![](https://dcbadge.vercel.app/api/server/nGckYNTp4w)](https://discord.gg/nGckYNTp4w)
