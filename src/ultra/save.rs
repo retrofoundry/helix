@@ -9,13 +9,12 @@ const EEPROM_STORE_SIZE: usize = 512;
 /// osEepromLong{Read,Write} `address` is a block index; each block is 8 bytes.
 const EEPROM_BLOCK_SIZE: usize = 8;
 
-struct Eeprom {
-    store: [u8; EEPROM_STORE_SIZE],
+struct SaveFile {
+    store: Vec<u8>,
     path: PathBuf,
 }
 
-/// `$HELIX_SAVE_PATH` wins (tests/CI); else a per-OS data dir; else the temp dir.
-fn save_path() -> PathBuf {
+fn save_path(name: &str) -> PathBuf {
     if let Ok(p) = std::env::var("HELIX_SAVE_PATH") {
         return PathBuf::from(p);
     }
@@ -37,18 +36,17 @@ fn save_path() -> PathBuf {
     };
     dir.unwrap_or_else(std::env::temp_dir)
         .join("helix")
-        .join("sm64_save_file.bin")
+        .join(name)
 }
 
-impl Eeprom {
-    fn load() -> Self {
-        let path = save_path();
-        let mut store = [0u8; EEPROM_STORE_SIZE];
+impl SaveFile {
+    fn load(path: PathBuf, size: usize) -> Self {
+        let mut store = vec![0u8; size];
         if let Ok(bytes) = std::fs::read(&path) {
-            let n = bytes.len().min(EEPROM_STORE_SIZE);
+            let n = bytes.len().min(size);
             store[..n].copy_from_slice(&bytes[..n]);
         }
-        Eeprom { store, path }
+        SaveFile { store, path }
     }
 
     /// Atomic write-through: temp file + fsync + rename, so a crash never leaves a torn save.
@@ -67,9 +65,14 @@ impl Eeprom {
     }
 }
 
-static EEPROM: OnceLock<Mutex<Eeprom>> = OnceLock::new();
-fn eeprom() -> &'static Mutex<Eeprom> {
-    EEPROM.get_or_init(|| Mutex::new(Eeprom::load()))
+static EEPROM: OnceLock<Mutex<SaveFile>> = OnceLock::new();
+fn eeprom() -> &'static Mutex<SaveFile> {
+    EEPROM.get_or_init(|| {
+        Mutex::new(SaveFile::load(
+            save_path("sm64_save_file.bin"),
+            EEPROM_STORE_SIZE,
+        ))
+    })
 }
 
 /// Flush the in-memory store to disk. No-op if the EEPROM backend was never lazily
@@ -127,6 +130,51 @@ pub unsafe extern "C" fn HLXEepromWrite(addr: u8, buf: *const u8, n: i32) -> i32
     }
 }
 
+// The PI SRAM base is a multiple of 32 KiB, so the mask accepts both addresses and raw offsets.
+const SRAM_SIZE: usize = 0x8000;
+
+static SRAM: OnceLock<Mutex<SaveFile>> = OnceLock::new();
+
+fn sram() -> &'static Mutex<SaveFile> {
+    SRAM.get_or_init(|| Mutex::new(SaveFile::load(save_path("sram.bin"), SRAM_SIZE)))
+}
+
+const OS_READ: i32 = 0; // OSIoMesg direction: SRAM -> RDRAM (OS_WRITE = 1 is RDRAM -> SRAM)
+
+/// Copies up to the SRAM boundary, then posts `mb` to `ret_queue`. The post happens even for a
+/// malformed request, because the guest blocks on it. dir: 0 reads SRAM; other values write it.
+///
+/// # Safety
+/// `dram` must be valid for `size` bytes; `mb`/`ret_queue` are opaque guest pointers.
+#[no_mangle]
+pub unsafe extern "C" fn HLXSramDma(
+    mb: *mut std::os::raw::c_void,
+    dev_addr: u32,
+    dram: *mut std::os::raw::c_void,
+    size: usize,
+    dir: i32,
+    ret_queue: *mut std::os::raw::c_void,
+) -> i32 {
+    let off = (dev_addr as usize) & (SRAM_SIZE - 1);
+    let n = size.min(SRAM_SIZE - off);
+    if !dram.is_null() && n > 0 {
+        let mut s = sram().lock().unwrap();
+        if dir == OS_READ {
+            std::ptr::copy_nonoverlapping(s.store.as_ptr().add(off), dram as *mut u8, n);
+        } else {
+            std::ptr::copy_nonoverlapping(dram as *const u8, s.store.as_mut_ptr().add(off), n);
+            if let Err(e) = s.persist() {
+                log::error!("sram write persist failed: {e}");
+            }
+        }
+    }
+    if !ret_queue.is_null() {
+        // OoT drains its single-slot completion queue before issuing the next SRAM transfer.
+        crate::ultra::mesg::send(ret_queue as usize, mb as usize, 0);
+    }
+    0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,6 +209,23 @@ mod tests {
             assert_eq!(HLXEepromRead(0, std::ptr::null_mut(), 8), -1);
             assert_eq!(HLXEepromWrite(0, src.as_ptr(), -1), -1);
         }
+
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn save_file_reloads_persisted_store_and_zero_fills_short_files() {
+        let tmp = std::env::temp_dir().join(format!("helix_sram_{}.bin", std::process::id()));
+        std::fs::write(&tmp, [0xCD_u8; 4]).unwrap();
+
+        let mut file = SaveFile::load(tmp.clone(), SRAM_SIZE);
+        assert_eq!(&file.store[..4], &[0xCD; 4]);
+        assert!(file.store[4..].iter().all(|&b| b == 0));
+
+        file.store[SRAM_SIZE - 1] = 0xEF;
+        file.persist().unwrap();
+        let reloaded = SaveFile::load(tmp.clone(), SRAM_SIZE);
+        assert_eq!(reloaded.store, file.store);
 
         let _ = std::fs::remove_file(&tmp);
     }

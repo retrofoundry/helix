@@ -4,6 +4,7 @@
 // The cart base makes ((base | devAddr) & PHYS_MASK) - ROM_BASE recover the VROM offset.
 #define PI_CART_DOMAIN1_BASE 0x10000000u
 #define DEVICE_TYPE_CART     0
+#define DEVICE_TYPE_SRAM     3
 
 static OSPiHandle sCartHandle;
 
@@ -18,6 +19,10 @@ OSPiHandle *osDriveRomInit(void) {
 }
 
 s32 osEPiStartDma(OSPiHandle *handle, OSIoMesg *mb, s32 direction) {
+    if (handle->type == DEVICE_TYPE_SRAM) {
+        return HLXSramDma((void *) mb, (u32) mb->devAddr, mb->dramAddr, mb->size, direction,
+                          (void *) mb->hdr.retQueue);
+    }
     return HLXEPiDma((void *) mb, HLX_DEV_CART, handle->baseAddress, (u32) mb->devAddr,
                      mb->dramAddr, mb->size, direction, (void *) mb->hdr.retQueue);
 }
