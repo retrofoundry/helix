@@ -49,6 +49,29 @@ fn lookup(key: usize) -> Arc<Mutex<Queue>> {
         .clone()
 }
 
+/// Reserves completion space before `fill`; returns 0 on success, -1 if full, -2 if unavailable.
+/// `fill` runs under the queue lock and must not lock a message queue itself.
+pub(crate) fn post_with<F: FnOnce()>(key: usize, msg: usize, fill: F) -> i32 {
+    let q = match registry().lock().ok().and_then(|r| r.get(&key).cloned()) {
+        Some(q) => q,
+        None => return -2,
+    };
+    let mut g = match q.lock() {
+        Ok(g) => g,
+        Err(_) => return -2,
+    };
+    if g.valid < g.cap {
+        fill();
+        g.push_tail(msg);
+        if let Some(w) = g.recv_waiters.pop_front() {
+            sched::wake(w);
+        }
+        0
+    } else {
+        -1
+    }
+}
+
 pub(crate) fn create(key: usize, count: i32) {
     let cap = (count.max(1)) as usize;
     let q = Queue {
