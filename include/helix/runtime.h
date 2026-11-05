@@ -11,6 +11,7 @@ extern "C" {
 /* Process lifecycle (helix/src/ultra/mod.rs). */
 void HLXRuntimeInit(void);
 void HLXRunEventLoop(void);
+void HLXSetWindowTitle(const char *title); /* from main_func, before the window opens */
 
 /* Threads (helix/src/ultra/thread.rs). Guest sp is ignored; t is the OSThread*. */
 void HLXThreadCreate(void *t, s32 id, void (*entry)(void *), void *arg, void *sp, s32 pri);

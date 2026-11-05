@@ -58,6 +58,13 @@ impl<'a> Gui<'a> {
         })
     }
 
+    pub fn set_title(&mut self, title: &str) {
+        self.title = title.to_string();
+        if let Some(window) = &self.window {
+            window.set_title(title);
+        }
+    }
+
     /// Create the window (once), seed the widescreen aspect from its initial physical size, then
     /// create the wgpu surface and hand it off to a freshly spawned render thread.
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {

@@ -106,7 +106,7 @@ pub extern "C" fn HLXRuntimeInit() {
     // Leak a GamepadManager so the Gui can hold a `&'static mut` across the two FFI calls
     // (created here, consumed in HLXRunEventLoop). The manager lives for the whole process.
     let gpm: &'static mut GamepadManager = Box::leak(Box::new(GamepadManager::new()));
-    let mut gui = Gui::new("Super Mario 64", Some(gpm)).expect("helix: failed to create Gui");
+    let mut gui = Gui::new("Helix", Some(gpm)).expect("helix: failed to create Gui");
 
     // Seed the controller snapshot on THIS (main) thread before any guest thread starts, so the
     // first `osContInit` on thread5 observes a plugged-in controller (bits) instead of the
@@ -116,6 +116,17 @@ pub extern "C" fn HLXRuntimeInit() {
     EVENT_LOOP.with(|slot| *slot.borrow_mut() = Some(wrapper));
     GUI.with(|slot| *slot.borrow_mut() = Some(gui));
     log::info!("helix: runtime initialized");
+}
+
+/// Set the window title on the main thread after HLXRuntimeInit, before the window opens.
+#[no_mangle]
+pub extern "C" fn HLXSetWindowTitle(title: *const std::ffi::c_char) {
+    let title = unsafe { std::ffi::CStr::from_ptr(title) }.to_string_lossy();
+    GUI.with(|slot| {
+        if let Some(gui) = slot.borrow_mut().as_mut() {
+            gui.set_title(&title);
+        }
+    });
 }
 
 /// Pump winit + gamepad on the process MAIN thread; returns only once shutdown_requested() is
