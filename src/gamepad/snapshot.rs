@@ -49,7 +49,7 @@ pub fn load() -> GamepadSnapshot {
 #[no_mangle]
 pub extern "C" fn HLXControllerInit(bits: *mut u8) -> i32 {
     if !bits.is_null() {
-        unsafe { *bits = load().bits };
+        unsafe { *bits = crate::gamepad::script::read().bits };
     }
     0
 }
@@ -60,7 +60,7 @@ pub extern "C" fn HLXControllerRead(pad: *mut OSControllerPad) {
     if pad.is_null() {
         return;
     }
-    let snap = load();
+    let snap = crate::gamepad::script::read();
     unsafe {
         (*pad).button = snap.button;
         (*pad).stick_x = snap.stick_x;
