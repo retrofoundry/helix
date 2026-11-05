@@ -4,6 +4,7 @@
 
 pub mod event;
 pub mod mesg;
+mod njpeg;
 pub mod pi;
 pub mod rcp;
 pub mod rom;
