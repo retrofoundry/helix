@@ -2,6 +2,7 @@
 #define HELIX_RUNTIME_H
 
 #include <libultra/ultratypes.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,6 +26,8 @@ typedef enum {
     HLX_MICROCODE_F3D = 1,
 } HLXMicrocode;
 void HLXRenderSetMicrocode(u32 microcode);
+/* Registers live guest memory for display-list reads and write-back until process exit. */
+void HLXRegisterGuestMemory(void *start, size_t size);
 
 /* Guest vertex/matrix layout (fixed N64 s16 vs float), orthogonal to the microcode in fast3d.
    Values must stay in sync with render.rs's DATA_FORMAT mapping. */

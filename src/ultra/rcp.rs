@@ -31,8 +31,7 @@ const M_AUDTASK: u32 = 2;
 const M_NJPEGTASK: u32 = 4;
 
 /// Host-ABI mirror of OSTask_t (include/PR/sptask.h). `repr(C)` reproduces exactly what the
-/// host C compiler lays out for the game's OSTask, so `.type_` (off 0) and `.data_ptr` (off 88)
-/// read the same bytes the game wrote. Fields other than those two are unread padding here.
+/// host C compiler lays out for the game's OSTask, including native-width pointers.
 #[allow(dead_code)]
 #[repr(C)]
 struct OSTaskT {
@@ -54,13 +53,12 @@ struct OSTaskT {
     yield_data_size: u32,
 }
 
-/// Read (type, data_ptr) from a native OSTask pointer (the game passes `&task.t`).
 ///
 /// # Safety
 /// `task` must point at a live OSTask whose layout matches `OSTaskT`.
-unsafe fn read_task(task: *const c_void) -> (u32, usize) {
+unsafe fn read_task(task: *const c_void) -> (u32, usize, usize) {
     let t = &*(task as *const OSTaskT);
-    (t.type_, t.data_ptr as usize)
+    (t.type_, t.data_ptr as usize, t.ucode as usize)
 }
 
 /// The two completion events an M_GFXTASK posts, in osSendMesg tail order: SP drains before
@@ -78,11 +76,21 @@ fn post_gfx_completion() {
     }
 }
 
-/// A message to the render thread: a display list to consume, a surface resize, or shutdown. One
+/// A message to the render thread: graphics, scanout, resize, or shutdown. One
 /// enum so a single `recv` wakes on any of them — shutdown/resize don't depend on DL traffic.
 pub(crate) enum RenderMsg {
-    Gfx { data_ptr: usize, done: Sender<()> },
-    Resize { width: u32, height: u32 },
+    Gfx {
+        data_ptr: usize,
+        ucode_ptr: usize,
+        done: Sender<()>,
+    },
+    Scanout {
+        address: u64,
+    },
+    Resize {
+        width: u32,
+        height: u32,
+    },
     Shutdown,
 }
 
@@ -116,12 +124,13 @@ pub(crate) fn take_render_receiver() -> Receiver<RenderMsg> {
 /// Submit a DL and block (run token held) until the consumer consumes it. `true` on consume, `false`
 /// if the render thread is gone — the caller then skips completion so a dead consumer never yields a
 /// false SP→DP.
-pub(crate) fn submit_and_wait(data_ptr: usize) -> bool {
+pub(crate) fn submit_and_wait(data_ptr: usize, ucode_ptr: usize) -> bool {
     let (done_tx, done_rx) = channel::<()>();
     if gfx()
         .tx
         .send(RenderMsg::Gfx {
             data_ptr,
+            ucode_ptr,
             done: done_tx,
         })
         .is_err()
@@ -131,7 +140,7 @@ pub(crate) fn submit_and_wait(data_ptr: usize) -> bool {
     done_rx.recv().is_ok()
 }
 
-/// Main-thread control: resize / shutdown. Best-effort — a gone render thread is fine to ignore.
+/// A dropped render receiver is harmless during shutdown.
 pub(crate) fn send_render_control(msg: RenderMsg) {
     let _ = gfx().tx.send(msg);
 }
@@ -143,10 +152,10 @@ pub extern "C" fn HLXSpTaskStartGo(task: *mut c_void) {
     if task.is_null() {
         return;
     }
-    let (ty, data_ptr) = unsafe { read_task(task) };
+    let (ty, data_ptr, ucode_ptr) = unsafe { read_task(task) };
     match ty {
         M_GFXTASK => {
-            if submit_and_wait(data_ptr) {
+            if submit_and_wait(data_ptr, ucode_ptr) {
                 post_gfx_completion();
             }
         }
@@ -187,24 +196,47 @@ mod tests {
     use super::*;
 
     #[test]
+    fn read_task_preserves_data_and_ucode_host_pointers() {
+        let task = OSTaskT {
+            type_: M_GFXTASK,
+            data_ptr: 0x1_dead_beef as *mut u64,
+            ucode: 0x2_1234_5678 as *mut u64,
+            ..unsafe { std::mem::zeroed() }
+        };
+        let fields = unsafe { read_task(&task as *const OSTaskT as *const c_void) };
+        assert_eq!(fields, (M_GFXTASK, 0x1_dead_beef, 0x2_1234_5678));
+    }
+
+    #[test]
     fn gfx_channel_round_trip_then_gone_returns_false() {
         let rx = take_render_receiver();
         let (tx_ready, rx_ready) = channel::<()>();
         let consumer = std::thread::spawn(move || {
             match rx.recv().expect("no message") {
-                RenderMsg::Gfx { data_ptr, done } => {
+                RenderMsg::Gfx {
+                    data_ptr,
+                    ucode_ptr,
+                    done,
+                } => {
                     assert_eq!(data_ptr, 0xDEAD_BEEF, "data_ptr must round-trip intact");
+                    assert_eq!(ucode_ptr, 0x1_1234_5678, "ucode must round-trip intact");
                     done.send(()).expect("guest gone");
                 }
                 _ => panic!("expected Gfx"),
             }
             tx_ready.send(()).unwrap();
         });
-        assert!(submit_and_wait(0xDEAD_BEEF), "consumed → true");
+        let mut task = OSTaskT {
+            type_: M_GFXTASK,
+            data_ptr: 0xDEAD_BEEF as *mut u64,
+            ucode: 0x1_1234_5678 as *mut u64,
+            ..unsafe { std::mem::zeroed() }
+        };
+        HLXSpTaskStartGo(&mut task as *mut OSTaskT as *mut c_void);
         rx_ready.recv().unwrap();
         consumer.join().unwrap();
         assert!(
-            !submit_and_wait(0x1234),
+            !submit_and_wait(0x1234, 0x5678),
             "receiver dropped → render gone → false, no hang"
         );
     }
@@ -223,6 +255,7 @@ mod tests {
     #[test]
     fn ostask_layout_matches_sptask_h() {
         assert_eq!(std::mem::offset_of!(OSTaskT, type_), 0);
+        assert_eq!(std::mem::offset_of!(OSTaskT, ucode), 24);
         assert_eq!(std::mem::offset_of!(OSTaskT, data_ptr), 88);
     }
 }

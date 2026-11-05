@@ -5,6 +5,7 @@
 use env_logger::Builder;
 pub mod audio;
 pub mod gamepad;
+mod guest_memory;
 pub mod gui;
 #[cfg(feature = "network")]
 pub mod network;

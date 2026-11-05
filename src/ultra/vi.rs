@@ -7,7 +7,7 @@
 //! The TV-family -> refresh-rate mapping lives here and is exported for the audio AI
 //! frequency path so VI and AI never diverge on TV timing.
 use std::os::raw::c_void;
-use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
@@ -99,8 +99,6 @@ struct ViEvent {
 }
 
 static VI_EVENT: Mutex<Option<ViEvent>> = Mutex::new(None);
-/// Last framebuffer handed to osViSwapBuffer (HLE scanout no-op).
-static SCANOUT_FB: AtomicUsize = AtomicUsize::new(0);
 /// Active VI mode index (0..=55) chosen by `osViSetMode`; `VI_MODE_UNSET` -> fall back to
 /// `osTvType`.
 static ACTIVE_VI_MODE_INDEX: AtomicU32 = AtomicU32::new(VI_MODE_UNSET);
@@ -380,9 +378,7 @@ pub extern "C" fn HLXViGetTvFamily(os_tv_type: u32) -> u32 {
 
 #[no_mangle]
 pub extern "C" fn HLXViSwapBuffer(fb: *mut c_void) {
-    // HLE scanout no-op: record the framebuffer; present shows the last-rendered
-    // frame. Consumed by the gfx path.
-    SCANOUT_FB.store(fb as usize, Ordering::Relaxed);
+    super::rcp::send_render_control(super::rcp::RenderMsg::Scanout { address: fb as u64 });
 }
 
 #[cfg(test)]
