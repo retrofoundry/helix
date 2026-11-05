@@ -1,5 +1,4 @@
-#include <PR/os_vi.h>
-#include <PR/libultra.h>
+#include <libultra/os_vi.h>
 
 #include <helix/internal.h>
 
@@ -18,6 +17,14 @@ u32 osTvType = TV_TYPE_NTSC; /* US */
 // VI ROM mode data on real hardware. main.c only takes &osViModeTable[mode] and
 // hands it to the no-op osViSetMode, so a zeroed table just needs to exist to link.
 OSViMode osViModeTable[56];
+
+// Guests reference these symbols, but retrace timing uses osTvType rather than their fields.
+OSViMode osViModeNtscLan1;
+OSViMode osViModePalLan1;
+OSViMode osViModeMpalLan1;
+
+static void *sViNextFramebuffer;
+static void *sViCurrentFramebuffer;
 
 void osCreateViManager(OSPri pri) {
 }
@@ -56,5 +63,27 @@ void osViSetEvent(OSMesgQueue *mq, OSMesg msg, u32 retraceCount) {
 }
 
 void osViSwapBuffer(void *vaddr) {
+    // OoT waits for the current buffer to match its swap before submitting another frame.
+    sViNextFramebuffer = vaddr;
+    sViCurrentFramebuffer = vaddr;
     HLXViSwapBuffer(vaddr);
+}
+
+void *osViGetNextFramebuffer(void) {
+    return sViNextFramebuffer;
+}
+
+void *osViGetCurrentFramebuffer(void) {
+    return sViCurrentFramebuffer;
+}
+
+// Helix renders at its own resolution, so VI scale and offset changes have no effect.
+void osViSetXScale(f32 value) {
+    (void) value;
+}
+void osViSetYScale(f32 value) {
+    (void) value;
+}
+void osViExtendVStart(u32 value) {
+    (void) value;
 }

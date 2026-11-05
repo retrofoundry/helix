@@ -1,5 +1,5 @@
-#include <PR/os_time.h>
-#include <PR/os_misc.h>
+#include <libultra/os_time.h>
+#include <libultra/os_misc.h>
 
 // osClockRate lived in the gated-out src/pc/ultra_reimplementation.c — re-home it.
 u64 osClockRate = 62500000;

@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <ultra64.h>
+#include <libultra/ultra64.h>
 
 #ifdef VERSION_SH
 #define NEW_AUDIO_UCODE

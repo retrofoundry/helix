@@ -46,6 +46,7 @@ extern "C" {
 
 typedef s32 OSPri;
 typedef s32 OSId;
+typedef u32 OSPageMask; // TLB page-mask (osMapTLB); TLB is a no-op on the native runtime.
 
 typedef union {
     struct {
