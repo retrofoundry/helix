@@ -103,6 +103,9 @@ s32 HLXEepromProbe(void);
 s32 HLXEepromRead(u8 addr, u8* buf, s32 n);
 s32 HLXEepromWrite(u8 addr, const u8* buf, s32 n);
 
+// Copies SRAM data and posts mb to retQueue. dir: 0 = SRAM->RDRAM, 1 = RDRAM->SRAM.
+s32 HLXSramDma(void* mb, u32 devAddr, void* dram, size_t size, s32 dir, void* retQueue);
+
 #ifdef __cplusplus
 }
 #endif
