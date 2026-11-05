@@ -60,9 +60,8 @@ pub extern "C" fn HLXAspectRatio() -> f32 {
     aspect_ratio()
 }
 
-/// Graphics microcode the guest declares via `HLXRenderSetMicrocode` (from its own build);
-/// `consume_dl` hands it to fast3d so the renderer matches the ROM. 0 = F3dex2 (fast3d's
-/// default), 1 = F3d — kept in sync with `HLXMicrocode` in runtime.h.
+/// Guest-declared fallback for unbound task ucode pointers: 0 = F3dex2, 1 = F3d.
+/// Kept in sync with `HLXMicrocode` in runtime.h.
 static MICROCODE: AtomicU32 = AtomicU32::new(0);
 
 /// An FFI enum id had no match: the C header and this file's mapping have drifted. Panics in dev
@@ -76,7 +75,10 @@ fn warn_id_drift(what: &str, id: u32) {
     }
 }
 
-fn microcode() -> fast3d::Microcode {
+fn microcode(ucode_ptr: u64, bindings: &[(u64, fast3d::Microcode)]) -> fast3d::Microcode {
+    if let Some((_, microcode)) = bindings.iter().find(|(address, _)| *address == ucode_ptr) {
+        return *microcode;
+    }
     match MICROCODE.load(Ordering::Relaxed) {
         0 => fast3d::Microcode::F3dex2,
         1 => fast3d::Microcode::F3d,
@@ -85,6 +87,27 @@ fn microcode() -> fast3d::Microcode {
             fast3d::Microcode::F3dex2
         }
     }
+}
+
+extern "C" {
+    static gspF3DZEX2_NoN_fifoTextStart: [u64; 1];
+    static gspS2DEX2d_fifoTextStart: [u64; 1];
+}
+
+// Guest G_LOAD_UCODE tokens may be native pointers or OS_K0_TO_PHYSICAL values
+// (the pointer minus 0x80000000).
+fn microcode_bindings() -> [(u64, fast3d::Microcode); 4] {
+    let f3dex2 = std::ptr::addr_of!(gspF3DZEX2_NoN_fifoTextStart) as u64;
+    let s2dex2 = std::ptr::addr_of!(gspS2DEX2d_fifoTextStart) as u64;
+    [
+        (f3dex2, fast3d::Microcode::F3dex2NoN),
+        (
+            f3dex2.wrapping_sub(0x8000_0000),
+            fast3d::Microcode::F3dex2NoN,
+        ),
+        (s2dex2, fast3d::Microcode::S2dex2),
+        (s2dex2.wrapping_sub(0x8000_0000), fast3d::Microcode::S2dex2),
+    ]
 }
 
 /// C-facing microcode selector: the guest declares its build's microcode before the first gfx task.
@@ -170,14 +193,8 @@ impl RenderContext {
         }))
         .expect("helix render: request_adapter");
 
-        let dual = adapter
-            .features()
-            .contains(wgpu::Features::DUAL_SOURCE_BLENDING);
-        let required_features = if dual {
-            wgpu::Features::DUAL_SOURCE_BLENDING
-        } else {
-            wgpu::Features::empty()
-        };
+        let required_features = adapter.features()
+            & (wgpu::Features::DUAL_SOURCE_BLENDING | wgpu::Features::DEPTH_CLIP_CONTROL);
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
             label: Some("fast3d-device"),
             required_features,
@@ -204,6 +221,7 @@ impl RenderContext {
                 power_preference: wgpu::PowerPreference::HighPerformance,
             },
         );
+        renderer.set_guest_writeback(true);
         let (capture_selection, capture_sequence) = match selection {
             Some(capture::Selection::Frames(selection)) => {
                 log::info!(
@@ -230,7 +248,7 @@ impl RenderContext {
         }
     }
 
-    pub fn consume_dl(&mut self, data_ptr: usize) {
+    pub fn consume_dl(&mut self, data_ptr: usize, ucode_ptr: usize) {
         self.frame_serial += 1;
         let capture = if let Some(sequence) = &mut self.capture_sequence {
             if let Err(error) = sequence
@@ -267,31 +285,44 @@ impl RenderContext {
             self.renderer.begin_frame();
             None
         };
-        let ram = fast3d::HostRam::new(&[]);
+        let ranges = crate::guest_memory::ranges();
+        let ram = if ranges.is_empty() {
+            fast3d::HostRam::new(&[])
+        } else {
+            fast3d::HostRam::with_ranges(&[], &ranges)
+        };
+        let bindings = microcode_bindings();
+        let microcode = microcode(ucode_ptr as u64, &bindings);
         // SAFETY: the guest stays blocked until consume_dl returns, so every span the walk
         // reads remains live and stable in the guest's native layout.
         let result = unsafe {
             if let Some(capture) = capture {
                 capture
-                    .process_dl_host(
+                    .process_dl_host_with_bindings(
                         &mut self.renderer,
                         ram,
                         data_ptr as u64,
-                        microcode(),
+                        microcode,
                         data_format(),
                         &mut DedupLogSink,
+                        &bindings,
                     )
                     .map(|_| ())
             } else {
-                let _ = self.renderer.process_dl_host(
+                let _ = self.renderer.process_dl_host_with_bindings(
                     ram,
                     data_ptr as u64,
-                    microcode(),
+                    microcode,
                     &mut DedupLogSink,
+                    &bindings,
                 );
                 Ok(())
             }
         };
+        // The guest holds its run token until consume_dl returns, including capture processing.
+        unsafe {
+            apply_guest_writes(self.renderer.take_guest_writes());
+        }
         if let Err(error) = result {
             log::error!(
                 "capture frame {}: {error}; shutting down",
@@ -301,9 +332,9 @@ impl RenderContext {
         }
     }
 
-    pub fn present(&mut self) {
+    pub fn present(&mut self, address: Option<u64>) {
         if let Some(sequence) = &mut self.capture_sequence {
-            match sequence.present(&mut self.renderer) {
+            match sequence.present(&mut self.renderer, address) {
                 Ok(true) => self.finish_capture("requested range complete"),
                 Ok(false) => {}
                 Err(error) => {
@@ -316,7 +347,7 @@ impl RenderContext {
         }
         if let Some(capture) = self.capture_frame.take() {
             let result = capture
-                .present_last(&mut self.renderer)
+                .present_host(&mut self.renderer, address)
                 .map_err(anyhow::Error::from)
                 .and_then(|fixture| self.capture_selection.as_ref().unwrap().write(&fixture));
             if let Err(error) = result {
@@ -328,7 +359,7 @@ impl RenderContext {
             }
             return;
         }
-        match self.renderer.present_last() {
+        match self.renderer.present_host(address) {
             Ok(()) => {}
             Err(fast3d::PresentError::SurfaceLost) => {}
             Err(e) => log::warn!("present: {e:?}"),
@@ -361,19 +392,31 @@ impl RenderContext {
     }
 }
 
+unsafe fn apply_guest_writes(patches: Vec<fast3d::GuestWrite>) {
+    for patch in patches {
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                patch.bytes.as_ptr(),
+                patch.address as *mut u8,
+                patch.bytes.len(),
+            );
+        }
+    }
+}
+
 /// Consume/present/resize seam so the loop's dispatch is unit-testable without a GPU.
 pub(crate) trait GfxConsumer {
-    fn consume_dl(&mut self, data_ptr: usize);
-    fn present(&mut self);
+    fn consume_dl(&mut self, data_ptr: usize, ucode_ptr: usize);
+    fn present(&mut self, address: Option<u64>);
     fn resize(&mut self, width: u32, height: u32);
 }
 
 impl GfxConsumer for RenderContext {
-    fn consume_dl(&mut self, data_ptr: usize) {
-        RenderContext::consume_dl(self, data_ptr)
+    fn consume_dl(&mut self, data_ptr: usize, ucode_ptr: usize) {
+        RenderContext::consume_dl(self, data_ptr, ucode_ptr)
     }
-    fn present(&mut self) {
-        RenderContext::present(self)
+    fn present(&mut self, address: Option<u64>) {
+        RenderContext::present(self, address)
     }
     fn resize(&mut self, width: u32, height: u32) {
         RenderContext::resize(self, width, height)
@@ -382,12 +425,25 @@ impl GfxConsumer for RenderContext {
 
 /// The render loop over the consumer seam. Exits on Shutdown or a dropped sender.
 pub(crate) fn render_loop_on(ctx: &mut impl GfxConsumer, rx: Receiver<RenderMsg>) {
+    let mut scanout = None;
     while let Ok(msg) = rx.recv() {
         match msg {
-            RenderMsg::Gfx { data_ptr, done } => {
-                ctx.consume_dl(data_ptr);
+            RenderMsg::Gfx {
+                data_ptr,
+                ucode_ptr,
+                done,
+            } => {
+                ctx.consume_dl(data_ptr, ucode_ptr);
                 let _ = done.send(()); // release the blocked guest → it posts SP then DP
-                ctx.present();
+
+                // OoT's pause setup task does not swap; keep the previous image until it does.
+                if scanout.is_none() {
+                    ctx.present(None);
+                }
+            }
+            RenderMsg::Scanout { address } => {
+                scanout = Some(address);
+                ctx.present(scanout);
             }
             RenderMsg::Resize { width, height } => ctx.resize(width, height),
             RenderMsg::Shutdown => break,
@@ -433,6 +489,59 @@ pub fn spawn(handoff: SurfaceHandoff) -> RenderHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[export_name = "gspF3DZEX2_NoN_fifoTextStart"]
+    static mut F3DEX2_TEXT: [u64; 1] = [0];
+    #[export_name = "gspS2DEX2d_fifoTextStart"]
+    static mut S2DEX2_TEXT: [u64; 1] = [0];
+
+    #[test]
+    fn microcode_bindings_preserve_non_and_s2dex2_for_both_pointer_forms() {
+        let bindings = microcode_bindings();
+        for (address, expected) in [
+            (
+                std::ptr::addr_of!(F3DEX2_TEXT) as u64,
+                fast3d::Microcode::F3dex2NoN,
+            ),
+            (
+                std::ptr::addr_of!(S2DEX2_TEXT) as u64,
+                fast3d::Microcode::S2dex2,
+            ),
+        ] {
+            for token in [address, address.wrapping_sub(0x8000_0000)] {
+                let selected = bindings
+                    .iter()
+                    .find(|(bound, _)| *bound == token)
+                    .unwrap()
+                    .1;
+                assert_eq!(selected, expected);
+            }
+        }
+    }
+
+    #[test]
+    fn task_microcode_uses_bindings_then_guest_declaration() {
+        let bindings = microcode_bindings();
+        let f3dex2 = std::ptr::addr_of!(F3DEX2_TEXT) as u64;
+        let s2dex2 = std::ptr::addr_of!(S2DEX2_TEXT) as u64;
+        HLXRenderSetMicrocode(1);
+        let selected = [
+            microcode(f3dex2, &bindings),
+            microcode(f3dex2.wrapping_sub(0x8000_0000), &bindings),
+            microcode(s2dex2, &bindings),
+            microcode(s2dex2.wrapping_sub(0x8000_0000), &bindings),
+            microcode(0, &bindings),
+            microcode(0x1234, &bindings),
+        ];
+        HLXRenderSetMicrocode(0);
+        assert_eq!(selected[2], fast3d::Microcode::S2dex2);
+        assert_eq!(selected[3], fast3d::Microcode::S2dex2);
+        assert_eq!(selected[0], fast3d::Microcode::F3dex2NoN);
+        assert_eq!(selected[1], fast3d::Microcode::F3dex2NoN);
+        assert_eq!(selected[4], fast3d::Microcode::F3d);
+        assert_eq!(selected[5], fast3d::Microcode::F3d);
+        assert_eq!(microcode(0x1234, &bindings), fast3d::Microcode::F3dex2);
+    }
 
     #[test]
     fn valid_surface_size_rejects_sentinels_and_zeros() {
@@ -489,10 +598,12 @@ mod tests {
         done_before_present: Receiver<()>,
     }
     impl super::GfxConsumer for FakeConsumer {
-        fn consume_dl(&mut self, data_ptr: usize) {
-            self.log.push(format!("consume:{data_ptr:#x}"));
+        fn consume_dl(&mut self, data_ptr: usize, ucode_ptr: usize) {
+            self.log
+                .push(format!("consume:{data_ptr:#x}:{ucode_ptr:#x}"));
         }
-        fn present(&mut self) {
+        fn present(&mut self, address: Option<u64>) {
+            assert_eq!(address, None);
             assert!(
                 self.done_before_present.try_recv().is_ok(),
                 "done must fire before present"
@@ -510,6 +621,7 @@ mod tests {
         let (tx, rx) = channel::<RenderMsg>();
         tx.send(RenderMsg::Gfx {
             data_ptr: 0xABC,
+            ucode_ptr: 0x1_1234_5678,
             done: tx_done,
         })
         .unwrap();
@@ -525,7 +637,86 @@ mod tests {
             done_before_present: rx_done,
         };
         super::render_loop_on(&mut fake, rx);
-        assert_eq!(fake.log, vec!["consume:0xabc", "present", "resize:640x480"]);
+        assert_eq!(
+            fake.log,
+            vec!["consume:0xabc:0x112345678", "present", "resize:640x480"]
+        );
+    }
+
+    #[test]
+    fn render_loop_applies_patches_before_done_and_orders_scanout() {
+        struct Consumer {
+            memory: [u16; 3],
+            completions: Vec<Receiver<()>>,
+            consumed: usize,
+            presented: Vec<(Option<u64>, [u16; 3])>,
+        }
+        impl GfxConsumer for Consumer {
+            fn consume_dl(&mut self, word: usize, _: usize) {
+                assert!(matches!(
+                    self.completions[self.consumed].try_recv(),
+                    Err(std::sync::mpsc::TryRecvError::Empty)
+                ));
+                let color = fast3d::GuestWrite {
+                    address: self.memory.as_mut_ptr() as u64,
+                    bytes: 0xf801u16.to_ne_bytes().to_vec(),
+                };
+                let patch = fast3d::GuestWrite {
+                    address: self.memory.as_mut_ptr() as u64 + 2,
+                    bytes: (word as u16).to_ne_bytes().to_vec(),
+                };
+                unsafe {
+                    apply_guest_writes(vec![color, patch]);
+                }
+                assert_eq!(self.memory, [0xf801, word as u16, 0x1234]);
+                assert!(matches!(
+                    self.completions[self.consumed].try_recv(),
+                    Err(std::sync::mpsc::TryRecvError::Empty)
+                ));
+                self.consumed += 1;
+            }
+            fn present(&mut self, address: Option<u64>) {
+                if let Some(done) = self.completions.get(self.consumed.wrapping_sub(1)) {
+                    assert!(matches!(
+                        done.try_recv(),
+                        Ok(()) | Err(std::sync::mpsc::TryRecvError::Disconnected)
+                    ));
+                }
+                self.presented.push((address, self.memory));
+            }
+            fn resize(&mut self, _: u32, _: u32) {}
+        }
+        let (tx, rx) = channel();
+        let mut consumer = Consumer {
+            memory: [0, 0, 0x1234],
+            completions: vec![],
+            consumed: 0,
+            presented: vec![],
+        };
+        let a = 0x1_0020_0000;
+        let b = 0x2_0020_0000;
+        for (swap, word) in [(Some(a), 0xfffc), (None, 0x4000), (Some(b), 0x8000)] {
+            if let Some(address) = swap {
+                tx.send(RenderMsg::Scanout { address }).unwrap();
+            }
+            let (done, receiver) = channel();
+            consumer.completions.push(receiver);
+            tx.send(RenderMsg::Gfx {
+                data_ptr: word,
+                ucode_ptr: 0,
+                done,
+            })
+            .unwrap();
+        }
+        tx.send(RenderMsg::Shutdown).unwrap();
+        render_loop_on(&mut consumer, rx);
+        assert_eq!(
+            consumer.presented,
+            vec![
+                (Some(a), [0, 0, 0x1234]),
+                (Some(b), [0xf801, 0x4000, 0x1234])
+            ]
+        );
     }
 
     #[test]

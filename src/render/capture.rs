@@ -209,9 +209,14 @@ impl SequenceRecording {
         })
     }
 
-    pub fn present(&mut self, renderer: &mut fast3d::Renderer) -> Result<bool> {
-        self.recorder.present_last(renderer)?;
-        self.completed_frames += 1;
+    pub fn present(
+        &mut self,
+        renderer: &mut fast3d::Renderer,
+        address: Option<u64>,
+    ) -> Result<bool> {
+        let completed = self.recorder.frame_mut().is_ok();
+        self.recorder.present_host(renderer, address)?;
+        self.completed_frames += u64::from(completed);
         Ok(self.completed_frames == self.selection.last_serial())
     }
 
@@ -529,8 +534,10 @@ mod tests {
                 height: 4,
                 vi: None,
                 dual_source_blending: false,
+                depth_clip_control: false,
             },
             tasks: vec![Task {
+                bindings: Vec::new(),
                 entry: 0x100,
                 microcode: fast3d::Microcode::F3d,
                 data_format: fast3d::DataFormat::Fixed,
