@@ -28,6 +28,7 @@ unsafe fn hlx_acmd_process(_list: *const c_void, _num_cmds: i32) {}
 /// place — it MUST NOT redefine them (a second definition in this module is an E0428 duplicate).
 const M_GFXTASK: u32 = 1;
 const M_AUDTASK: u32 = 2;
+const M_NJPEGTASK: u32 = 4;
 
 /// Host-ABI mirror of OSTask_t (include/PR/sptask.h). `repr(C)` reproduces exactly what the
 /// host C compiler lays out for the game's OSTask, so `.type_` (off 0) and `.data_ptr` (off 88)
@@ -158,7 +159,11 @@ pub extern "C" fn HLXSpTaskStartGo(task: *mut c_void) {
             unsafe { hlx_acmd_process(t.data_ptr as *const c_void, num_cmds) };
             event::post(OS_EVENT_SP);
         }
-        // Any other forwarded task (e.g. M_NJPEGTASK) still runs on the RSP, so it must post SP
+        M_NJPEGTASK => {
+            unsafe { super::njpeg::process(data_ptr as *const c_void) };
+            event::post(OS_EVENT_SP);
+        }
+        // Any other forwarded task still runs on the RSP, so it must post SP
         // or the guest scheduler blocks forever on completion. SP only — only gfx drives the RDP.
         _ => event::post(OS_EVENT_SP),
     }
