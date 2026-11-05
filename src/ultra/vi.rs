@@ -378,6 +378,7 @@ pub extern "C" fn HLXViGetTvFamily(os_tv_type: u32) -> u32 {
 
 #[no_mangle]
 pub extern "C" fn HLXViSwapBuffer(fb: *mut c_void) {
+    crate::gamepad::script::on_swap();
     super::rcp::send_render_control(super::rcp::RenderMsg::Scanout { address: fb as u64 });
 }
 
