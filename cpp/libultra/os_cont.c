@@ -44,3 +44,40 @@ void osContGetReadData(OSContPad *pad) {
     }
     GamepadManagerGetReadData(_ref_gamepad_manager, pad);
 }
+
+// The guest waits for SI completion after starting a controller query.
+s32 osContStartQuery(OSMesgQueue *mq) {
+    (void) mq;
+    if (HLXRuntimeActive()) {
+        HLXEventPost(OS_EVENT_SI);
+    }
+    return 0;
+}
+
+void osContGetQuery(OSContStatus *data) {
+    for (s32 i = 0; i < MAXCONTROLLERS; i++) {
+        if (i == 0) {
+            data[i].type = CONT_ABSOLUTE | CONT_JOYPORT;
+            data[i].status = 0;
+            data[i].err_no = 0;
+        } else {
+            data[i].type = 0;
+            data[i].status = 0;
+            data[i].err_no = CONT_NO_RESPONSE_ERROR;
+        }
+    }
+}
+
+s32 osContSetCh(u8 ch) {
+    (void) ch; // helix surfaces a fixed single controller channel
+    return 0;
+}
+
+// No motor device: report failure so the guest disables rumble.
+struct OSPfs;
+s32 osMotorInit(OSMesgQueue *ctrlrqueue, struct OSPfs *pfs, s32 channel) {
+    (void) ctrlrqueue;
+    (void) pfs;
+    (void) channel;
+    return -1;
+}
