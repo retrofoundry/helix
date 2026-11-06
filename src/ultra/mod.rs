@@ -4,10 +4,11 @@
 
 pub mod event;
 pub mod mesg;
-mod njpeg;
+mod njpgdsp;
 pub mod pi;
 pub mod rcp;
 pub mod rom;
+pub(crate) mod rsp;
 pub mod save;
 pub mod sched;
 pub mod thread;

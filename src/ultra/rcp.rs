@@ -1,16 +1,13 @@
-//! ultra/rcp.rs — RCP task engine (the M_GFXTASK graphics path).
-//!
-//! Routes an OSTask by `OSTask.t.type` (M_GFXTASK=1, M_AUDTASK=2; include/PR/sptask.h).
-//! M_GFXTASK: submit the DL `data_ptr` to the dedicated render thread over an mpsc channel,
-//! block the calling guest thread HOLDING the run token until the render thread has consumed
-//! the DL (fast3d begin_frame + process_dl), then post OS_EVENT_SP then OS_EVENT_DP in
-//! osSendMesg tail order (never jam). M_AUDTASK is handled separately, below.
+//! RCP task engine: routes each OSTask through its guest-registered microcode handler.
+//! Graphics tasks hold the guest run token until the render thread consumes the display list,
+//! then post SP followed by DP. Audio and njpgdsp handlers run in place and post SP.
 
 use std::os::raw::c_void;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Mutex, OnceLock};
 
 use crate::ultra::event::{self, OS_EVENT_DP, OS_EVENT_SP};
+use crate::ultra::rsp::{self, Handler};
 
 #[cfg(not(test))]
 extern "C" {
@@ -23,12 +20,7 @@ extern "C" {
 #[cfg(test)]
 unsafe fn hlx_acmd_process(_list: *const c_void, _num_cmds: i32) {}
 
-/// OSTask type constants (include/PR/sptask.h). This is the SINGLE canonical definition of
-/// M_GFXTASK/M_AUDTASK (and `OSTaskT` below) in `rcp.rs`; the M_AUDTASK path reuses these in
-/// place — it MUST NOT redefine them (a second definition in this module is an E0428 duplicate).
 const M_GFXTASK: u32 = 1;
-const M_AUDTASK: u32 = 2;
-const M_NJPEGTASK: u32 = 4;
 
 /// Host-ABI mirror of OSTask_t (include/PR/sptask.h). `repr(C)` reproduces exactly what the
 /// host C compiler lays out for the game's OSTask, including native-width pointers.
@@ -61,9 +53,15 @@ unsafe fn read_task(task: *const c_void) -> (u32, usize, usize) {
     (t.type_, t.data_ptr as usize, t.ucode as usize)
 }
 
-/// The two completion events an M_GFXTASK posts, in osSendMesg tail order: SP drains before
-/// DP so the game's handle_sp_complete runs before handle_dp_complete (else handle_dp_complete
-/// nulls sCurrentDisplaySPTask under handle_sp_complete). NEVER osJamMesg.
+fn skip_completion_events(task_type: u32) -> &'static [i32] {
+    if task_type == M_GFXTASK {
+        &[OS_EVENT_SP, OS_EVENT_DP]
+    } else {
+        &[OS_EVENT_SP]
+    }
+}
+
+/// SP must drain before DP: the guest's DP handler may clear the current SP task.
 const fn gfx_completion_events() -> [i32; 2] {
     [OS_EVENT_SP, OS_EVENT_DP]
 }
@@ -81,7 +79,7 @@ fn post_gfx_completion() {
 pub(crate) enum RenderMsg {
     Gfx {
         data_ptr: usize,
-        ucode_ptr: usize,
+        microcode: fast3d::Microcode,
         done: Sender<()>,
     },
     Scanout {
@@ -124,13 +122,13 @@ pub(crate) fn take_render_receiver() -> Receiver<RenderMsg> {
 /// Submit a DL and block (run token held) until the consumer consumes it. `true` on consume, `false`
 /// if the render thread is gone — the caller then skips completion so a dead consumer never yields a
 /// false SP→DP.
-pub(crate) fn submit_and_wait(data_ptr: usize, ucode_ptr: usize) -> bool {
+pub(crate) fn submit_and_wait(data_ptr: usize, microcode: fast3d::Microcode) -> bool {
     let (done_tx, done_rx) = channel::<()>();
     if gfx()
         .tx
         .send(RenderMsg::Gfx {
             data_ptr,
-            ucode_ptr,
+            microcode,
             done: done_tx,
         })
         .is_err()
@@ -145,21 +143,24 @@ pub(crate) fn send_render_control(msg: RenderMsg) {
     let _ = gfx().tx.send(msg);
 }
 
-/// osSpTaskStartGo: route the RCP task by type. M_GFXTASK → block on the render-thread consume,
-/// then post SP+DP. M_AUDTASK is the in-place Acmd interpreter. Load/Yield no-ops.
+/// osSpTaskStartGo: run the registered microcode handler, then post completion.
 #[no_mangle]
 pub extern "C" fn HLXSpTaskStartGo(task: *mut c_void) {
     if task.is_null() {
         return;
     }
     let (ty, data_ptr, ucode_ptr) = unsafe { read_task(task) };
-    match ty {
-        M_GFXTASK => {
-            if submit_and_wait(data_ptr, ucode_ptr) {
+    let handler = rsp::lookup(ucode_ptr).unwrap_or_else(|| {
+        log::error!("unregistered RSP task: type {ty}, ucode {ucode_ptr:#x}");
+        std::process::abort();
+    });
+    match handler {
+        Handler::Gfx(microcode) => {
+            if submit_and_wait(data_ptr, microcode) {
                 post_gfx_completion();
             }
         }
-        M_AUDTASK => {
+        Handler::AudioAcmd => {
             // In-place under the held run token: decode the Acmd list and mix.
             // A_SAVEBUFF commands write PCM straight into the game's native buffers
             // (pointers embedded in the list). data_size is in bytes; sizeof(Acmd)=16.
@@ -168,13 +169,15 @@ pub extern "C" fn HLXSpTaskStartGo(task: *mut c_void) {
             unsafe { hlx_acmd_process(t.data_ptr as *const c_void, num_cmds) };
             event::post(OS_EVENT_SP);
         }
-        M_NJPEGTASK => {
-            unsafe { super::njpeg::process(data_ptr as *const c_void) };
+        Handler::JpegNjpgdsp => {
+            unsafe { super::njpgdsp::process(data_ptr as *const c_void) };
             event::post(OS_EVENT_SP);
         }
-        // Any other forwarded task still runs on the RSP, so it must post SP
-        // or the guest scheduler blocks forever on completion. SP only — only gfx drives the RDP.
-        _ => event::post(OS_EVENT_SP),
+        Handler::Skip => {
+            for &ev in skip_completion_events(ty) {
+                event::post(ev);
+            }
+        }
     }
 }
 
@@ -215,28 +218,33 @@ mod tests {
             match rx.recv().expect("no message") {
                 RenderMsg::Gfx {
                     data_ptr,
-                    ucode_ptr,
+                    microcode,
                     done,
                 } => {
                     assert_eq!(data_ptr, 0xDEAD_BEEF, "data_ptr must round-trip intact");
-                    assert_eq!(ucode_ptr, 0x1_1234_5678, "ucode must round-trip intact");
+                    assert_eq!(microcode, fast3d::Microcode::S2dex2);
                     done.send(()).expect("guest gone");
                 }
                 _ => panic!("expected Gfx"),
             }
             tx_ready.send(()).unwrap();
         });
+        let binding = rsp::HLXRspBinding {
+            ucode: 0x1_1234_5678 as *const c_void,
+            handler: 4,
+        };
+        assert_eq!(rsp::HLXRspRegister(&binding, 1), 0);
         let mut task = OSTaskT {
-            type_: M_GFXTASK,
+            type_: 99,
             data_ptr: 0xDEAD_BEEF as *mut u64,
-            ucode: 0x1_1234_5678 as *mut u64,
+            ucode: 0x9234_5678 as *mut u64,
             ..unsafe { std::mem::zeroed() }
         };
         HLXSpTaskStartGo(&mut task as *mut OSTaskT as *mut c_void);
         rx_ready.recv().unwrap();
         consumer.join().unwrap();
         assert!(
-            !submit_and_wait(0x1234, 0x5678),
+            !submit_and_wait(0x1234, fast3d::Microcode::F3d),
             "receiver dropped → render gone → false, no hang"
         );
     }
@@ -250,6 +258,17 @@ mod tests {
             sp < dp,
             "SP posts before DP (osSendMesg tail order, never jam)"
         );
+    }
+
+    #[test]
+    fn skip_completion_follows_task_type() {
+        assert_eq!(
+            skip_completion_events(M_GFXTASK),
+            &[OS_EVENT_SP, OS_EVENT_DP]
+        );
+        for task_type in [2, 4, 99] {
+            assert_eq!(skip_completion_events(task_type), &[OS_EVENT_SP]);
+        }
     }
 
     #[test]
