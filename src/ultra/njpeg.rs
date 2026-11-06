@@ -1,6 +1,5 @@
-use std::f64::consts::{FRAC_1_SQRT_2, PI};
 use std::os::raw::c_void;
-use std::sync::{Once, OnceLock};
+use std::sync::Once;
 
 const ZIGZAG: [usize; 64] = [
     0, 1, 8, 16, 9, 2, 3, 10, 17, 24, 32, 25, 18, 11, 4, 5, 12, 19, 26, 33, 40, 48, 41, 34, 27, 20,
@@ -24,40 +23,77 @@ fn from_k0_physical(address: usize) -> usize {
     address.wrapping_add(0x8000_0000)
 }
 
-fn inverse_dct(coefficients: &[u16], table: &[u16; 64]) -> [f64; 64] {
-    static BASIS: OnceLock<[[f64; 8]; 8]> = OnceLock::new();
-    let basis = BASIS.get_or_init(|| {
-        std::array::from_fn(|x| {
-            std::array::from_fn(|u| {
-                let scale = if u == 0 { FRAC_1_SQRT_2 } else { 1.0 };
-                0.5 * scale * ((2 * x + 1) as f64 * u as f64 * PI / 16.0).cos()
-            })
-        })
-    });
-    let mut natural = [0.0; 64];
-    for (i, &position) in ZIGZAG.iter().enumerate() {
-        natural[position] = f64::from(coefficients[i] as i16) * f64::from(table[i]);
-    }
-    let mut rows = [0.0; 64];
-    for (v, row) in natural.chunks_exact(8).enumerate() {
-        for (x, weights) in basis.iter().enumerate() {
-            rows[v * 8 + x] = row.iter().zip(weights).map(|(c, w)| c * w).sum();
-        }
-    }
-    std::array::from_fn(|i| {
-        let value: f64 = (0..8).map(|v| rows[v * 8 + i % 8] * basis[i / 8][v]).sum();
-        (value + 128.0).round().clamp(0.0, 255.0)
-    })
+// The microcode's fixed-point constants (njpgdspMain's data block). Its butterflies, rounding and
+// saturation are reproduced step by step: reassociating them or using a float IDCT changes pixels.
+const ODD: [i64; 6] = [6393, -32138, 27246, -18205, 18205, 32138];
+const EVEN: [i64; 5] = [23170, -23170, 12540, -30274, 30274];
+
+fn sat(value: i64) -> i64 {
+    value.clamp(i16::MIN.into(), i16::MAX.into())
 }
 
-fn rgba5551(y: f64, cb: f64, cr: f64) -> u16 {
-    let cb = cb - 128.0;
-    let cr = cr - 128.0;
-    let channel = |value: f64| (value.round().clamp(0.0, 255.0) as u16) >> 3;
-    let r = channel(y + 1.402 * cr);
-    let g = channel(y - 0.34414 * cb - 0.71414 * cr);
-    let b = channel(y + 1.772 * cb);
-    (r << 11) | (g << 6) | (b << 1) | 1
+/// VMULF then VMACF: one rounding bias for the pair.
+fn multiply_pair(a: i64, ca: i64, b: i64, cb: i64) -> i64 {
+    sat((a * ca + b * cb + 16384) >> 15)
+}
+
+fn idct_pass(c: [i64; 8], last: bool) -> [i64; 8] {
+    let odd_a = multiply_pair(c[3], ODD[2], c[5], ODD[4]);
+    let odd_b = multiply_pair(c[7], ODD[0], c[1], ODD[5]);
+    let odd_c = multiply_pair(c[1], ODD[0], c[7], ODD[1]);
+    let odd_d = multiply_pair(c[5], ODD[2], c[3], ODD[3]);
+    let (diff_a, diff_b) = (sat(odd_b - odd_a), sat(odd_c - odd_d));
+    let odd = [
+        sat(odd_b + odd_a),
+        multiply_pair(diff_a, EVEN[0], diff_b, EVEN[0]),
+        multiply_pair(diff_a, EVEN[0], diff_b, EVEN[1]),
+        sat(odd_c + odd_d),
+    ];
+    let even_a = multiply_pair(c[0], EVEN[0], c[4], EVEN[0]);
+    let even_b = multiply_pair(c[6], EVEN[2], c[2], EVEN[4]);
+    let even_c = multiply_pair(c[0], EVEN[0], c[4], EVEN[1]);
+    let even_d = multiply_pair(c[2], EVEN[2], c[6], EVEN[3]);
+    let even = [
+        sat(even_a + even_b),
+        sat(even_c + even_d),
+        sat(even_c - even_d),
+        sat(even_a - even_b),
+    ];
+    let mut output = [0; 8];
+    for i in 0..4 {
+        // The final stage divides the unsaturated sums by four, rounding half up.
+        let (sum, difference) = (even[i] + odd[i], even[i] - odd[i]);
+        (output[i], output[7 - i]) = if last {
+            ((sum + 2) >> 2, (difference + 2) >> 2)
+        } else {
+            (sat(sum), sat(difference))
+        };
+    }
+    output
+}
+
+/// Signed samples scaled by 16, before the level shift.
+fn inverse_dct(coefficients: &[u16], table: &[u16; 64]) -> [i64; 64] {
+    let mut block = [0; 64];
+    for (i, &position) in ZIGZAG.iter().enumerate() {
+        let product = sat(i64::from(coefficients[i] as i16) * i64::from(table[i] as i16));
+        // VMUDN keeps the low halfword: the scale by 16 wraps instead of saturating.
+        block[position] = i64::from((product * 16) as i16);
+    }
+    let rows: [[i64; 8]; 8] =
+        std::array::from_fn(|y| idct_pass(std::array::from_fn(|x| block[y * 8 + x]), false));
+    let columns: [[i64; 8]; 8] =
+        std::array::from_fn(|x| idct_pass(std::array::from_fn(|y| rows[y][x]), true));
+    std::array::from_fn(|i| columns[i % 8][i / 8])
+}
+
+fn rgba5551(y: i64, cb: i64, cr: i64) -> u16 {
+    let y = sat(y + 2048);
+    let red = sat(sat(((cr * 26378) >> 16) + cr) + y);
+    let green = sat(y - sat(((cb * 22564) >> 16) + ((cr * 46819) >> 16)));
+    let blue = sat(sat(((cb * 50659) >> 16) + cb) + y);
+    let channel = |value: i64| (value.clamp(0, 4080) >> 7) as u16;
+    (channel(red) << 11) | (channel(green) << 6) | (channel(blue) << 1) | 1
 }
 
 /// # Safety
@@ -85,7 +121,7 @@ pub(super) unsafe fn process(data: *const c_void) {
     let stride = (y_blocks + 2) * 64;
     for mb in 0..task.mb_count as usize {
         let buffer = std::slice::from_raw_parts_mut(address.add(mb * stride), stride);
-        let mut blocks = [[0.0; 64]; 6];
+        let mut blocks = [[0; 64]; 6];
         for (block, output) in blocks[..y_blocks + 2].iter_mut().enumerate() {
             let component = if block < y_blocks {
                 0
@@ -109,6 +145,7 @@ pub(super) unsafe fn process(data: *const c_void) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::f64::consts::{FRAC_1_SQRT_2, PI};
 
     fn physical<T>(ptr: *const T) -> usize {
         (ptr as usize).wrapping_sub(0x8000_0000)
@@ -278,13 +315,72 @@ mod tests {
         unsafe { process((&task as *const JpegTaskData).cast()) };
     }
 
+    struct Lcg(u64);
+
+    impl Lcg {
+        fn next(&mut self) -> u32 {
+            self.0 = self
+                .0
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (self.0 >> 32) as u32
+        }
+    }
+
+    // The hashes are of the pixels OoT's njpgdspMain produced for these inputs on an NTSC N64.
+    #[test]
+    fn decode_matches_the_rsp_on_hardware() {
+        let mut rng = Lcg(1);
+        for (mode, count, expected) in [
+            (0, 2, 0x8fda_e0ee_2f90_8b30u64),
+            (2, 2, 0xab18_a583_2b8a_1aab),
+        ] {
+            let y_blocks = if mode == 0 { 2 } else { 4 };
+            let mut tables = [[0u16; 64]; 3];
+            for (i, entry) in tables.as_flattened_mut().iter_mut().enumerate() {
+                *entry = if i < 128 {
+                    1 + (rng.next() % 64) as u16
+                } else {
+                    rng.next() as u16
+                };
+            }
+            let mut data = Vec::new();
+            for _ in 0..count * (y_blocks + 2) {
+                let kind = rng.next() % 3;
+                data.extend((0..64).map(|_| {
+                    let r = rng.next();
+                    match kind {
+                        0 => ((r % 128) as i32 - 64) as u16,
+                        1 => ((r % 2048) as i32 - 1024) as u16,
+                        _ => r as u16,
+                    }
+                }));
+            }
+            let task = task(&mut data, &tables, mode, count as u32);
+            unsafe { process((&task as *const JpegTaskData).cast()) };
+            let stride = (y_blocks + 2) * 64;
+            let mut hash = 0xcbf2_9ce4_8422_2325u64;
+            for mb in 0..count {
+                for &pixel in &data[mb * stride..][..y_blocks * 64] {
+                    for byte in u16::from_be(pixel).to_be_bytes() {
+                        hash = (hash ^ u64::from(byte)).wrapping_mul(0x100_0000_01b3);
+                    }
+                }
+            }
+            assert_eq!(hash, expected, "mode {mode}");
+        }
+    }
+
     #[test]
     fn dc_blocks_level_shift_and_clamp_to_opaque_rgb() {
         for (dc, expected) in [
             ([-2048, 0, 0], 0x0001),
-            ([2048, 0, 0], 0xffff),
+            ([2047, 0, 0], 0xffff),
+            // 2048 * 16 wraps the RSP's i16 to black.
+            ([2048, 0, 0], 0x0001),
             ([0, 0, 0], 0x8421),
-            ([0, -2048, 2048], 0xfa81),
+            ([0, -2048, 2047], 0xf901),
+            ([100, -300, 250], 0xbc13),
         ] {
             let tables = [[1; 64]; 3];
             let mut data = [0; 384];
