@@ -17,6 +17,7 @@ pub mod vi;
 
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Condvar, Mutex};
 
 use crate::gamepad::manager::GamepadManager;
 use crate::gui::{EventLoopWrapper, Gui};
@@ -47,6 +48,50 @@ pub extern "C" fn HLXRuntimeActive() -> bool {
 }
 
 static SHUTDOWN: AtomicBool = AtomicBool::new(false);
+
+/// Guest threads wait for the renderer before running any guest code, so its startup (a cold Metal
+/// shader compile can take seconds) never counts against a guest timer such as OoT's 3 s RCP
+/// watchdog. Only `HLXRuntimeInit` expects a renderer; without it the gate is open.
+struct RendererGate {
+    expected: AtomicBool,
+    ready: Mutex<bool>,
+    created: Condvar,
+}
+
+impl RendererGate {
+    const fn new() -> Self {
+        RendererGate {
+            expected: AtomicBool::new(false),
+            ready: Mutex::new(false),
+            created: Condvar::new(),
+        }
+    }
+
+    fn wait(&self) {
+        if !self.expected.load(Ordering::SeqCst) {
+            return;
+        }
+        let mut ready = self.ready.lock().unwrap();
+        while !*ready {
+            ready = self.created.wait(ready).unwrap();
+        }
+    }
+
+    fn open(&self) {
+        *self.ready.lock().unwrap() = true;
+        self.created.notify_all();
+    }
+}
+
+static RENDERER: RendererGate = RendererGate::new();
+
+pub(crate) fn wait_for_renderer() {
+    RENDERER.wait();
+}
+
+pub(crate) fn renderer_created() {
+    RENDERER.open();
+}
 
 /// Set by HLXRuntimeInit; lets gui.rs know the runtime owns the loop.
 pub fn mark_runtime_active() {
@@ -99,6 +144,7 @@ fn record_teardown_step(step: &'static str) {
 #[no_mangle]
 pub extern "C" fn HLXRuntimeInit() {
     crate::init();
+    RENDERER.expected.store(true, Ordering::SeqCst);
     // Force the process-global scheduler to exist before any guest thread starts.
     let _ = sched::scheduler();
     mark_runtime_active();
@@ -175,6 +221,25 @@ pub extern "C" fn HLXRunEventLoop() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn renderer_gate_holds_guest_threads_only_when_a_renderer_is_expected() {
+        let gate: &'static RendererGate = Box::leak(Box::new(RendererGate::new()));
+        gate.wait();
+
+        gate.expected.store(true, Ordering::SeqCst);
+        let (done, finished) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            gate.wait();
+            done.send(()).unwrap();
+        });
+        let pending = std::time::Duration::from_millis(50);
+        assert!(finished.recv_timeout(pending).is_err());
+        gate.open();
+        finished
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .unwrap();
+    }
 
     #[test]
     fn shutdown_and_runtime_active_flags_roundtrip() {
