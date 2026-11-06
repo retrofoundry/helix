@@ -1,3 +1,5 @@
+//! HLE for Ocarina of Time's njpgdspMain (M_NJPEGTASK).
+
 use std::os::raw::c_void;
 use std::sync::Once;
 
