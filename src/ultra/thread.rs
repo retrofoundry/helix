@@ -83,6 +83,7 @@ pub extern "C" fn HLXThreadStart(t: *mut c_void) {
         // bypassing SendPtr's `unsafe impl Send` and failing the `spawn` bound.
         let arg = arg;
         sched::set_current_id(key);
+        super::wait_for_renderer();
         scheduler().acquire(key);
         (entry)(arg.0);
         scheduler().on_exit(key);

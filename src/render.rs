@@ -428,6 +428,7 @@ pub fn spawn(handoff: SurfaceHandoff) -> RenderHandle {
         .spawn(move || {
             let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 let mut ctx = RenderContext::from_handoff(handoff);
+                crate::ultra::renderer_created();
                 render_loop_on(&mut ctx, rx);
                 ctx.finish_capture("shutdown");
             }));
