@@ -1,19 +1,22 @@
-# fast3d capture
+# ultragfx capture
 
-Set capture variables before launching the game. Helix must be built against a
-fast3d revision with `CaptureSequence` and the native capture API. The dependency
-enables fast3d's `capture` feature. A statically linked game must be relinked after
+Set capture variables before launching the game. Helix must be built against an
+ultragfx revision with `CaptureSequence` and the native capture API. The dependency
+enables ultragfx's `capture` feature. A statically linked game must be relinked after
 rebuilding Helix.
+
+Captures use the `.ugfxcap` extension and ultragfx's `UGFXCAP\0` magic. Use the
+matching ultragfx replay tool; captures with the old magic are not compatible.
 
 | Variable | Meaning |
 | --- | --- |
-| `FAST3D_CAPTURE_DIR` | Directory for individual frame fixtures. Requires `FAST3D_CAPTURE_FRAMES`. |
-| `FAST3D_CAPTURE_FRAMES` | Comma-separated renderer serials for individual fixtures, starting at 1. |
-| `FAST3D_CAPTURE_SEQUENCE` | Output file for one sequence, for example `/tmp/startup.f3dcap`. Mutually exclusive with `FAST3D_CAPTURE_DIR`. |
-| `FAST3D_CAPTURE_WARMUP_FRAMES` | Number of initial sequence frames before observation; defaults to 0. These frames remain in the recording. |
-| `FAST3D_CAPTURE_PRESENTATIONS` | Required sequence presentation serials, comma-separated, all greater than the warm-up count. |
-| `FAST3D_CAPTURE_REVISION` | Decomp revision in each frame's provenance; defaults to `unknown`. |
-| `FAST3D_CAPTURE_SYMBOLS` | Source symbols or scene annotations in provenance; defaults to `unknown (live task)`. |
+| `ULTRAGFX_CAPTURE_DIR` | Directory for individual frame fixtures. Requires `ULTRAGFX_CAPTURE_FRAMES`. |
+| `ULTRAGFX_CAPTURE_FRAMES` | Comma-separated renderer serials for individual fixtures, starting at 1. |
+| `ULTRAGFX_CAPTURE_SEQUENCE` | Output file for one sequence, for example `/tmp/startup.ugfxcap`. Mutually exclusive with `ULTRAGFX_CAPTURE_DIR`. |
+| `ULTRAGFX_CAPTURE_WARMUP_FRAMES` | Number of initial sequence frames before observation; defaults to 0. These frames remain in the recording. |
+| `ULTRAGFX_CAPTURE_PRESENTATIONS` | Required sequence presentation serials, comma-separated, all greater than the warm-up count. |
+| `ULTRAGFX_CAPTURE_REVISION` | Decomp revision in each frame's provenance; defaults to `unknown`. |
+| `ULTRAGFX_CAPTURE_SYMBOLS` | Source symbols or scene annotations in provenance; defaults to `unknown (live task)`. |
 
 Lists accept surrounding whitespace, duplicate serials, and empty comma-separated
 elements, including the trailing comma produced by BSD `seq -s,`. Empty lists,
@@ -24,16 +27,16 @@ alone do not enable capture.
 ## Individual frames
 
 ```sh
-FAST3D_CAPTURE_DIR=/tmp/sm64-frames \
-FAST3D_CAPTURE_FRAMES=120,240,360, \
-FAST3D_CAPTURE_REVISION="$(git rev-parse HEAD)" \
-FAST3D_CAPTURE_SYMBOLS='live sm64 graphics tasks' \
+ULTRAGFX_CAPTURE_DIR=/tmp/sm64-frames \
+ULTRAGFX_CAPTURE_FRAMES=120,240,360, \
+ULTRAGFX_CAPTURE_REVISION="$(git rev-parse HEAD)" \
+ULTRAGFX_CAPTURE_SYMBOLS='live sm64 graphics tasks' \
 RUST_LOG=helix::render=info \
 ./build-cmake/sm64-us
 ```
 
-This writes `frame-000120.f3dcap`, `frame-000240.f3dcap`, and
-`frame-000360.f3dcap`, named from `fixture.frame.serial`. Serial 1 is the first
+This writes `frame-000120.ugfxcap`, `frame-000240.ugfxcap`, and
+`frame-000360.ugfxcap`, named from `fixture.frame.serial`. Serial 1 is the first
 graphics task, including startup before gameplay. PR #33 used zero-based consume
 indices, so its selection 120 wrote serial 121; this hook selects the renderer
 serial directly. Add one to old selections to capture the same tasks.
@@ -46,11 +49,11 @@ shutdown. A successful write logs `captured frame ...`.
 ## Sequences
 
 ```sh
-FAST3D_CAPTURE_SEQUENCE=/tmp/sm64-startup.f3dcap \
-FAST3D_CAPTURE_WARMUP_FRAMES=120 \
-FAST3D_CAPTURE_PRESENTATIONS=121,180,240, \
-FAST3D_CAPTURE_REVISION="$(git rev-parse HEAD)" \
-FAST3D_CAPTURE_SYMBOLS='startup through selected gameplay route' \
+ULTRAGFX_CAPTURE_SEQUENCE=/tmp/sm64-startup.ugfxcap \
+ULTRAGFX_CAPTURE_WARMUP_FRAMES=120 \
+ULTRAGFX_CAPTURE_PRESENTATIONS=121,180,240, \
+ULTRAGFX_CAPTURE_REVISION="$(git rev-parse HEAD)" \
+ULTRAGFX_CAPTURE_SYMBOLS='startup through selected gameplay route' \
 RUST_LOG=helix::render=info \
 ./build-cmake/sm64-us
 ```
@@ -124,12 +127,12 @@ the replay tool before using it. A `.partial` file alone is not a successful cap
 
 ## Replay and validation
 
-From the fast3d worktree, with its supported toolchain:
+From the ultragfx worktree, with its supported toolchain:
 
 ```sh
 mkdir -p /tmp/sm64-replay
-cargo run -p fast3d --features capture --example replay_capture -- \
-  /tmp/sm64-startup.f3dcap /tmp/sm64-replay/startup all
+cargo run -p ultragfx --features capture --example replay_capture -- \
+  /tmp/sm64-startup.ugfxcap /tmp/sm64-replay/startup all
 ```
 
 The replay loader rejects gaps, missing reset history, invalid warm-up/presentation

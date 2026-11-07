@@ -79,7 +79,7 @@ fn post_gfx_completion() {
 pub(crate) enum RenderMsg {
     Gfx {
         data_ptr: usize,
-        microcode: fast3d::Microcode,
+        microcode: ultragfx::Microcode,
         done: Sender<()>,
     },
     Scanout {
@@ -122,7 +122,7 @@ pub(crate) fn take_render_receiver() -> Receiver<RenderMsg> {
 /// Submit a DL and block (run token held) until the consumer consumes it. `true` on consume, `false`
 /// if the render thread is gone — the caller then skips completion so a dead consumer never yields a
 /// false SP→DP.
-pub(crate) fn submit_and_wait(data_ptr: usize, microcode: fast3d::Microcode) -> bool {
+pub(crate) fn submit_and_wait(data_ptr: usize, microcode: ultragfx::Microcode) -> bool {
     let (done_tx, done_rx) = channel::<()>();
     if gfx()
         .tx
@@ -222,7 +222,7 @@ mod tests {
                     done,
                 } => {
                     assert_eq!(data_ptr, 0xDEAD_BEEF, "data_ptr must round-trip intact");
-                    assert_eq!(microcode, fast3d::Microcode::S2dex2);
+                    assert_eq!(microcode, ultragfx::Microcode::S2dex2);
                     done.send(()).expect("guest gone");
                 }
                 _ => panic!("expected Gfx"),
@@ -244,7 +244,7 @@ mod tests {
         rx_ready.recv().unwrap();
         consumer.join().unwrap();
         assert!(
-            !submit_and_wait(0x1234, fast3d::Microcode::F3d),
+            !submit_and_wait(0x1234, ultragfx::Microcode::F3d),
             "receiver dropped → render gone → false, no hang"
         );
     }

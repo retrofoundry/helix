@@ -1,10 +1,10 @@
 use anyhow::{bail, Context, Result};
-use fast3d::capture::{CaptureSequence, Fixture, Provenance};
 use std::ffi::OsString;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Once;
+use ultragfx::capture::{CaptureSequence, Fixture, Provenance};
 
 pub(super) enum Selection {
     Frames(FrameSelection),
@@ -14,11 +14,11 @@ pub(super) enum Selection {
 impl Selection {
     pub fn from_env() -> Result<Option<Self>> {
         let selection = Self::parse(
-            std::env::var_os("FAST3D_CAPTURE_DIR"),
-            std::env::var("FAST3D_CAPTURE_FRAMES").ok(),
-            std::env::var_os("FAST3D_CAPTURE_SEQUENCE"),
-            std::env::var("FAST3D_CAPTURE_WARMUP_FRAMES").ok(),
-            std::env::var("FAST3D_CAPTURE_PRESENTATIONS").ok(),
+            std::env::var_os("ULTRAGFX_CAPTURE_DIR"),
+            std::env::var("ULTRAGFX_CAPTURE_FRAMES").ok(),
+            std::env::var_os("ULTRAGFX_CAPTURE_SEQUENCE"),
+            std::env::var("ULTRAGFX_CAPTURE_WARMUP_FRAMES").ok(),
+            std::env::var("ULTRAGFX_CAPTURE_PRESENTATIONS").ok(),
         )?;
         if let Some(Self::Sequence(sequence)) = &selection {
             static CONTEXTS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -56,14 +56,14 @@ impl Selection {
     ) -> Result<Option<Self>> {
         match (directory, sequence) {
             (Some(_), Some(_)) => {
-                bail!("FAST3D_CAPTURE_DIR and FAST3D_CAPTURE_SEQUENCE are mutually exclusive")
+                bail!("ULTRAGFX_CAPTURE_DIR and ULTRAGFX_CAPTURE_SEQUENCE are mutually exclusive")
             }
             (Some(directory), None) => {
                 if directory.is_empty() {
-                    bail!("FAST3D_CAPTURE_DIR is empty");
+                    bail!("ULTRAGFX_CAPTURE_DIR is empty");
                 }
-                let frames =
-                    frames.context("FAST3D_CAPTURE_FRAMES is required with FAST3D_CAPTURE_DIR")?;
+                let frames = frames
+                    .context("ULTRAGFX_CAPTURE_FRAMES is required with ULTRAGFX_CAPTURE_DIR")?;
                 Ok(Some(Self::Frames(FrameSelection {
                     directory: directory.into(),
                     frames: parse_serials(&frames)?,
@@ -115,7 +115,7 @@ impl FrameSelection {
     pub fn write(&self, fixture: &Fixture) -> Result<()> {
         let path = self
             .directory
-            .join(format!("frame-{:06}.f3dcap", fixture.frame.serial));
+            .join(format!("frame-{:06}.ugfxcap", fixture.frame.serial));
         CaptureOutput::create(&path)?.write(&fixture.to_bytes()?)?;
         log::info!(
             "captured frame {} to {}",
@@ -139,20 +139,19 @@ impl SequenceSelection {
         presentations: Option<String>,
     ) -> Result<Self> {
         if path.is_empty() {
-            bail!("FAST3D_CAPTURE_SEQUENCE is empty");
+            bail!("ULTRAGFX_CAPTURE_SEQUENCE is empty");
         }
         let warmup_frames = warmup
             .as_deref()
             .unwrap_or("0")
             .trim()
             .parse::<u32>()
-            .context("invalid FAST3D_CAPTURE_WARMUP_FRAMES")?;
-        let presentations = parse_serials(
-            &presentations
-                .context("FAST3D_CAPTURE_PRESENTATIONS is required with FAST3D_CAPTURE_SEQUENCE")?,
-        )?;
+            .context("invalid ULTRAGFX_CAPTURE_WARMUP_FRAMES")?;
+        let presentations = parse_serials(&presentations.context(
+            "ULTRAGFX_CAPTURE_PRESENTATIONS is required with ULTRAGFX_CAPTURE_SEQUENCE",
+        )?)?;
         if presentations[0] <= u64::from(warmup_frames) {
-            bail!("FAST3D_CAPTURE_PRESENTATIONS must be after FAST3D_CAPTURE_WARMUP_FRAMES");
+            bail!("ULTRAGFX_CAPTURE_PRESENTATIONS must be after ULTRAGFX_CAPTURE_WARMUP_FRAMES");
         }
         Ok(Self {
             path: path.into(),
@@ -191,7 +190,7 @@ pub(super) struct SequenceRecording {
 }
 
 impl SequenceRecording {
-    pub fn begin(renderer: &mut fast3d::Renderer, selection: SequenceSelection) -> Result<Self> {
+    pub fn begin(renderer: &mut ultragfx::Renderer, selection: SequenceSelection) -> Result<Self> {
         let output = CaptureOutput::create(&selection.path)?;
         let recorder = CaptureSequence::begin(renderer, 0)?;
         log::info!(
@@ -211,7 +210,7 @@ impl SequenceRecording {
 
     pub fn present(
         &mut self,
-        renderer: &mut fast3d::Renderer,
+        renderer: &mut ultragfx::Renderer,
         address: Option<u64>,
     ) -> Result<bool> {
         let completed = self.recorder.frame_mut().is_ok();
@@ -321,9 +320,9 @@ impl Drop for CaptureOutput {
 
 pub(super) fn provenance(serial: u64) -> Provenance {
     Provenance {
-        decomp_revision: std::env::var("FAST3D_CAPTURE_REVISION")
+        decomp_revision: std::env::var("ULTRAGFX_CAPTURE_REVISION")
             .unwrap_or_else(|_| "unknown".into()),
-        source_symbols: std::env::var("FAST3D_CAPTURE_SYMBOLS")
+        source_symbols: std::env::var("ULTRAGFX_CAPTURE_SYMBOLS")
             .unwrap_or_else(|_| "unknown (live task)".into()),
         command_vector: format!("helix/frame/{serial}"),
         synthetic_data: "none; live guest memory".into(),
@@ -366,7 +365,7 @@ mod tests {
             let selection = Selection::parse(
                 None,
                 None,
-                Some("unused.f3dcap".into()),
+                Some("unused.ugfxcap".into()),
                 None,
                 Some("1".into()),
             )
@@ -439,7 +438,7 @@ mod tests {
             let selection = Selection::parse(
                 None,
                 None,
-                Some("unused.f3dcap".into()),
+                Some("unused.ugfxcap".into()),
                 None,
                 Some("1".into()),
             )
@@ -501,10 +500,10 @@ mod tests {
                 "--nocapture",
             ])
             .env(CHILD, "1")
-            .env_remove("FAST3D_CAPTURE_DIR")
-            .env("FAST3D_CAPTURE_SEQUENCE", directory.join("run.f3dcap"))
-            .env("FAST3D_CAPTURE_WARMUP_FRAMES", "0")
-            .env("FAST3D_CAPTURE_PRESENTATIONS", "1")
+            .env_remove("ULTRAGFX_CAPTURE_DIR")
+            .env("ULTRAGFX_CAPTURE_SEQUENCE", directory.join("run.ugfxcap"))
+            .env("ULTRAGFX_CAPTURE_WARMUP_FRAMES", "0")
+            .env("ULTRAGFX_CAPTURE_PRESENTATIONS", "1")
             .output()
             .unwrap();
         std::fs::remove_dir_all(directory).unwrap();
@@ -517,13 +516,13 @@ mod tests {
     }
 
     fn fixture(serial: u64) -> Fixture {
-        use fast3d::capture::{Frame, MemoryLayout, MemorySpan, SourceLayout, Task};
+        use ultragfx::capture::{Frame, MemoryLayout, MemorySpan, SourceLayout, Task};
         Fixture {
             frame: Frame {
                 serial,
                 dither_seed: 0,
-                config: fast3d::RendererConfig {
-                    clear_policy: fast3d::ClearPolicy::Persist,
+                config: ultragfx::RendererConfig {
+                    clear_policy: ultragfx::ClearPolicy::Persist,
                     resolution_multiplier: 1,
                     sample_count: 1,
                     present_mode: wgpu::PresentMode::Fifo,
@@ -539,8 +538,8 @@ mod tests {
             tasks: vec![Task {
                 bindings: Vec::new(),
                 entry: 0x100,
-                microcode: fast3d::Microcode::F3d,
-                data_format: fast3d::DataFormat::Fixed,
+                microcode: ultragfx::Microcode::F3d,
+                data_format: ultragfx::DataFormat::Fixed,
                 order: 0,
                 source: SourceLayout {
                     memory: MemoryLayout::IMAGE,
@@ -572,7 +571,7 @@ mod tests {
         assert!(Selection::parse(
             Some("frames".into()),
             Some("1".into()),
-            Some("run.f3dcap".into()),
+            Some("run.ugfxcap".into()),
             None,
             Some("1".into())
         )
@@ -592,8 +591,9 @@ mod tests {
         assert!(!selection.contains(6));
         let fixture = fixture(7);
         selection.write(&fixture).unwrap();
-        let path = directory.join("frame-000007.f3dcap");
+        let path = directory.join("frame-000007.ugfxcap");
         let bytes = std::fs::read(&path).unwrap();
+        assert_eq!(&bytes[..8], b"UGFXCAP\0");
         assert_eq!(Fixture::from_bytes(&bytes).unwrap(), fixture);
         assert!(selection.write(&fixture).is_err());
         assert_eq!(std::fs::read(path).unwrap(), bytes);
@@ -604,7 +604,7 @@ mod tests {
     #[test]
     fn output_is_unpublished_until_complete_and_refuses_a_competing_writer() {
         let directory = scratch_directory();
-        let path = directory.join("run.f3dcap");
+        let path = directory.join("run.ugfxcap");
         let output = CaptureOutput::create(&path).unwrap();
         assert!(!path.exists());
         let competing = CaptureOutput::create(&path).unwrap();
@@ -619,7 +619,7 @@ mod tests {
     #[test]
     fn abandoned_empty_output_is_cleaned_up_and_can_be_retried() {
         let directory = scratch_directory();
-        let path = directory.join("run.f3dcap");
+        let path = directory.join("run.ugfxcap");
         drop(CaptureOutput::create(&path).unwrap());
         assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 0);
         CaptureOutput::create(&path)
@@ -633,7 +633,7 @@ mod tests {
     #[test]
     fn partial_prefix_writes_a_valid_sequence_with_every_original_serial() {
         let directory = scratch_directory();
-        let path = directory.join("run.f3dcap");
+        let path = directory.join("run.ugfxcap");
         let selection = SequenceSelection::parse(
             path.clone().into_os_string(),
             Some("10".into()),
@@ -641,7 +641,7 @@ mod tests {
         )
         .unwrap();
         let (warmup_frames, presentations) = selection.prefix(4).unwrap();
-        let sequence = fast3d::capture::Sequence {
+        let sequence = ultragfx::capture::Sequence {
             frames: (1..=4).map(fixture).collect(),
             warmup_frames,
             presentations,
@@ -650,7 +650,7 @@ mod tests {
             .unwrap()
             .write(&sequence.to_bytes().unwrap())
             .unwrap();
-        let saved = fast3d::capture::Sequence::from_bytes(&std::fs::read(path).unwrap()).unwrap();
+        let saved = ultragfx::capture::Sequence::from_bytes(&std::fs::read(path).unwrap()).unwrap();
         assert_eq!(
             saved
                 .frames
@@ -676,7 +676,7 @@ mod tests {
     #[test]
     fn sequence_selection_requires_presentations_after_warmup() {
         let selection = SequenceSelection::parse(
-            "run.f3dcap".into(),
+            "run.ugfxcap".into(),
             Some("10".into()),
             Some("20,11,".into()),
         )
@@ -686,10 +686,10 @@ mod tests {
         assert_eq!(selection.last_serial(), 20);
         for (path, warmup, presentations) in [
             ("", None, Some("1")),
-            ("run.f3dcap", Some("-1"), Some("1")),
-            ("run.f3dcap", Some("4294967296"), Some("1")),
-            ("run.f3dcap", Some("10"), Some("10,11")),
-            ("run.f3dcap", None, None),
+            ("run.ugfxcap", Some("-1"), Some("1")),
+            ("run.ugfxcap", Some("4294967296"), Some("1")),
+            ("run.ugfxcap", Some("10"), Some("10,11")),
+            ("run.ugfxcap", None, None),
         ] {
             assert!(SequenceSelection::parse(
                 path.into(),
@@ -702,9 +702,12 @@ mod tests {
 
     #[test]
     fn interrupted_sequence_retains_reached_selections_or_last_frame() {
-        let selection =
-            SequenceSelection::parse("run.f3dcap".into(), Some("10".into()), Some("12,20".into()))
-                .unwrap();
+        let selection = SequenceSelection::parse(
+            "run.ugfxcap".into(),
+            Some("10".into()),
+            Some("12,20".into()),
+        )
+        .unwrap();
         assert_eq!(selection.prefix(20).unwrap(), (10, vec![12, 20]));
         assert_eq!(selection.prefix(15).unwrap(), (10, vec![12]));
         assert_eq!(selection.prefix(11).unwrap(), (10, vec![11]));

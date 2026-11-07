@@ -43,7 +43,7 @@ s32 HLXRspRegister(const HLXRspBinding *bindings, size_t count);
 /* Registers live guest memory for display-list reads and write-back until process exit. */
 void HLXRegisterGuestMemory(void *start, size_t size);
 
-/* Guest vertex/matrix layout (fixed N64 s16 vs float), orthogonal to the microcode in fast3d.
+/* Guest vertex/matrix layout (fixed N64 s16 vs float), orthogonal to the microcode in ultragfx.
    Values must stay in sync with render.rs's DATA_FORMAT mapping. */
 typedef enum {
     HLX_DATAFMT_FIXED = 0,
