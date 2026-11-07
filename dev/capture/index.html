@@ -19,7 +19,7 @@
     
     
       
-        <title>fast3d capture - Helix Documentation</title>
+        <title>ultragfx capture - Helix Documentation</title>
       
     
     
@@ -71,7 +71,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#fast3d-capture" class="md-skip">
+        <a href="#ultragfx-capture" class="md-skip">
           Skip to content
         </a>
       
@@ -109,7 +109,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              fast3d capture
+              ultragfx capture
             
           </span>
         </div>
@@ -349,11 +349,13 @@
 
 
 
-<h1 id="fast3d-capture">fast3d capture<a class="headerlink" href="#fast3d-capture" title="Permanent link">&para;</a></h1>
-<p>Set capture variables before launching the game. Helix must be built against a
-fast3d revision with <code>CaptureSequence</code> and the native capture API. The dependency
-enables fast3d&rsquo;s <code>capture</code> feature. A statically linked game must be relinked after
+<h1 id="ultragfx-capture">ultragfx capture<a class="headerlink" href="#ultragfx-capture" title="Permanent link">&para;</a></h1>
+<p>Set capture variables before launching the game. Helix must be built against an
+ultragfx revision with <code>CaptureSequence</code> and the native capture API. The dependency
+enables ultragfx&rsquo;s <code>capture</code> feature. A statically linked game must be relinked after
 rebuilding Helix.</p>
+<p>Captures use the <code>.ugfxcap</code> extension and ultragfx&rsquo;s <code>UGFXCAP\0</code> magic. Use the
+matching ultragfx replay tool; captures with the old magic are not compatible.</p>
 <table>
 <thead>
 <tr>
@@ -363,31 +365,31 @@ rebuilding Helix.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>FAST3D_CAPTURE_DIR</code></td>
-<td>Directory for individual frame fixtures. Requires <code>FAST3D_CAPTURE_FRAMES</code>.</td>
+<td><code>ULTRAGFX_CAPTURE_DIR</code></td>
+<td>Directory for individual frame fixtures. Requires <code>ULTRAGFX_CAPTURE_FRAMES</code>.</td>
 </tr>
 <tr>
-<td><code>FAST3D_CAPTURE_FRAMES</code></td>
+<td><code>ULTRAGFX_CAPTURE_FRAMES</code></td>
 <td>Comma-separated renderer serials for individual fixtures, starting at 1.</td>
 </tr>
 <tr>
-<td><code>FAST3D_CAPTURE_SEQUENCE</code></td>
-<td>Output file for one sequence, for example <code>/tmp/startup.f3dcap</code>. Mutually exclusive with <code>FAST3D_CAPTURE_DIR</code>.</td>
+<td><code>ULTRAGFX_CAPTURE_SEQUENCE</code></td>
+<td>Output file for one sequence, for example <code>/tmp/startup.ugfxcap</code>. Mutually exclusive with <code>ULTRAGFX_CAPTURE_DIR</code>.</td>
 </tr>
 <tr>
-<td><code>FAST3D_CAPTURE_WARMUP_FRAMES</code></td>
+<td><code>ULTRAGFX_CAPTURE_WARMUP_FRAMES</code></td>
 <td>Number of initial sequence frames before observation; defaults to 0. These frames remain in the recording.</td>
 </tr>
 <tr>
-<td><code>FAST3D_CAPTURE_PRESENTATIONS</code></td>
+<td><code>ULTRAGFX_CAPTURE_PRESENTATIONS</code></td>
 <td>Required sequence presentation serials, comma-separated, all greater than the warm-up count.</td>
 </tr>
 <tr>
-<td><code>FAST3D_CAPTURE_REVISION</code></td>
+<td><code>ULTRAGFX_CAPTURE_REVISION</code></td>
 <td>Decomp revision in each frame&rsquo;s provenance; defaults to <code>unknown</code>.</td>
 </tr>
 <tr>
-<td><code>FAST3D_CAPTURE_SYMBOLS</code></td>
+<td><code>ULTRAGFX_CAPTURE_SYMBOLS</code></td>
 <td>Source symbols or scene annotations in provenance; defaults to <code>unknown (live task)</code>.</td>
 </tr>
 </tbody>
@@ -398,15 +400,15 @@ zero, invalid numbers, and invalid combinations cause render-thread failure and
 runtime shutdown. Existing capture files are never overwritten. Auxiliary variables
 alone do not enable capture.</p>
 <h2 id="individual-frames">Individual frames<a class="headerlink" href="#individual-frames" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><span class="nv">FAST3D_CAPTURE_DIR</span><span class="o">=</span>/tmp/sm64-frames <span class="se">\</span>
-<span class="nv">FAST3D_CAPTURE_FRAMES</span><span class="o">=</span><span class="m">120</span>,240,360, <span class="se">\</span>
-<span class="nv">FAST3D_CAPTURE_REVISION</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>git rev-parse HEAD<span class="k">)</span><span class="s2">&quot;</span> <span class="se">\</span>
-<span class="nv">FAST3D_CAPTURE_SYMBOLS</span><span class="o">=</span><span class="s1">&#39;live sm64 graphics tasks&#39;</span> <span class="se">\</span>
+<div class="highlight"><pre><span></span><code><span class="nv">ULTRAGFX_CAPTURE_DIR</span><span class="o">=</span>/tmp/sm64-frames <span class="se">\</span>
+<span class="nv">ULTRAGFX_CAPTURE_FRAMES</span><span class="o">=</span><span class="m">120</span>,240,360, <span class="se">\</span>
+<span class="nv">ULTRAGFX_CAPTURE_REVISION</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>git rev-parse HEAD<span class="k">)</span><span class="s2">&quot;</span> <span class="se">\</span>
+<span class="nv">ULTRAGFX_CAPTURE_SYMBOLS</span><span class="o">=</span><span class="s1">&#39;live sm64 graphics tasks&#39;</span> <span class="se">\</span>
 <span class="nv">RUST_LOG</span><span class="o">=</span>helix::render<span class="o">=</span>info <span class="se">\</span>
 ./build-cmake/sm64-us
 </code></pre></div>
-<p>This writes <code>frame-000120.f3dcap</code>, <code>frame-000240.f3dcap</code>, and
-<code>frame-000360.f3dcap</code>, named from <code>fixture.frame.serial</code>. Serial 1 is the first
+<p>This writes <code>frame-000120.ugfxcap</code>, <code>frame-000240.ugfxcap</code>, and
+<code>frame-000360.ugfxcap</code>, named from <code>fixture.frame.serial</code>. Serial 1 is the first
 graphics task, including startup before gameplay. PR #33 used zero-based consume
 indices, so its selection 120 wrote serial 121; this hook selects the renderer
 serial directly. Add one to old selections to capture the same tasks.</p>
@@ -415,11 +417,11 @@ on prior RDP/TMEM or framebuffer history can fail standalone capture or replay;
 use a sequence for those workloads. Capture failures log an error and request
 shutdown. A successful write logs <code>captured frame ...</code>.</p>
 <h2 id="sequences">Sequences<a class="headerlink" href="#sequences" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><span class="nv">FAST3D_CAPTURE_SEQUENCE</span><span class="o">=</span>/tmp/sm64-startup.f3dcap <span class="se">\</span>
-<span class="nv">FAST3D_CAPTURE_WARMUP_FRAMES</span><span class="o">=</span><span class="m">120</span> <span class="se">\</span>
-<span class="nv">FAST3D_CAPTURE_PRESENTATIONS</span><span class="o">=</span><span class="m">121</span>,180,240, <span class="se">\</span>
-<span class="nv">FAST3D_CAPTURE_REVISION</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>git rev-parse HEAD<span class="k">)</span><span class="s2">&quot;</span> <span class="se">\</span>
-<span class="nv">FAST3D_CAPTURE_SYMBOLS</span><span class="o">=</span><span class="s1">&#39;startup through selected gameplay route&#39;</span> <span class="se">\</span>
+<div class="highlight"><pre><span></span><code><span class="nv">ULTRAGFX_CAPTURE_SEQUENCE</span><span class="o">=</span>/tmp/sm64-startup.ugfxcap <span class="se">\</span>
+<span class="nv">ULTRAGFX_CAPTURE_WARMUP_FRAMES</span><span class="o">=</span><span class="m">120</span> <span class="se">\</span>
+<span class="nv">ULTRAGFX_CAPTURE_PRESENTATIONS</span><span class="o">=</span><span class="m">121</span>,180,240, <span class="se">\</span>
+<span class="nv">ULTRAGFX_CAPTURE_REVISION</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>git rev-parse HEAD<span class="k">)</span><span class="s2">&quot;</span> <span class="se">\</span>
+<span class="nv">ULTRAGFX_CAPTURE_SYMBOLS</span><span class="o">=</span><span class="s1">&#39;startup through selected gameplay route&#39;</span> <span class="se">\</span>
 <span class="nv">RUST_LOG</span><span class="o">=</span>helix::render<span class="o">=</span>info <span class="se">\</span>
 ./build-cmake/sm64-us
 </code></pre></div>
@@ -481,10 +483,10 @@ leave them behind without blocking retries. Failed writes/publications can leave
 nonempty staging files; the error identifies the path. Validate such a file with
 the replay tool before using it. A <code>.partial</code> file alone is not a successful capture.</p>
 <h2 id="replay-and-validation">Replay and validation<a class="headerlink" href="#replay-and-validation" title="Permanent link">&para;</a></h2>
-<p>From the fast3d worktree, with its supported toolchain:</p>
+<p>From the ultragfx worktree, with its supported toolchain:</p>
 <div class="highlight"><pre><span></span><code>mkdir -p /tmp/sm64-replay
-cargo run -p fast3d --features capture --example replay_capture -- <span class="se">\</span>
-  /tmp/sm64-startup.f3dcap /tmp/sm64-replay/startup all
+cargo run -p ultragfx --features capture --example replay_capture -- <span class="se">\</span>
+  /tmp/sm64-startup.ugfxcap /tmp/sm64-replay/startup all
 </code></pre></div>
 <p>The replay loader rejects gaps, missing reset history, invalid warm-up/presentation
 metadata, and malformed/truncated files. The <code>all</code> mode replays depth policies
