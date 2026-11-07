@@ -9,7 +9,7 @@ pub struct HLXRspBinding {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Handler {
-    Gfx(fast3d::Microcode),
+    Gfx(ultragfx::Microcode),
     AudioAcmd,
     JpegNjpgdsp,
     Skip,
@@ -17,7 +17,7 @@ pub(crate) enum Handler {
 
 struct Registry {
     bindings: Vec<(usize, Handler)>,
-    graphics_bindings: Vec<(u64, fast3d::Microcode)>,
+    graphics_bindings: Vec<(u64, ultragfx::Microcode)>,
 }
 
 impl Registry {
@@ -34,7 +34,7 @@ pub(crate) fn lookup(ucode: usize) -> Option<Handler> {
     REGISTRY.get()?.lookup(ucode)
 }
 
-pub(crate) fn graphics_bindings() -> &'static [(u64, fast3d::Microcode)] {
+pub(crate) fn graphics_bindings() -> &'static [(u64, ultragfx::Microcode)] {
     REGISTRY
         .get()
         .map_or(&[], |registry| &registry.graphics_bindings)
@@ -58,10 +58,10 @@ fn register(registry: &OnceLock<Registry>, bindings: &[HLXRspBinding]) -> Result
             return Err(());
         }
         let handler = match binding.handler {
-            1 => Handler::Gfx(fast3d::Microcode::F3d),
-            2 => Handler::Gfx(fast3d::Microcode::F3dex2),
-            3 => Handler::Gfx(fast3d::Microcode::F3dex2NoN),
-            4 => Handler::Gfx(fast3d::Microcode::S2dex2),
+            1 => Handler::Gfx(ultragfx::Microcode::F3d),
+            2 => Handler::Gfx(ultragfx::Microcode::F3dex2),
+            3 => Handler::Gfx(ultragfx::Microcode::F3dex2NoN),
+            4 => Handler::Gfx(ultragfx::Microcode::S2dex2),
             5 => Handler::AudioAcmd,
             6 => Handler::JpegNjpgdsp,
             7 => Handler::Skip,
@@ -149,10 +149,10 @@ mod tests {
     fn resolves_all_handlers_in_both_address_forms_and_derives_graphics_bindings() {
         let registry = OnceLock::new();
         let handlers = [
-            Handler::Gfx(fast3d::Microcode::F3d),
-            Handler::Gfx(fast3d::Microcode::F3dex2),
-            Handler::Gfx(fast3d::Microcode::F3dex2NoN),
-            Handler::Gfx(fast3d::Microcode::S2dex2),
+            Handler::Gfx(ultragfx::Microcode::F3d),
+            Handler::Gfx(ultragfx::Microcode::F3dex2),
+            Handler::Gfx(ultragfx::Microcode::F3dex2NoN),
+            Handler::Gfx(ultragfx::Microcode::S2dex2),
             Handler::AudioAcmd,
             Handler::JpegNjpgdsp,
             Handler::Skip,

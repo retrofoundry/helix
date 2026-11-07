@@ -1,4 +1,4 @@
-//! render thread: owns fast3d::Renderer off the process main thread. Main creates the surface and
+//! render thread: owns ultragfx::Renderer off the process main thread. Main creates the surface and
 //! hands it here; this thread consumes DLs and presents. Aspect ratio is a main-fed global the C HUD reads.
 
 use crate::ultra::rcp::{take_render_receiver, RenderMsg};
@@ -11,8 +11,8 @@ mod capture;
 /// Dedup-then-log diagnostics: a message is logged at most once per process lifetime, keyed on
 /// `d.kind`'s `Display` string.
 pub(crate) struct DedupLogSink;
-impl fast3d::DiagSink for DedupLogSink {
-    fn emit(&mut self, d: fast3d::Diagnostic) {
+impl ultragfx::DiagSink for DedupLogSink {
+    fn emit(&mut self, d: ultragfx::Diagnostic) {
         use std::sync::Mutex;
         static SEEN: Mutex<Option<std::collections::HashSet<String>>> = Mutex::new(None);
         let mut guard = SEEN.lock().unwrap();
@@ -72,17 +72,17 @@ fn warn_id_drift(what: &str, id: u32) {
 }
 
 /// Guest vertex/matrix layout (fixed N64 s16 vs float), declared via `HLXRenderSetDataFormat`;
-/// fast3d treats it as orthogonal to the microcode, so `consume_dl` applies it before each frame.
-/// 0 = Fixed (fast3d's default), 1 = Float — kept in sync with `HLXDataFormat` in runtime.h.
+/// ultragfx treats it as orthogonal to the microcode, so `consume_dl` applies it before each frame.
+/// 0 = Fixed (ultragfx's default), 1 = Float — kept in sync with `HLXDataFormat` in runtime.h.
 static DATA_FORMAT: AtomicU32 = AtomicU32::new(0);
 
-fn data_format() -> fast3d::DataFormat {
+fn data_format() -> ultragfx::DataFormat {
     match DATA_FORMAT.load(Ordering::Relaxed) {
-        0 => fast3d::DataFormat::Fixed,
-        1 => fast3d::DataFormat::Float,
+        0 => ultragfx::DataFormat::Fixed,
+        1 => ultragfx::DataFormat::Float,
         other => {
             warn_id_drift("data format", other);
-            fast3d::DataFormat::Fixed
+            ultragfx::DataFormat::Fixed
         }
     }
 }
@@ -95,7 +95,7 @@ pub extern "C" fn HLXRenderSetDataFormat(format: u32) {
 
 pub(crate) const SURFACE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 
-/// The surface config helix pins, matching fast3d `Renderer::new` for `Some(Bgra8Unorm)`. `with_device`
+/// The surface config helix pins, matching ultragfx `Renderer::new` for `Some(Bgra8Unorm)`. `with_device`
 /// does not configure the surface, so the render thread calls `surface.configure` with this first.
 pub(crate) fn surface_config(width: u32, height: u32) -> wgpu::SurfaceConfiguration {
     wgpu::SurfaceConfiguration {
@@ -118,16 +118,16 @@ pub struct SurfaceHandoff {
 }
 
 pub struct RenderContext {
-    renderer: fast3d::Renderer,
+    renderer: ultragfx::Renderer,
     frame_serial: u64,
     capture_selection: Option<capture::FrameSelection>,
-    capture_frame: Option<fast3d::capture::CaptureFrame>,
+    capture_frame: Option<ultragfx::capture::CaptureFrame>,
     capture_sequence: Option<capture::SequenceRecording>,
     deferred_resize: Option<(u32, u32)>,
 }
 
 impl RenderContext {
-    /// Build the Renderer on this thread from the handed-over surface. Replicates fast3d `new()`'s
+    /// Build the Renderer on this thread from the handed-over surface. Replicates ultragfx `new()`'s
     /// device setup verbatim (`with_device` adopts a caller-made device and does not configure the
     /// surface — spec §6). Panics here are caught by `spawn` (fatal-on-panic).
     pub fn from_handoff(h: SurfaceHandoff) -> RenderContext {
@@ -151,7 +151,7 @@ impl RenderContext {
         let required_features = adapter.features()
             & (wgpu::Features::DUAL_SOURCE_BLENDING | wgpu::Features::DEPTH_CLIP_CONTROL);
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-            label: Some("fast3d-device"),
+            label: Some("ultragfx-device"),
             required_features,
             required_limits: wgpu::Limits::default(),
             memory_hints: wgpu::MemoryHints::default(),
@@ -163,16 +163,16 @@ impl RenderContext {
         let config = surface_config(width, height);
         surface.configure(&device, &config);
 
-        let mut renderer = fast3d::Renderer::with_device(
+        let mut renderer = ultragfx::Renderer::with_device(
             device,
             queue,
-            fast3d::PresentTarget::Surface { surface, config },
-            fast3d::RendererConfig {
+            ultragfx::PresentTarget::Surface { surface, config },
+            ultragfx::RendererConfig {
                 resolution_multiplier: 1,
                 sample_count: 1,
                 present_mode: wgpu::PresentMode::Fifo,
                 format: Some(SURFACE_FORMAT),
-                clear_policy: fast3d::ClearPolicy::Persist,
+                clear_policy: ultragfx::ClearPolicy::Persist,
                 power_preference: wgpu::PowerPreference::HighPerformance,
             },
         );
@@ -203,7 +203,7 @@ impl RenderContext {
         }
     }
 
-    pub fn consume_dl(&mut self, data_ptr: usize, microcode: fast3d::Microcode) {
+    pub fn consume_dl(&mut self, data_ptr: usize, microcode: ultragfx::Microcode) {
         self.frame_serial += 1;
         let capture = if let Some(sequence) = &mut self.capture_sequence {
             if let Err(error) = sequence
@@ -228,7 +228,7 @@ impl RenderContext {
             .as_ref()
             .is_some_and(|selection| selection.contains(self.frame_serial))
         {
-            self.capture_frame = Some(fast3d::capture::CaptureFrame::begin(
+            self.capture_frame = Some(ultragfx::capture::CaptureFrame::begin(
                 &mut self.renderer,
                 self.frame_serial,
                 0,
@@ -242,9 +242,9 @@ impl RenderContext {
         };
         let ranges = crate::guest_memory::ranges();
         let ram = if ranges.is_empty() {
-            fast3d::HostRam::new(&[])
+            ultragfx::HostRam::new(&[])
         } else {
-            fast3d::HostRam::with_ranges(&[], &ranges)
+            ultragfx::HostRam::with_ranges(&[], &ranges)
         };
         let bindings = crate::ultra::rsp::graphics_bindings();
         // SAFETY: the guest stays blocked until consume_dl returns, so every span the walk
@@ -315,7 +315,7 @@ impl RenderContext {
         }
         match self.renderer.present_host(address) {
             Ok(()) => {}
-            Err(fast3d::PresentError::SurfaceLost) => {}
+            Err(ultragfx::PresentError::SurfaceLost) => {}
             Err(e) => log::warn!("present: {e:?}"),
         }
     }
@@ -346,7 +346,7 @@ impl RenderContext {
     }
 }
 
-unsafe fn apply_guest_writes(patches: Vec<fast3d::GuestWrite>) {
+unsafe fn apply_guest_writes(patches: Vec<ultragfx::GuestWrite>) {
     for patch in patches {
         unsafe {
             std::ptr::copy_nonoverlapping(
@@ -360,13 +360,13 @@ unsafe fn apply_guest_writes(patches: Vec<fast3d::GuestWrite>) {
 
 /// Consume/present/resize seam so the loop's dispatch is unit-testable without a GPU.
 pub(crate) trait GfxConsumer {
-    fn consume_dl(&mut self, data_ptr: usize, microcode: fast3d::Microcode);
+    fn consume_dl(&mut self, data_ptr: usize, microcode: ultragfx::Microcode);
     fn present(&mut self, address: Option<u64>);
     fn resize(&mut self, width: u32, height: u32);
 }
 
 impl GfxConsumer for RenderContext {
-    fn consume_dl(&mut self, data_ptr: usize, microcode: fast3d::Microcode) {
+    fn consume_dl(&mut self, data_ptr: usize, microcode: ultragfx::Microcode) {
         RenderContext::consume_dl(self, data_ptr, microcode)
     }
     fn present(&mut self, address: Option<u64>) {
@@ -476,7 +476,7 @@ mod tests {
     }
 
     #[test]
-    fn surface_config_matches_fast3d_new() {
+    fn surface_config_matches_ultragfx_new() {
         let c = surface_config(1280, 720);
         assert_eq!(c.format, wgpu::TextureFormat::Bgra8Unorm);
         assert_eq!(c.present_mode, wgpu::PresentMode::Fifo);
@@ -500,7 +500,7 @@ mod tests {
         done_before_present: Receiver<()>,
     }
     impl super::GfxConsumer for FakeConsumer {
-        fn consume_dl(&mut self, data_ptr: usize, microcode: fast3d::Microcode) {
+        fn consume_dl(&mut self, data_ptr: usize, microcode: ultragfx::Microcode) {
             self.log
                 .push(format!("consume:{data_ptr:#x}:{microcode:?}"));
         }
@@ -523,7 +523,7 @@ mod tests {
         let (tx, rx) = channel::<RenderMsg>();
         tx.send(RenderMsg::Gfx {
             data_ptr: 0xABC,
-            microcode: fast3d::Microcode::F3dex2NoN,
+            microcode: ultragfx::Microcode::F3dex2NoN,
             done: tx_done,
         })
         .unwrap();
@@ -554,16 +554,16 @@ mod tests {
             presented: Vec<(Option<u64>, [u16; 3])>,
         }
         impl GfxConsumer for Consumer {
-            fn consume_dl(&mut self, word: usize, _: fast3d::Microcode) {
+            fn consume_dl(&mut self, word: usize, _: ultragfx::Microcode) {
                 assert!(matches!(
                     self.completions[self.consumed].try_recv(),
                     Err(std::sync::mpsc::TryRecvError::Empty)
                 ));
-                let color = fast3d::GuestWrite {
+                let color = ultragfx::GuestWrite {
                     address: self.memory.as_mut_ptr() as u64,
                     bytes: 0xf801u16.to_ne_bytes().to_vec(),
                 };
-                let patch = fast3d::GuestWrite {
+                let patch = ultragfx::GuestWrite {
                     address: self.memory.as_mut_ptr() as u64 + 2,
                     bytes: (word as u16).to_ne_bytes().to_vec(),
                 };
@@ -605,7 +605,7 @@ mod tests {
             consumer.completions.push(receiver);
             tx.send(RenderMsg::Gfx {
                 data_ptr: word,
-                microcode: fast3d::Microcode::F3dex2,
+                microcode: ultragfx::Microcode::F3dex2,
                 done,
             })
             .unwrap();

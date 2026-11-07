@@ -44,7 +44,7 @@ void HLXAudioTeardown(void);
 void* GUICreateEventLoop(void);
 void* GUICreate(const char* title, void* event_loop, void* gamepad_manager);
 
-// Render (helix/src/render.rs) — the dedicated render thread owns fast3d::Renderer and the
+// Render (helix/src/render.rs) — the dedicated render thread owns ultragfx::Renderer and the
 // widescreen aspect; this is the sole C-facing getter (repoints HLXDisplayGetAspectRatio).
 float HLXAspectRatio(void);
 

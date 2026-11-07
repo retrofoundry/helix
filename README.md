@@ -4,9 +4,9 @@ Helix is a Rust library for running N64 software on PC and other systems. It pro
 
 ## Features Provided
 
-- [x] Libultra runtime (ultra) — real threads, message queues + events, a 60 Hz VI clock, an RCP task engine (graphics → fast3d, audio → an HLE Acmd interpreter), PI/DMA, timers, and EEPROM save, all over native pointers
+- [x] Libultra runtime (ultra) — real threads, message queues + events, a 60 Hz VI clock, an RCP task engine (graphics → ultragfx, audio → an HLE Acmd interpreter), PI/DMA, timers, and EEPROM save, all over native pointers
 - [x] Window Management (gui)
-- [x] N64 RDP command processing and rendering via [fast3d-rs](https://github.com/retrofoundry/fast3d-rs) on wgpu (gui)
+- [x] N64 RDP command processing and rendering via [ultragfx](https://github.com/retrofoundry/ultragfx) on wgpu (gui)
 - [x] Input Handling (gamepad)
 - [x] Audio Rendering via [arie](https://github.com/retrofoundry/arie) (audio)
 
@@ -20,7 +20,7 @@ For details on each of the features provided please see our [documentation](http
 
 For setup and more in-depth information please see our [documentation](https://retrofoundry.github.io/helix/dev/).
 
-For display-list fixtures and continuous recordings, see [fast3d capture](docs/capture.md).
+For display-list fixtures and continuous recordings, see [ultragfx capture](docs/capture.md).
 
 ## Community
 

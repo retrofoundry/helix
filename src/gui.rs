@@ -32,7 +32,7 @@ impl Default for EventLoopWrapper {
 
 /// Main-thread half of the split: owns the winit window, pumps events, and drives the (`!Send`)
 /// gamepad manager. On `resumed` it creates the wgpu surface and hands it off to the render
-/// thread (`crate::render::spawn`), which owns `fast3d::Renderer` and does all consume/present
+/// thread (`crate::render::spawn`), which owns `ultragfx::Renderer` and does all consume/present
 /// from then on — this struct never touches a `Renderer`.
 pub struct Gui<'a> {
     title: String,
@@ -85,7 +85,7 @@ impl<'a> Gui<'a> {
         crate::render::set_aspect_from_size(size.width, size.height); // seed from initial physical size
 
         // `Arc<Window>` satisfies `Into<SurfaceTarget<'static>>` (carries its own display handle).
-        let instance = wgpu::Instance::default(); // match fast3d Renderer::new exactly
+        let instance = wgpu::Instance::default(); // match ultragfx Renderer::new exactly
         let surface = instance
             .create_surface(window.clone())
             .expect("create_surface on main");
