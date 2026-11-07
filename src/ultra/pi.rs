@@ -38,7 +38,6 @@ pub extern "C" fn HLXPiStartDma(
         }
         let dev = dev_addr as *mut u8;
         let v = v_addr as *mut u8;
-        // Reserve completion space before copying so a full queue leaves guest memory untouched.
         let rc = mesg::post_with(mq as usize, mb as usize, || {
             if nbytes > 0 {
                 // Guest source and destination buffers may overlap.
@@ -51,7 +50,7 @@ pub extern "C" fn HLXPiStartDma(
                 }
             }
         });
-        if rc != 0 {
+        if rc == -2 {
             return -1;
         }
         0
@@ -124,7 +123,7 @@ mod tests {
     }
 
     #[test]
-    fn full_retqueue_errors_without_side_effect() {
+    fn full_retqueue_still_copies_and_drops_the_completion() {
         let mq = fresh_queue(1);
         assert_eq!(mesg::send(mq as usize, 0x1, 0), 0);
         let src = [1u8, 2, 3, 4];
@@ -137,8 +136,16 @@ mod tests {
             4,
             mq,
         );
-        assert_eq!(r, -1);
-        assert_eq!(dst, [9u8; 4], "no copy on a full retQueue (no side effect)");
+        assert_eq!(r, 0);
+        assert_eq!(dst, src);
+        let mut out: *mut c_void = ptr::null_mut();
+        assert_eq!(HLXMesgRecv(mq, &mut out, 0), 0);
+        assert_eq!(out as usize, 0x1);
+        assert_eq!(
+            HLXMesgRecv(mq, &mut out, 0),
+            -1,
+            "the completion was dropped"
+        );
     }
 
     #[test]

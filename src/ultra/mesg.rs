@@ -49,7 +49,8 @@ fn lookup(key: usize) -> Arc<Mutex<Queue>> {
         .clone()
 }
 
-/// Reserves completion space before `fill`; returns 0 on success, -1 if full, -2 if unavailable.
+/// Runs `fill`, then posts without blocking, like a device manager's completion: returns 0 if posted,
+/// -1 if the full queue dropped it (the work still happened), -2 if unavailable (no work).
 /// `fill` runs under the queue lock and must not lock a message queue itself.
 pub(crate) fn post_with<F: FnOnce()>(key: usize, msg: usize, fill: F) -> i32 {
     let q = match registry().lock().ok().and_then(|r| r.get(&key).cloned()) {
@@ -60,8 +61,8 @@ pub(crate) fn post_with<F: FnOnce()>(key: usize, msg: usize, fill: F) -> i32 {
         Ok(g) => g,
         Err(_) => return -2,
     };
+    fill();
     if g.valid < g.cap {
-        fill();
         g.push_tail(msg);
         if let Some(w) = g.recv_waiters.pop_front() {
             sched::wake(w);
