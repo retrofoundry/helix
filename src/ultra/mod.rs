@@ -2,6 +2,7 @@
 //! The game runs its ORIGINAL src/game/main.c threads on real host threads; reality64 owns the
 //! "hardware".
 
+mod acmd;
 pub mod event;
 pub mod mesg;
 mod njpgdsp;

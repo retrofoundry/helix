@@ -9,40 +9,30 @@ use std::sync::{Mutex, OnceLock};
 use crate::ultra::event::{self, OS_EVENT_DP, OS_EVENT_SP};
 use crate::ultra::rsp::{self, Handler};
 
-#[cfg(not(test))]
-extern "C" {
-    fn r64_acmd_process(list: *const c_void, num_cmds: i32);
-}
-
-// `cargo test` builds the Rust lib without the C audio interpreter (cpp/audio/acmd.c is compiled by the
-// consumer's CMake), so stand in for its symbol — otherwise the MSVC linker rejects the undefined
-// external, and no test exercises the interpreter anyway.
-#[cfg(test)]
-unsafe fn r64_acmd_process(_list: *const c_void, _num_cmds: i32) {}
+use super::acmd::native::NativeContext;
 
 const M_GFXTASK: u32 = 1;
 
-/// Host-ABI mirror of OSTask_t (include/PR/sptask.h). `repr(C)` reproduces exactly what the
-/// host C compiler lays out for the game's OSTask, including native-width pointers.
-#[allow(dead_code)]
+/// Host ABI of OSTask_t in include/libultra/os_sp.h.
+#[derive(Clone, Copy, Default)]
 #[repr(C)]
-struct OSTaskT {
-    type_: u32,
-    flags: u32,
-    ucode_boot: *mut u64,
-    ucode_boot_size: u32,
-    ucode: *mut u64,
-    ucode_size: u32,
-    ucode_data: *mut u64,
-    ucode_data_size: u32,
-    dram_stack: *mut u64,
-    dram_stack_size: u32,
-    output_buff: *mut u64,
-    output_buff_size: *mut u64,
-    data_ptr: *mut u64,
-    data_size: u32,
-    yield_data_ptr: *mut u64,
-    yield_data_size: u32,
+pub(crate) struct OSTaskT {
+    pub type_: u32,
+    pub flags: u32,
+    pub ucode_boot: *mut u64,
+    pub ucode_boot_size: u32,
+    pub ucode: *mut u64,
+    pub ucode_size: u32,
+    pub ucode_data: *mut u64,
+    pub ucode_data_size: u32,
+    pub dram_stack: *mut u64,
+    pub dram_stack_size: u32,
+    pub output_buff: *mut u64,
+    pub output_buff_size: *mut u64,
+    pub data_ptr: *mut u64,
+    pub data_size: u32,
+    pub yield_data_ptr: *mut u64,
+    pub yield_data_size: u32,
 }
 
 ///
@@ -161,12 +151,15 @@ pub extern "C" fn R64SpTaskStartGo(task: *mut c_void) {
             }
         }
         Handler::AudioAcmd => {
-            // In-place under the held run token: decode the Acmd list and mix.
-            // A_SAVEBUFF commands write PCM straight into the game's native buffers
-            // (pointers embedded in the list). data_size is in bytes; sizeof(Acmd)=16.
-            let t = unsafe { &*(task as *const OSTaskT) };
-            let num_cmds = (t.data_size / 16) as i32;
-            unsafe { r64_acmd_process(t.data_ptr as *const c_void, num_cmds) };
+            static AUDIO: OnceLock<Mutex<NativeContext>> = OnceLock::new();
+            let mut context = AUDIO
+                .get_or_init(|| Mutex::new(NativeContext::default()))
+                .lock()
+                .unwrap();
+            if let Err(error) = unsafe { context.task(task) } {
+                log::error!("classic audio task failed: {error}");
+                std::process::abort();
+            }
             event::post(OS_EVENT_SP);
         }
         Handler::JpegNjpgdsp => {
@@ -185,13 +178,6 @@ pub extern "C" fn R64SpTaskStartGo(task: *mut c_void) {
 #[no_mangle]
 pub extern "C" fn R64SpTaskYielded(_task: *mut c_void) -> i32 {
     0
-}
-
-/// Direct entry for tests/tools. `_out` is unused (A_SAVEBUFF targets are embedded
-/// in the list as native pointers); `nsamples` is interpreted as the Acmd count.
-#[no_mangle]
-pub extern "C" fn R64AudioProcessCommandList(alist: *mut c_void, _out: *mut i16, nsamples: i32) {
-    unsafe { r64_acmd_process(alist, nsamples) }
 }
 
 #[cfg(test)]
@@ -273,6 +259,10 @@ mod tests {
 
     #[test]
     fn ostask_layout_matches_sptask_h() {
+        assert_eq!(std::mem::size_of::<OSTaskT>(), 0x78);
+        assert_eq!(std::mem::offset_of!(OSTaskT, ucode_data), 0x28);
+        assert_eq!(std::mem::offset_of!(OSTaskT, ucode_data_size), 0x30);
+        assert_eq!(std::mem::offset_of!(OSTaskT, data_size), 0x60);
         assert_eq!(std::mem::offset_of!(OSTaskT, type_), 0);
         assert_eq!(std::mem::offset_of!(OSTaskT, ucode), 24);
         assert_eq!(std::mem::offset_of!(OSTaskT, data_ptr), 88);

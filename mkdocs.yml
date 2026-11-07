@@ -75,3 +75,4 @@ nav:
   - 'Overview': index.md
   - 'Integration': integration.md
   - 'Features': features.md
+  - 'Audio microcode': audio-microcode.md

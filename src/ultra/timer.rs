@@ -181,7 +181,7 @@ mod tests {
         crate::ultra::mesg::create(mq as usize, 4);
         let start = Instant::now();
         assert_eq!(R64SetTimer(timer, cycles(100), 0, mq, 7 as *mut c_void), 0);
-        assert_eq!(drain(mq, 1, Duration::from_millis(20)), []);
+        assert!(drain(mq, 1, Duration::from_millis(20)).is_empty());
         assert_eq!(drain(mq, 2, Duration::from_millis(1000)), [7]);
         assert!(start.elapsed() >= Duration::from_millis(100));
         assert_eq!(R64StopTimer(timer), -1);
@@ -193,7 +193,7 @@ mod tests {
         crate::ultra::mesg::create(mq as usize, 4);
         R64SetTimer(timer, cycles(200), 0, mq, 9 as *mut c_void);
         assert_eq!(R64StopTimer(timer), 0);
-        assert_eq!(drain(mq, 1, Duration::from_millis(400)), []);
+        assert!(drain(mq, 1, Duration::from_millis(400)).is_empty());
     }
 
     #[test]
