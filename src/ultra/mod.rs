@@ -1,5 +1,5 @@
-//! helix libultra runtime: process-global state, scheduler, and native-pointer os* backing.
-//! The game runs its ORIGINAL src/game/main.c threads on real host threads; helix owns the
+//! reality64 libultra runtime: process-global state, scheduler, and native-pointer os* backing.
+//! The game runs its ORIGINAL src/game/main.c threads on real host threads; reality64 owns the
 //! "hardware".
 
 pub mod event;
@@ -23,27 +23,27 @@ use crate::gamepad::manager::GamepadManager;
 use crate::gui::{EventLoopWrapper, Gui};
 
 // The winit EventLoop and the Gui are NOT Send/Sync: keep them pinned to the process
-// main thread across the two FFI calls (HLXRuntimeInit stores, HLXRunEventLoop consumes).
+// main thread across the two FFI calls (R64RuntimeInit stores, R64RunEventLoop consumes).
 thread_local! {
     static EVENT_LOOP: RefCell<Option<EventLoopWrapper>> = const { RefCell::new(None) };
     static GUI: RefCell<Option<Gui<'static>>> = const { RefCell::new(None) };
 }
 
-/// Set true once HLXRuntimeInit has run: the game is driving the machine through the
+/// Set true once R64RuntimeInit has run: the game is driving the machine through the
 /// libultra runtime. Consulted by the os_cont SI post, distinguishing pre- vs
-/// post-HLXRuntimeInit runtime state.
+/// post-R64RuntimeInit runtime state.
 static RUNTIME_ACTIVE: AtomicBool = AtomicBool::new(false);
 
-/// True when the libultra runtime owns frame pacing / input (post-`HLXRuntimeInit`).
+/// True when the libultra runtime owns frame pacing / input (post-`R64RuntimeInit`).
 pub fn runtime_active() -> bool {
     RUNTIME_ACTIVE.load(Ordering::SeqCst)
 }
 
 /// C-callable form of `runtime_active()`. Consumed by the `os_cont.c` SI post to guard the
-/// `HLXEventPost(OS_EVENT_SI)` call so controller sampling falls back to the direct
+/// `R64EventPost(OS_EVENT_SI)` call so controller sampling falls back to the direct
 /// GamepadManager path whenever the runtime isn't active.
 #[no_mangle]
-pub extern "C" fn HLXRuntimeActive() -> bool {
+pub extern "C" fn R64RuntimeActive() -> bool {
     runtime_active()
 }
 
@@ -51,7 +51,7 @@ static SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
 /// Guest threads wait for the renderer before running any guest code, so its startup (a cold Metal
 /// shader compile can take seconds) never counts against a guest timer such as OoT's 3 s RCP
-/// watchdog. Only `HLXRuntimeInit` expects a renderer; without it the gate is open.
+/// watchdog. Only `R64RuntimeInit` expects a renderer; without it the gate is open.
 struct RendererGate {
     expected: AtomicBool,
     ready: Mutex<bool>,
@@ -93,13 +93,13 @@ pub(crate) fn renderer_created() {
     RENDERER.open();
 }
 
-/// Set by HLXRuntimeInit; lets gui.rs know the runtime owns the loop.
+/// Set by R64RuntimeInit; lets gui.rs know the runtime owns the loop.
 pub fn mark_runtime_active() {
     RUNTIME_ACTIVE.store(true, Ordering::SeqCst);
 }
 
 /// Set by the winit CloseRequested handler or a winit `PumpStatus::Exit`, or by the render
-/// thread on a fatal construction/loop failure; observed by HLXRunEventLoop's pump loop.
+/// thread on a fatal construction/loop failure; observed by R64RunEventLoop's pump loop.
 pub fn request_shutdown() {
     SHUTDOWN.store(true, Ordering::SeqCst);
 }
@@ -110,7 +110,7 @@ pub fn shutdown_requested() -> bool {
 /// Graceful teardown, in order: detach and drop the audio runtime (so no Arie player or
 /// callback outlives the process), stop and join the VI retrace clock, then flush EEPROM to
 /// disk. Audio is torn down BEFORE the EEPROM flush. Guest host-threads stay parked — the
-/// cooperative scheduler has no async preemption; process exit after HLXRunEventLoop returns
+/// cooperative scheduler has no async preemption; process exit after R64RunEventLoop returns
 /// reclaims them.
 pub fn teardown() {
     #[cfg(test)]
@@ -142,7 +142,7 @@ fn record_teardown_step(step: &'static str) {
 /// RUNTIME_ACTIVE flag, and the main-thread-pinned winit `EventLoopWrapper` + `Gui`.
 /// Called first from host_main.c.
 #[no_mangle]
-pub extern "C" fn HLXRuntimeInit() {
+pub extern "C" fn R64RuntimeInit() {
     crate::init();
     RENDERER.expected.store(true, Ordering::SeqCst);
     // Force the process-global scheduler to exist before any guest thread starts.
@@ -151,9 +151,9 @@ pub extern "C" fn HLXRuntimeInit() {
 
     let wrapper = EventLoopWrapper::new();
     // Leak a GamepadManager so the Gui can hold a `&'static mut` across the two FFI calls
-    // (created here, consumed in HLXRunEventLoop). The manager lives for the whole process.
+    // (created here, consumed in R64RunEventLoop). The manager lives for the whole process.
     let gpm: &'static mut GamepadManager = Box::leak(Box::new(GamepadManager::new()));
-    let mut gui = Gui::new("Helix", Some(gpm)).expect("helix: failed to create Gui");
+    let mut gui = Gui::new("reality64", Some(gpm)).expect("reality64: failed to create Gui");
 
     // Seed the controller snapshot on THIS (main) thread before any guest thread starts, so the
     // first `osContInit` on thread5 observes a plugged-in controller (bits) instead of the
@@ -162,12 +162,12 @@ pub extern "C" fn HLXRuntimeInit() {
 
     EVENT_LOOP.with(|slot| *slot.borrow_mut() = Some(wrapper));
     GUI.with(|slot| *slot.borrow_mut() = Some(gui));
-    log::info!("helix: runtime initialized");
+    log::info!("reality64: runtime initialized");
 }
 
-/// Set the window title on the main thread after HLXRuntimeInit, before the window opens.
+/// Set the window title on the main thread after R64RuntimeInit, before the window opens.
 #[no_mangle]
-pub extern "C" fn HLXSetWindowTitle(title: *const std::ffi::c_char) {
+pub extern "C" fn R64SetWindowTitle(title: *const std::ffi::c_char) {
     let title = unsafe { std::ffi::CStr::from_ptr(title) }.to_string_lossy();
     GUI.with(|slot| {
         if let Some(gui) = slot.borrow_mut().as_mut() {
@@ -181,17 +181,17 @@ pub extern "C" fn HLXSetWindowTitle(title: *const std::ffi::c_char) {
 /// spawned by `Gui::resumed` (via `crate::render::spawn`) the first time the window comes up;
 /// guest threads submit gfx tasks straight to that render thread over the `RenderMsg` channel
 /// (`ultra::rcp::submit_and_wait`), bypassing this pump entirely. `Gui`/`EventLoopWrapper` were
-/// created on THIS thread in HLXRuntimeInit.
+/// created on THIS thread in R64RuntimeInit.
 #[no_mangle]
-pub extern "C" fn HLXRunEventLoop() {
+pub extern "C" fn R64RunEventLoop() {
     use winit::platform::pump_events::PumpStatus;
 
     let mut gui = GUI
         .with(|slot| slot.borrow_mut().take())
-        .expect("helix: HLXRunEventLoop must run on the HLXRuntimeInit thread");
+        .expect("reality64: R64RunEventLoop must run on the R64RuntimeInit thread");
     let mut wrapper = EVENT_LOOP
         .with(|slot| slot.borrow_mut().take())
-        .expect("helix: HLXRunEventLoop must run on the HLXRuntimeInit thread");
+        .expect("reality64: R64RunEventLoop must run on the R64RuntimeInit thread");
 
     loop {
         if shutdown_requested() {

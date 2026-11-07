@@ -324,7 +324,7 @@ pub(super) fn provenance(serial: u64) -> Provenance {
             .unwrap_or_else(|_| "unknown".into()),
         source_symbols: std::env::var("ULTRAGFX_CAPTURE_SYMBOLS")
             .unwrap_or_else(|_| "unknown (live task)".into()),
-        command_vector: format!("helix/frame/{serial}"),
+        command_vector: format!("reality64/frame/{serial}"),
         synthetic_data: "none; live guest memory".into(),
     }
 }
@@ -336,7 +336,7 @@ mod tests {
     fn scratch_directory() -> PathBuf {
         static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let directory = std::env::temp_dir().join(format!(
-            "helix-capture-{}-{}",
+            "reality64-capture-{}-{}",
             std::process::id(),
             NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
         ));
@@ -356,7 +356,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn sequence_termination_requests_runtime_shutdown() {
-        const CHILD: &str = "HELIX_TEST_CAPTURE_TERMINATION";
+        const CHILD: &str = "REALITY64_TEST_CAPTURE_TERMINATION";
         if let Ok(signal) = std::env::var(CHILD) {
             reset_shutdown_signals_in_child();
             env_logger::Builder::new()
@@ -420,7 +420,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn shutdown_handler_conflicts_warn_once_and_do_not_stop_capture_startup() {
-        const CHILD: &str = "HELIX_TEST_CAPTURE_HANDLER_CONFLICT";
+        const CHILD: &str = "REALITY64_TEST_CAPTURE_HANDLER_CONFLICT";
         if let Ok(conflict) = std::env::var(CHILD) {
             reset_shutdown_signals_in_child();
             env_logger::Builder::new()
@@ -479,7 +479,7 @@ mod tests {
 
     #[test]
     fn sequence_selection_cannot_be_reinitialized() {
-        const CHILD: &str = "HELIX_TEST_CAPTURE_SELECTION_OWNER";
+        const CHILD: &str = "REALITY64_TEST_CAPTURE_SELECTION_OWNER";
         if std::env::var_os(CHILD).is_some() {
             let mut selection = Selection::from_env().unwrap();
             assert!(selection.is_some());

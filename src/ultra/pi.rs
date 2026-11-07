@@ -1,4 +1,4 @@
-//! Synchronous PI (parallel interface) DMA: `HLXPiStartDma` performs a bounded memmove
+//! Synchronous PI (parallel interface) DMA: `R64PiStartDma` performs a bounded memmove
 //! and immediately posts the OSIoMesg completion to the caller's retQueue. No worker
 //! thread: sm64's DMA drain loops (heap.c:1160 audio DMA poll, load.c:114) rely on the
 //! completion being synchronous with the call, not delivered asynchronously later.
@@ -12,7 +12,7 @@ const OS_READ: i32 = 0; // device -> RDRAM (include/PR/os_pi.h)
 const OS_WRITE: i32 = 1; // RDRAM -> device
 
 #[no_mangle]
-pub extern "C" fn HLXPiStartDma(
+pub extern "C" fn R64PiStartDma(
     mb: *mut c_void,
     dir: i32,
     dev_addr: usize,
@@ -62,7 +62,7 @@ pub extern "C" fn HLXPiStartDma(
 mod tests {
     use super::*;
     use crate::ultra::mesg;
-    use crate::ultra::mesg::{HLXMesgQueueCreate, HLXMesgRecv};
+    use crate::ultra::mesg::{R64MesgQueueCreate, R64MesgRecv};
     use std::ffi::c_void;
     use std::ptr;
 
@@ -72,7 +72,7 @@ mod tests {
         let backing = Box::leak(Box::new([0u8; 64])).as_mut_ptr() as *mut c_void;
         let slots: &'static mut [*mut c_void] =
             Box::leak(vec![ptr::null_mut::<c_void>(); cap].into_boxed_slice());
-        HLXMesgQueueCreate(backing, slots.as_mut_ptr(), cap as i32);
+        R64MesgQueueCreate(backing, slots.as_mut_ptr(), cap as i32);
         backing
     }
     fn fresh_mb() -> *mut c_void {
@@ -85,7 +85,7 @@ mod tests {
         let mut dst = [0u8; 4];
         let mq = fresh_queue(1);
         let mb = fresh_mb();
-        let r = HLXPiStartDma(
+        let r = R64PiStartDma(
             mb,
             0,
             src.as_ptr() as usize,
@@ -106,7 +106,7 @@ mod tests {
         let src: [u8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
         let mut dst: [u8; 8] = [0xFF; 8];
         let mb = fresh_mb();
-        let rc = HLXPiStartDma(
+        let rc = R64PiStartDma(
             mb,
             0,
             src.as_ptr() as usize,
@@ -118,7 +118,7 @@ mod tests {
         assert_eq!(&dst[..4], &src[..4]);
         assert_eq!(&dst[4..], &[0xFF; 4], "copied exactly nbytes");
         let mut out: *mut c_void = ptr::null_mut();
-        assert_eq!(HLXMesgRecv(mq, &mut out, 0), 0);
+        assert_eq!(R64MesgRecv(mq, &mut out, 0), 0);
         assert_eq!(out, mb);
     }
 
@@ -128,7 +128,7 @@ mod tests {
         assert_eq!(mesg::send(mq as usize, 0x1, 0), 0);
         let src = [1u8, 2, 3, 4];
         let mut dst = [9u8; 4];
-        let r = HLXPiStartDma(
+        let r = R64PiStartDma(
             fresh_mb(),
             0,
             src.as_ptr() as usize,
@@ -139,10 +139,10 @@ mod tests {
         assert_eq!(r, 0);
         assert_eq!(dst, src);
         let mut out: *mut c_void = ptr::null_mut();
-        assert_eq!(HLXMesgRecv(mq, &mut out, 0), 0);
+        assert_eq!(R64MesgRecv(mq, &mut out, 0), 0);
         assert_eq!(out as usize, 0x1);
         assert_eq!(
-            HLXMesgRecv(mq, &mut out, 0),
+            R64MesgRecv(mq, &mut out, 0),
             -1,
             "the completion was dropped"
         );
@@ -154,7 +154,7 @@ mod tests {
         let src = [1u8; 4];
         let mut dst = [0u8; 4];
         assert_eq!(
-            HLXPiStartDma(
+            R64PiStartDma(
                 fresh_mb(),
                 0,
                 src.as_ptr() as usize,
@@ -172,23 +172,23 @@ mod tests {
         let mb = fresh_mb();
         let dummy = 1usize as *mut c_void; // non-null; guards return before any deref
         assert_eq!(
-            HLXPiStartDma(ptr::null_mut(), 0, 1, dummy, 4, mq),
+            R64PiStartDma(ptr::null_mut(), 0, 1, dummy, 4, mq),
             -1,
             "null mb"
         );
         assert_eq!(
-            HLXPiStartDma(mb, 0, 1, dummy, 4, ptr::null_mut()),
+            R64PiStartDma(mb, 0, 1, dummy, 4, ptr::null_mut()),
             -1,
             "null mq"
         );
         assert_eq!(
-            HLXPiStartDma(mb, 0, 1, ptr::null_mut(), 4, mq),
+            R64PiStartDma(mb, 0, 1, ptr::null_mut(), 4, mq),
             -1,
             "null v_addr, nbytes>0"
         );
         let mut d = [0u8; 4];
         assert_eq!(
-            HLXPiStartDma(mb, 0, 0, d.as_mut_ptr() as *mut c_void, 4, mq),
+            R64PiStartDma(mb, 0, 0, d.as_mut_ptr() as *mut c_void, 4, mq),
             -1,
             "zero dev_addr, nbytes>0"
         );
@@ -201,12 +201,12 @@ mod tests {
         let mut d = [0u8; 4];
         let dp = d.as_mut_ptr() as *mut c_void;
         assert_eq!(
-            HLXPiStartDma(mb, 0, 1, dp, isize::MAX as usize + 1, mq),
+            R64PiStartDma(mb, 0, 1, dp, isize::MAX as usize + 1, mq),
             -1,
             "nbytes > isize::MAX"
         );
         assert_eq!(
-            HLXPiStartDma(mb, 0, usize::MAX, dp, 4, mq),
+            R64PiStartDma(mb, 0, usize::MAX, dp, 4, mq),
             -1,
             "dev_addr + nbytes wraps"
         );
@@ -219,7 +219,7 @@ mod tests {
         let base = buf.as_mut_ptr();
         let src = base as usize;
         let dst = unsafe { base.add(1) } as *mut c_void;
-        let r = HLXPiStartDma(fresh_mb(), 0, src, dst, 4, mq);
+        let r = R64PiStartDma(fresh_mb(), 0, src, dst, 4, mq);
         assert_eq!(r, 0);
         assert_eq!(buf, [1u8, 1, 2, 3, 4], "memmove shifted correctly");
     }
@@ -228,7 +228,7 @@ mod tests {
     fn zero_size_is_noop_but_completes() {
         let mq = fresh_queue(1);
         let mb = fresh_mb();
-        assert_eq!(HLXPiStartDma(mb, 0, 0, ptr::null_mut(), 0, mq), 0);
+        assert_eq!(R64PiStartDma(mb, 0, 0, ptr::null_mut(), 0, mq), 0);
         let (ret, m) = mesg::recv(mq as usize, 0);
         assert_eq!(ret, 0);
         assert_eq!(m, mb as usize);
@@ -240,7 +240,7 @@ mod tests {
         let src = [9u8, 8, 7, 6];
         let mq = fresh_queue(1);
         let mb = fresh_mb();
-        let r = HLXPiStartDma(
+        let r = R64PiStartDma(
             mb,
             1,
             dev.as_mut_ptr() as usize,
@@ -259,7 +259,7 @@ mod tests {
         let mut dst = [0u8; 4];
         let mq = fresh_queue(1);
         assert_eq!(
-            HLXPiStartDma(
+            R64PiStartDma(
                 fresh_mb(),
                 2,
                 src.as_ptr() as usize,

@@ -1,5 +1,5 @@
 #include <libultra/os_sp.h>
-#include <helix/internal.h>
+#include <reality64/internal.h>
 
 // MARK: - Methods from libultra (RCP task engine → ultra/rcp.rs)
 
@@ -9,7 +9,7 @@ void osSpTaskLoad(OSTask *task) {
 }
 
 void osSpTaskStartGo(OSTask *task) {
-    HLXSpTaskStartGo(task);
+    R64SpTaskStartGo(task);
 }
 
 void osSpTaskYield(void) {
@@ -17,5 +17,5 @@ void osSpTaskYield(void) {
 }
 
 OSYieldResult osSpTaskYielded(OSTask *task) {
-    return HLXSpTaskYielded(task);
+    return R64SpTaskYielded(task);
 }

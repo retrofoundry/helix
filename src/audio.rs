@@ -1,8 +1,8 @@
-//! Native-pointer audio runtime for the Helix libultra shim.
+//! Native-pointer audio runtime for the reality64 libultra shim.
 //!
-//! Helix owns exactly one Arie 0.3 [`AudioPlayer`] — through Arie's *Rust* API,
+//! reality64 owns exactly one Arie 0.3 [`AudioPlayer`] — through Arie's *Rust* API,
 //! never its C ABI — together with the sole N64 v2 AI descriptor tracker, behind
-//! one process-global `Mutex<AudioRuntime>`. The six `HLXAudio*` `extern "C"`
+//! one process-global `Mutex<AudioRuntime>`. The six `R64Audio*` `extern "C"`
 //! entry points are the only boundary the C shim (`os_ai.c`) calls; each is a
 //! thin wrapper that locks the one mutex and defers to a private
 //! [`AudioRuntime`] method. Fixed-width scalars cross the boundary; no Arie type
@@ -21,33 +21,33 @@ use model::DescriptorTracker;
 
 pub(crate) mod model;
 
-// C-boundary result codes — the Rust mirror of the `HLX_AUDIO_*` enum in
-// `include/helix/internal.h`. `HLXAudioResult` is `i32` on both sides.
-pub type HLXAudioResult = i32;
-pub const HLX_AUDIO_OK: HLXAudioResult = 0;
-pub const HLX_AUDIO_UNAVAILABLE: HLXAudioResult = -1;
-pub const HLX_AUDIO_INVALID_ARGUMENT: HLXAudioResult = -2;
-pub const HLX_AUDIO_QUEUE_FULL: HLXAudioResult = -3;
-pub const HLX_AUDIO_BACKEND_ERROR: HLXAudioResult = -4;
+// C-boundary result codes — the Rust mirror of the `R64_AUDIO_*` enum in
+// `include/reality64/internal.h`. `R64AudioResult` is `i32` on both sides.
+pub type R64AudioResult = i32;
+pub const R64_AUDIO_OK: R64AudioResult = 0;
+pub const R64_AUDIO_UNAVAILABLE: R64AudioResult = -1;
+pub const R64_AUDIO_INVALID_ARGUMENT: R64AudioResult = -2;
+pub const R64_AUDIO_QUEUE_FULL: R64AudioResult = -3;
+pub const R64_AUDIO_BACKEND_ERROR: R64AudioResult = -4;
 
-// Helix-internal AI status bits — the Rust mirror of the `HLX_AI_*` macros in
-// `include/helix/internal.h`. This is Helix's own bit layout, distinct from the
+// reality64-internal AI status bits — the Rust mirror of the `R64_AI_*` macros in
+// `include/reality64/internal.h`. This is reality64's own bit layout, distinct from the
 // guest N64 `AI_STATUS_*` register bits; `os_ai.c` maps these onto those.
 /// Arie is `Running` and total host occupancy has reached the AI target depth.
 /// See [`AudioRuntime::status`] for why both conditions: the `Running` gate keeps
 /// this clear through `Prebuffering` so a status-paced guest keeps feeding to
 /// Arie's startup low-water, and the target depth lets the deep host buffer fill.
-pub const HLX_AI_FIFO_FULL: u32 = 0x1;
+pub const R64_AI_FIFO_FULL: u32 = 0x1;
 /// An accepted, unretired guest DMA exists (occupancy `> 0`) — set during
 /// `Prebuffering`/`Starved` too, cleared only in terminal backend states.
-pub const HLX_AI_DMA_BUSY: u32 = 0x2;
+pub const R64_AI_DMA_BUSY: u32 = 0x2;
 
-/// Target host-buffer depth Helix aims to keep queued ahead of playback, and the
+/// Target host-buffer depth reality64 aims to keep queued ahead of playback, and the
 /// startup prebuffer, for every Arie player it builds. The software-queue size is
 /// derived per-rate from this plus one maximum legal AI DMA (see
 /// [`AudioRuntime::set_source_rate`]) — no game-specific constant is involved.
 const AI_TARGET_DEPTH_MS: u64 = 80;
-/// Startup prebuffer duration for every Arie player Helix builds — one target
+/// Startup prebuffer duration for every Arie player reality64 builds — one target
 /// depth of audio.
 const PREBUFFER_MS: u64 = AI_TARGET_DEPTH_MS;
 
@@ -111,7 +111,7 @@ impl PlayerFactory for CpalPlayerFactory {
 ///
 /// State machine (all transitions happen under the lock):
 /// - fresh / setup-failed / cleared-to-lost / torn-down → `unavailable`, no
-///   player: submit is [`HLX_AUDIO_UNAVAILABLE`], length is `0`;
+///   player: submit is [`R64_AUDIO_UNAVAILABLE`], length is `0`;
 /// - live: a player is installed at `rate` and `unavailable` is clear;
 /// - `shutdown` latches after teardown; no player is ever re-created.
 struct AudioRuntime {
@@ -149,21 +149,21 @@ impl AudioRuntime {
         }
     }
 
-    /// `HLXAudioSetSourceRate`: install (or replace) the player for `rate`.
+    /// `R64AudioSetSourceRate`: install (or replace) the player for `rate`.
     ///
     /// Rate `0` is invalid. The same realized rate is a strict no-op. A changed
     /// rate transactionally marks unavailable, discards descriptors, drops the
     /// current player, then builds and installs a new one *only* on success.
-    fn set_source_rate(&mut self, rate: u32) -> HLXAudioResult {
+    fn set_source_rate(&mut self, rate: u32) -> R64AudioResult {
         if rate == 0 {
-            return HLX_AUDIO_INVALID_ARGUMENT;
+            return R64_AUDIO_INVALID_ARGUMENT;
         }
         if self.shutdown {
-            return HLX_AUDIO_UNAVAILABLE;
+            return R64_AUDIO_UNAVAILABLE;
         }
         // Same realized rate with a live player: strict no-op, no mutation.
         if self.rate == Some(rate) && self.player.is_some() {
-            return HLX_AUDIO_OK;
+            return R64_AUDIO_OK;
         }
 
         // Changed (or first) rate: drop the current player before building the
@@ -191,38 +191,38 @@ impl AudioRuntime {
                 self.player = Some(player);
                 self.rate = Some(rate);
                 self.unavailable = false;
-                HLX_AUDIO_OK
+                R64_AUDIO_OK
             }
             // Creation failed: stay explicitly unavailable with no player.
-            Err(_) => HLX_AUDIO_BACKEND_ERROR,
+            Err(_) => R64_AUDIO_BACKEND_ERROR,
         }
     }
 
-    /// `HLXAudioSubmit`: free-push the interleaved stereo PCM straight into Arie
+    /// `R64AudioSubmit`: free-push the interleaved stereo PCM straight into Arie
     /// and record the accepted DMA span; Arie's queue is the only backpressure.
     ///
     /// The descriptor tracker never gates a submit. Before pushing, an
     /// opportunistic reap at the live retired position keeps a submit-only guest
     /// (one that never polls length) from growing the tracker unbounded. A
     /// failed status snapshot neither reaps nor queues; an Arie `QueueFull` is
-    /// the distinct [`HLX_AUDIO_QUEUE_FULL`].
-    fn submit(&mut self, samples: &[i16], byte_count: u32) -> HLXAudioResult {
+    /// the distinct [`R64_AUDIO_QUEUE_FULL`].
+    fn submit(&mut self, samples: &[i16], byte_count: u32) -> R64AudioResult {
         // Defensive: the C shim collapses the zero-length no-op, but a zero or
         // frame-misaligned byte count is never a valid guest AI DMA.
         if byte_count == 0 || !byte_count.is_multiple_of(BYTES_PER_FRAME) {
-            return HLX_AUDIO_INVALID_ARGUMENT;
+            return R64_AUDIO_INVALID_ARGUMENT;
         }
         if self.unavailable {
-            return HLX_AUDIO_UNAVAILABLE;
+            return R64_AUDIO_UNAVAILABLE;
         }
         let Some(player) = self.player.as_mut() else {
-            return HLX_AUDIO_UNAVAILABLE;
+            return R64_AUDIO_UNAVAILABLE;
         };
 
         // Snapshot the live retired position. A failed status snapshot neither
         // reaps nor queues: no mutation.
         let Some(status) = player.status() else {
-            return HLX_AUDIO_BACKEND_ERROR;
+            return R64_AUDIO_BACKEND_ERROR;
         };
         // Opportunistic reap so a submit-only guest can't grow the tracker
         // unbounded; this never gates the push below.
@@ -234,7 +234,7 @@ impl AudioRuntime {
             Ok(receipt) => {
                 self.tracker
                     .push(receipt.start_source_position, receipt.end_source_position);
-                HLX_AUDIO_OK
+                R64_AUDIO_OK
             }
             // Arie's software queue is full — the sole, real backpressure. The
             // per-rate sizing admits any single legal DMA, so a QueueFull here
@@ -248,11 +248,11 @@ impl AudioRuntime {
                 // observable in release, not silent.
                 if self.dropped_dma_count == 1 || self.dropped_dma_count.is_multiple_of(256) {
                     log::warn!(
-                        "helix audio: Arie QueueFull dropped a guest DMA (dropped_dma_count = {})",
+                        "reality64 audio: Arie QueueFull dropped a guest DMA (dropped_dma_count = {})",
                         self.dropped_dma_count
                     );
                 }
-                HLX_AUDIO_QUEUE_FULL
+                R64_AUDIO_QUEUE_FULL
             }
             // Terminal Arie state (device lost / position counter exhausted): the
             // player is dead. Go unavailable so length reports 0 and later submits
@@ -260,9 +260,9 @@ impl AudioRuntime {
             // never-draining current-DMA length.
             Err(QueueError::DeviceLost | QueueError::CounterExhausted) => {
                 self.go_unavailable();
-                HLX_AUDIO_UNAVAILABLE
+                R64_AUDIO_UNAVAILABLE
             }
-            Err(_) => HLX_AUDIO_BACKEND_ERROR,
+            Err(_) => R64_AUDIO_BACKEND_ERROR,
         }
     }
 
@@ -276,7 +276,7 @@ impl AudioRuntime {
         self.unavailable = true;
     }
 
-    /// `HLXAudioCurrentLength`: remaining guest bytes of the *current* DMA only,
+    /// `R64AudioCurrentLength`: remaining guest bytes of the *current* DMA only,
     /// always bounded to a single DMA — never the summed tracker occupancy.
     ///
     /// Zero while unavailable, without a player, or when the status snapshot
@@ -311,13 +311,13 @@ impl AudioRuntime {
         self.tracker.current_dma_remaining_bytes(retired)
     }
 
-    /// `HLXAudioStatus`: the guest-visible AI status as Helix bitflags.
+    /// `R64AudioStatus`: the guest-visible AI status as reality64 bitflags.
     ///
     /// Returns `0` when unavailable, without a player, or when the status
-    /// snapshot fails. `HLX_AI_FIFO_FULL` is set only once Arie is actually
+    /// snapshot fails. `R64_AI_FIFO_FULL` is set only once Arie is actually
     /// `Running` and total host occupancy (`software_queued_source_frames`) has
     /// reached the AI target depth (`rate * AI_TARGET_DEPTH_MS`).
-    /// `HLX_AI_DMA_BUSY` is set whenever an accepted, unretired DMA exists
+    /// `R64_AI_DMA_BUSY` is set whenever an accepted, unretired DMA exists
     /// (occupancy `> 0`), except in the terminal backend states.
     ///
     /// FIFO_FULL uses the target depth so a status-paced guest (which submits
@@ -343,14 +343,14 @@ impl AudioRuntime {
             u64::from(self.rate.unwrap_or(0)).saturating_mul(AI_TARGET_DEPTH_MS) / 1000;
         let mut out: u32 = 0;
         if s.state == PlaybackState::Running && s.software_queued_source_frames >= target_frames {
-            out |= HLX_AI_FIFO_FULL;
+            out |= R64_AI_FIFO_FULL;
         }
         let terminal = matches!(
             s.state,
             PlaybackState::DeviceLost | PlaybackState::CounterExhausted
         );
         if s.software_queued_source_frames > 0 && !terminal {
-            out |= HLX_AI_DMA_BUSY;
+            out |= R64_AI_DMA_BUSY;
         }
         out
     }
@@ -362,31 +362,31 @@ impl AudioRuntime {
         self.dropped_dma_count
     }
 
-    /// `HLXAudioClear`: clear Arie and the descriptor tracker atomically.
+    /// `R64AudioClear`: clear Arie and the descriptor tracker atomically.
     ///
     /// Unavailable when no player exists. If the Arie epoch cannot be rebuilt,
     /// tracked DMAs are still discarded, the now-unusable player is dropped, and
     /// the runtime goes unavailable.
-    fn clear(&mut self) -> HLXAudioResult {
+    fn clear(&mut self) -> R64AudioResult {
         let Some(player) = self.player.as_mut() else {
-            return HLX_AUDIO_UNAVAILABLE;
+            return R64_AUDIO_UNAVAILABLE;
         };
         match player.clear() {
             Ok(()) => {
                 self.tracker.clear();
-                HLX_AUDIO_OK
+                R64_AUDIO_OK
             }
             Err(_) => {
                 self.tracker.clear();
                 self.player = None;
                 self.rate = None;
                 self.unavailable = true;
-                HLX_AUDIO_BACKEND_ERROR
+                R64_AUDIO_BACKEND_ERROR
             }
         }
     }
 
-    /// `HLXAudioTeardown`: detach and drop the player under the lock, discard
+    /// `R64AudioTeardown`: detach and drop the player under the lock, discard
     /// tracked DMAs, and latch shutdown. Accepts every prior state; idempotent.
     fn teardown(&mut self) {
         self.player = None;
@@ -402,7 +402,7 @@ impl AudioRuntime {
 static AUDIO: OnceLock<Mutex<AudioRuntime>> = OnceLock::new();
 
 /// The process-global audio runtime, created on first use with the real CPAL
-/// factory. No device is opened until the first `HLXAudioSetSourceRate`.
+/// factory. No device is opened until the first `R64AudioSetSourceRate`.
 fn audio() -> &'static Mutex<AudioRuntime> {
     AUDIO.get_or_init(|| Mutex::new(AudioRuntime::new(Box::new(CpalPlayerFactory))))
 }
@@ -428,63 +428,63 @@ pub(crate) fn teardown() {
     }
 }
 
-/// C entry point for `HLXAudioSetSourceRate`; locks the runtime and installs or
+/// C entry point for `R64AudioSetSourceRate`; locks the runtime and installs or
 /// replaces the player for `realized_rate_hz`.
 #[no_mangle]
-pub extern "C" fn HLXAudioSetSourceRate(realized_rate_hz: u32) -> HLXAudioResult {
-    with_runtime(HLX_AUDIO_BACKEND_ERROR, |runtime| {
+pub extern "C" fn R64AudioSetSourceRate(realized_rate_hz: u32) -> R64AudioResult {
+    with_runtime(R64_AUDIO_BACKEND_ERROR, |runtime| {
         runtime.set_source_rate(realized_rate_hz)
     })
 }
 
-/// C entry point for `HLXAudioSubmit`. `stereo_i16` must be null or address at
+/// C entry point for `R64AudioSubmit`. `stereo_i16` must be null or address at
 /// least `byte_count` readable bytes of interleaved stereo `i16`; a null pointer
 /// or zero `byte_count` is rejected before any read.
 #[no_mangle]
-pub extern "C" fn HLXAudioSubmit(stereo_i16: *const c_void, byte_count: u32) -> HLXAudioResult {
+pub extern "C" fn R64AudioSubmit(stereo_i16: *const c_void, byte_count: u32) -> R64AudioResult {
     if stereo_i16.is_null() || byte_count == 0 {
-        return HLX_AUDIO_INVALID_ARGUMENT;
+        return R64_AUDIO_INVALID_ARGUMENT;
     }
     // `from_raw_parts::<i16>` requires 2-byte alignment; a misaligned pointer
     // would be undefined behavior. The real caller passes an `s16*` AI buffer
     // (always aligned), but the `const void *` boundary must defend its contract.
     if !(stereo_i16 as usize).is_multiple_of(std::mem::align_of::<i16>()) {
-        return HLX_AUDIO_INVALID_ARGUMENT;
+        return R64_AUDIO_INVALID_ARGUMENT;
     }
     // SAFETY: non-null, `i16`-aligned, and the C shim guarantees `stereo_i16`
     // addresses at least `byte_count` readable bytes. Two bytes per sample; a
     // frame-misaligned `byte_count` is rejected inside `submit` before any read.
     let samples =
         unsafe { std::slice::from_raw_parts(stereo_i16 as *const i16, (byte_count / 2) as usize) };
-    with_runtime(HLX_AUDIO_BACKEND_ERROR, |runtime| {
+    with_runtime(R64_AUDIO_BACKEND_ERROR, |runtime| {
         runtime.submit(samples, byte_count)
     })
 }
 
-/// C entry point for `HLXAudioCurrentLength`; remaining guest bytes of the
+/// C entry point for `R64AudioCurrentLength`; remaining guest bytes of the
 /// current DMA, or zero when unavailable.
 #[no_mangle]
-pub extern "C" fn HLXAudioCurrentLength() -> u32 {
+pub extern "C" fn R64AudioCurrentLength() -> u32 {
     with_runtime(0, |runtime| runtime.current_length())
 }
 
-/// C entry point for `HLXAudioStatus`; the guest-visible AI status as Helix
-/// bitflags (`HLX_AI_*`), or `0` when unavailable.
+/// C entry point for `R64AudioStatus`; the guest-visible AI status as reality64
+/// bitflags (`R64_AI_*`), or `0` when unavailable.
 #[no_mangle]
-pub extern "C" fn HLXAudioStatus() -> u32 {
+pub extern "C" fn R64AudioStatus() -> u32 {
     with_runtime(0, |runtime| runtime.status())
 }
 
-/// C entry point for `HLXAudioClear`; clears Arie and the descriptor tracker.
+/// C entry point for `R64AudioClear`; clears Arie and the descriptor tracker.
 #[no_mangle]
-pub extern "C" fn HLXAudioClear() -> HLXAudioResult {
-    with_runtime(HLX_AUDIO_BACKEND_ERROR, |runtime| runtime.clear())
+pub extern "C" fn R64AudioClear() -> R64AudioResult {
+    with_runtime(R64_AUDIO_BACKEND_ERROR, |runtime| runtime.clear())
 }
 
-/// C entry point for `HLXAudioTeardown`; idempotently detaches and drops the
+/// C entry point for `R64AudioTeardown`; idempotently detaches and drops the
 /// player under the lock. Accepts every prior state.
 #[no_mangle]
-pub extern "C" fn HLXAudioTeardown() {
+pub extern "C" fn R64AudioTeardown() {
     let _ = std::panic::catch_unwind(teardown);
 }
 
@@ -506,14 +506,14 @@ mod tests {
         // The reject short-circuits before touching the global runtime.
         let aligned = [0i16; 8]; // 2-byte aligned base
         let misaligned = (aligned.as_ptr() as *const u8).wrapping_add(1) as *const c_void;
-        assert_eq!(HLXAudioSubmit(misaligned, 4), HLX_AUDIO_INVALID_ARGUMENT);
+        assert_eq!(R64AudioSubmit(misaligned, 4), R64_AUDIO_INVALID_ARGUMENT);
         assert_eq!(
-            HLXAudioSubmit(std::ptr::null(), 4),
-            HLX_AUDIO_INVALID_ARGUMENT
+            R64AudioSubmit(std::ptr::null(), 4),
+            R64_AUDIO_INVALID_ARGUMENT
         );
         assert_eq!(
-            HLXAudioSubmit(aligned.as_ptr() as *const c_void, 0),
-            HLX_AUDIO_INVALID_ARGUMENT
+            R64AudioSubmit(aligned.as_ptr() as *const c_void, 0),
+            R64_AUDIO_INVALID_ARGUMENT
         );
     }
 
@@ -677,23 +677,23 @@ mod tests {
         let (mut rt, h) = fake();
         h.lock().unwrap().create_fails = true;
 
-        assert_eq!(rt.set_source_rate(32_000), HLX_AUDIO_BACKEND_ERROR);
+        assert_eq!(rt.set_source_rate(32_000), R64_AUDIO_BACKEND_ERROR);
         assert_eq!(created(&h), 0);
         assert_eq!(rt.current_length(), 0);
         // Submission while unavailable fails without touching the (absent) model.
-        assert_eq!(rt.submit(&[0, 0, 0, 0], 8), HLX_AUDIO_UNAVAILABLE);
+        assert_eq!(rt.submit(&[0, 0, 0, 0], 8), R64_AUDIO_UNAVAILABLE);
     }
 
     #[test]
     fn same_rate_is_a_no_op_without_mutation() {
         let (mut rt, h) = fake();
-        assert_eq!(rt.set_source_rate(32_000), HLX_AUDIO_OK);
+        assert_eq!(rt.set_source_rate(32_000), R64_AUDIO_OK);
         // Populate one descriptor [0, 528) so we can prove no reset happened.
-        assert_eq!(rt.submit(&[0i16; 528 * 2], 528 * 4), HLX_AUDIO_OK);
+        assert_eq!(rt.submit(&[0i16; 528 * 2], 528 * 4), R64_AUDIO_OK);
         let before = rt.current_length();
         assert!(before > 0);
 
-        assert_eq!(rt.set_source_rate(32_000), HLX_AUDIO_OK);
+        assert_eq!(rt.set_source_rate(32_000), R64_AUDIO_OK);
         // No new player, descriptors intact.
         assert_eq!(created(&h), 1);
         assert_eq!(dropped(&h), 0);
@@ -703,11 +703,11 @@ mod tests {
     #[test]
     fn changed_rate_drops_old_installs_new_and_clears_descriptors() {
         let (mut rt, h) = fake();
-        assert_eq!(rt.set_source_rate(32_000), HLX_AUDIO_OK);
-        assert_eq!(rt.submit(&[0i16; 528 * 2], 528 * 4), HLX_AUDIO_OK);
+        assert_eq!(rt.set_source_rate(32_000), R64_AUDIO_OK);
+        assert_eq!(rt.submit(&[0i16; 528 * 2], 528 * 4), R64_AUDIO_OK);
         assert!(rt.current_length() > 0);
 
-        assert_eq!(rt.set_source_rate(22_050), HLX_AUDIO_OK);
+        assert_eq!(rt.set_source_rate(22_050), R64_AUDIO_OK);
         assert_eq!(created(&h), 2);
         assert_eq!(dropped(&h), 1);
         // Descriptors were cleared by the rate transition.
@@ -720,11 +720,11 @@ mod tests {
         // every buffer -- Arie's queue is the only backpressure -- so the runtime
         // can never wedge itself when Arie stops draining.
         let (mut rt, h) = fake();
-        assert_eq!(rt.set_source_rate(32_000), HLX_AUDIO_OK);
+        assert_eq!(rt.set_source_rate(32_000), R64_AUDIO_OK);
         // `retired` stays frozen at 0 for the whole loop — the pathological case.
         let buffer = vec![0i16; 528 * 2];
         for _ in 0..64 {
-            assert_eq!(rt.submit(&buffer, 528 * 4), HLX_AUDIO_OK);
+            assert_eq!(rt.submit(&buffer, 528 * 4), R64_AUDIO_OK);
         }
         // Non-vacuous: every one of the 64 submits truly reached Arie's queue,
         // even with `retired` frozen at 0.
@@ -735,7 +735,7 @@ mod tests {
     fn submit_maps_arie_queue_full() {
         // Arie's `QueueFull` — the sole real backpressure — maps distinctly.
         let (mut rt, h) = fake();
-        assert_eq!(rt.set_source_rate(32_000), HLX_AUDIO_OK);
+        assert_eq!(rt.set_source_rate(32_000), R64_AUDIO_OK);
         set_queue_error(
             &h,
             0,
@@ -743,7 +743,7 @@ mod tests {
                 available_source_frames: 0,
             },
         );
-        assert_eq!(rt.submit(&[0i16; 8 * 2], 8 * 4), HLX_AUDIO_QUEUE_FULL);
+        assert_eq!(rt.submit(&[0i16; 8 * 2], 8 * 4), R64_AUDIO_QUEUE_FULL);
     }
 
     #[test]
@@ -753,14 +753,14 @@ mod tests {
         // fail cleanly — not a retained dead player with a frozen current-DMA
         // length. Composes cleanly with the free-push/faithful-length path.
         let (mut rt, h) = fake();
-        assert_eq!(rt.set_source_rate(32_000), HLX_AUDIO_OK);
-        assert_eq!(rt.submit(&[0i16; 528 * 2], 528 * 4), HLX_AUDIO_OK);
+        assert_eq!(rt.set_source_rate(32_000), R64_AUDIO_OK);
+        assert_eq!(rt.submit(&[0i16; 528 * 2], 528 * 4), R64_AUDIO_OK);
 
         set_queue_error(&h, 0, QueueError::DeviceLost);
-        assert_eq!(rt.submit(&[0i16; 8 * 2], 8 * 4), HLX_AUDIO_UNAVAILABLE);
+        assert_eq!(rt.submit(&[0i16; 8 * 2], 8 * 4), R64_AUDIO_UNAVAILABLE);
         // Now cleanly unavailable.
         assert_eq!(rt.current_length(), 0);
-        assert_eq!(rt.submit(&[0i16; 8 * 2], 8 * 4), HLX_AUDIO_UNAVAILABLE);
+        assert_eq!(rt.submit(&[0i16; 8 * 2], 8 * 4), R64_AUDIO_UNAVAILABLE);
         assert_eq!(rt.status(), 0);
     }
 
@@ -774,7 +774,7 @@ mod tests {
         // duration for `want_frames` guarantees the realized capacity >= want.
         for rate in [3_000u32, 16_000, 22_050, 32_000, 32_006, 48_000, 368_000] {
             let (mut rt, h) = fake();
-            assert_eq!(rt.set_source_rate(rate), HLX_AUDIO_OK);
+            assert_eq!(rt.set_source_rate(rate), R64_AUDIO_OK);
             let cfg = last_config(&h);
             assert_eq!(cfg.prebuffer, Duration::from_millis(AI_TARGET_DEPTH_MS));
             let want_frames = MAX_DMA_SOURCE_FRAMES + u64::from(rate) * AI_TARGET_DEPTH_MS / 1000;
@@ -799,22 +799,22 @@ mod tests {
         // gate could latch full below Arie's effective startup need and deadlock
         // the guest.
         let (mut rt, h) = fake();
-        assert_eq!(rt.set_source_rate(32_000), HLX_AUDIO_OK);
+        assert_eq!(rt.set_source_rate(32_000), R64_AUDIO_OK);
         let target = 32_000u64 * AI_TARGET_DEPTH_MS / 1000; // 2560 frames
 
         // Prebuffering with occupancy far above target: still not full.
         set_state(&h, 0, PlaybackState::Prebuffering);
         set_queued_frames(&h, 0, target + 5000);
-        assert_eq!(rt.status() & HLX_AI_FIFO_FULL, 0, "prebuffering never full");
+        assert_eq!(rt.status() & R64_AI_FIFO_FULL, 0, "prebuffering never full");
 
         // Running below target: not full. At/above target: full.
         set_state(&h, 0, PlaybackState::Running);
         set_queued_frames(&h, 0, target - 1);
-        assert_eq!(rt.status() & HLX_AI_FIFO_FULL, 0, "running below target");
+        assert_eq!(rt.status() & R64_AI_FIFO_FULL, 0, "running below target");
         set_queued_frames(&h, 0, target);
         assert_eq!(
-            rt.status() & HLX_AI_FIFO_FULL,
-            HLX_AI_FIFO_FULL,
+            rt.status() & R64_AI_FIFO_FULL,
+            R64_AI_FIFO_FULL,
             "running at target"
         );
     }
@@ -825,7 +825,7 @@ mod tests {
         // (occupancy > 0) — true during Prebuffering/Starved, not gated on the host
         // callback playing. Only terminal backend states clear it.
         let (mut rt, h) = fake();
-        assert_eq!(rt.set_source_rate(32_000), HLX_AUDIO_OK);
+        assert_eq!(rt.set_source_rate(32_000), R64_AUDIO_OK);
         set_queued_frames(&h, 0, 10);
         for s in [
             PlaybackState::Prebuffering,
@@ -834,19 +834,19 @@ mod tests {
         ] {
             set_state(&h, 0, s);
             assert_eq!(
-                rt.status() & HLX_AI_DMA_BUSY,
-                HLX_AI_DMA_BUSY,
+                rt.status() & R64_AI_DMA_BUSY,
+                R64_AI_DMA_BUSY,
                 "{s:?} with occupancy>0 is busy"
             );
         }
         // No unretired DMA: not busy.
         set_state(&h, 0, PlaybackState::Running);
         set_queued_frames(&h, 0, 0);
-        assert_eq!(rt.status() & HLX_AI_DMA_BUSY, 0);
+        assert_eq!(rt.status() & R64_AI_DMA_BUSY, 0);
         // Terminal state clears busy even with stale occupancy.
         set_state(&h, 0, PlaybackState::DeviceLost);
         set_queued_frames(&h, 0, 10);
-        assert_eq!(rt.status() & HLX_AI_DMA_BUSY, 0);
+        assert_eq!(rt.status() & R64_AI_DMA_BUSY, 0);
     }
 
     #[test]
@@ -855,7 +855,7 @@ mod tests {
         // Fresh runtime: unavailable, no player -> zero.
         assert_eq!(rt.status(), 0);
 
-        assert_eq!(rt.set_source_rate(32_000), HLX_AUDIO_OK);
+        assert_eq!(rt.set_source_rate(32_000), R64_AUDIO_OK);
         // Status snapshot failure -> zero.
         player(&h, 0).lock().unwrap().status_fails = true;
         assert_eq!(rt.status(), 0);
@@ -865,9 +865,9 @@ mod tests {
     fn queue_full_submit_increments_dropped_dma_count() {
         // The per-rate sizing makes a QueueFull unreachable for any legal DMA, but
         // a real drop must be observable rather than silent: it bumps the counter
-        // and still returns HLX_AUDIO_QUEUE_FULL.
+        // and still returns R64_AUDIO_QUEUE_FULL.
         let (mut rt, h) = fake();
-        assert_eq!(rt.set_source_rate(32_000), HLX_AUDIO_OK);
+        assert_eq!(rt.set_source_rate(32_000), R64_AUDIO_OK);
         assert_eq!(rt.dropped_dma_count(), 0);
 
         set_queue_error(
@@ -877,16 +877,16 @@ mod tests {
                 available_source_frames: 0,
             },
         );
-        assert_eq!(rt.submit(&[0i16; 8 * 2], 8 * 4), HLX_AUDIO_QUEUE_FULL);
+        assert_eq!(rt.submit(&[0i16; 8 * 2], 8 * 4), R64_AUDIO_QUEUE_FULL);
         assert_eq!(rt.dropped_dma_count(), 1);
-        assert_eq!(rt.submit(&[0i16; 8 * 2], 8 * 4), HLX_AUDIO_QUEUE_FULL);
+        assert_eq!(rt.submit(&[0i16; 8 * 2], 8 * 4), R64_AUDIO_QUEUE_FULL);
         assert_eq!(rt.dropped_dma_count(), 2);
 
         // A non-QueueFull, non-terminal backend error is not a dropped DMA — the
         // counter is specifically QueueFull telemetry. (Terminal errors go
         // unavailable; see terminal_backend_state_goes_unavailable_gracefully.)
         set_queue_error(&h, 0, QueueError::MisalignedSamples);
-        assert_eq!(rt.submit(&[0i16; 8 * 2], 8 * 4), HLX_AUDIO_BACKEND_ERROR);
+        assert_eq!(rt.submit(&[0i16; 8 * 2], 8 * 4), R64_AUDIO_BACKEND_ERROR);
         assert_eq!(rt.dropped_dma_count(), 2);
     }
 
@@ -895,9 +895,9 @@ mod tests {
         // Two 528-frame DMAs: [0, 528) then [528, 1056). `current_length` must
         // report only the current DMA's remaining bytes, never the summed pair.
         let (mut rt, h) = fake();
-        assert_eq!(rt.set_source_rate(32_000), HLX_AUDIO_OK);
-        assert_eq!(rt.submit(&[0i16; 528 * 2], 528 * 4), HLX_AUDIO_OK);
-        assert_eq!(rt.submit(&[0i16; 528 * 2], 528 * 4), HLX_AUDIO_OK);
+        assert_eq!(rt.set_source_rate(32_000), R64_AUDIO_OK);
+        assert_eq!(rt.submit(&[0i16; 528 * 2], 528 * 4), R64_AUDIO_OK);
+        assert_eq!(rt.submit(&[0i16; 528 * 2], 528 * 4), R64_AUDIO_OK);
 
         set_retired(&h, 0, 0);
         assert_eq!(rt.current_length(), 528 * 4); // whole DMA #1 remains
@@ -909,9 +909,9 @@ mod tests {
         // Sweep retired monotonically across both DMAs on a fresh runtime: the
         // reported length is always within one DMA, never the sum of the two.
         let (mut rt2, h2) = fake();
-        assert_eq!(rt2.set_source_rate(32_000), HLX_AUDIO_OK);
-        assert_eq!(rt2.submit(&[0i16; 528 * 2], 528 * 4), HLX_AUDIO_OK);
-        assert_eq!(rt2.submit(&[0i16; 528 * 2], 528 * 4), HLX_AUDIO_OK);
+        assert_eq!(rt2.set_source_rate(32_000), R64_AUDIO_OK);
+        assert_eq!(rt2.submit(&[0i16; 528 * 2], 528 * 4), R64_AUDIO_OK);
+        assert_eq!(rt2.submit(&[0i16; 528 * 2], 528 * 4), R64_AUDIO_OK);
         for r in 0..=(528 * 2) {
             set_retired(&h2, 0, r);
             assert!(rt2.current_length() <= 528 * 4);
@@ -923,13 +923,13 @@ mod tests {
         // A submit-only guest that never polls length must not accumulate spans:
         // each submit reaps opportunistically at the live retired position.
         let (mut rt, h) = fake();
-        assert_eq!(rt.set_source_rate(32_000), HLX_AUDIO_OK);
+        assert_eq!(rt.set_source_rate(32_000), R64_AUDIO_OK);
         let buffer = vec![0i16; 528 * 2];
         for i in 0..1000u64 {
             // Retired keeps pace with the DMAs already submitted, so each new
             // submit's opportunistic reap frees all prior spans first.
             set_retired(&h, 0, i * 528);
-            assert_eq!(rt.submit(&buffer, 528 * 4), HLX_AUDIO_OK);
+            assert_eq!(rt.submit(&buffer, 528 * 4), R64_AUDIO_OK);
         }
         // Each iteration's opportunistic reap frees the single prior span before
         // the new push, so exactly one DMA is ever in flight — despite 1000 submits
@@ -945,9 +945,9 @@ mod tests {
         // The tracker is reaped with the live retired position before the query,
         // without the caller reaping manually.
         let (mut rt, h) = fake();
-        assert_eq!(rt.set_source_rate(32_000), HLX_AUDIO_OK);
+        assert_eq!(rt.set_source_rate(32_000), R64_AUDIO_OK);
         player(&h, 0).lock().unwrap().next_position = 100;
-        assert_eq!(rt.submit(&[0i16; 528 * 2], 528 * 4), HLX_AUDIO_OK); // [100, 628)
+        assert_eq!(rt.submit(&[0i16; 528 * 2], 528 * 4), R64_AUDIO_OK); // [100, 628)
 
         player(&h, 0).lock().unwrap().retired = 364;
         assert_eq!(rt.current_length(), (628 - 364) * 4); // 1056
@@ -959,14 +959,14 @@ mod tests {
     #[test]
     fn status_failure_returns_zero_and_preserves_descriptors() {
         let (mut rt, h) = fake();
-        assert_eq!(rt.set_source_rate(32_000), HLX_AUDIO_OK);
-        assert_eq!(rt.submit(&[0i16; 528 * 2], 528 * 4), HLX_AUDIO_OK); // [0, 528)
+        assert_eq!(rt.set_source_rate(32_000), R64_AUDIO_OK);
+        assert_eq!(rt.submit(&[0i16; 528 * 2], 528 * 4), R64_AUDIO_OK); // [0, 528)
 
         // Status retrieval fails: length is zero and no reap occurs.
         player(&h, 0).lock().unwrap().status_fails = true;
         assert_eq!(rt.current_length(), 0);
         // Submit under status failure is a backend error and does not mutate.
-        assert_eq!(rt.submit(&[0i16; 8 * 2], 8 * 4), HLX_AUDIO_BACKEND_ERROR);
+        assert_eq!(rt.submit(&[0i16; 8 * 2], 8 * 4), R64_AUDIO_BACKEND_ERROR);
 
         // Restore status with a retired position that would not reap the
         // descriptor: it is still present (proving it survived the failure).
@@ -982,11 +982,11 @@ mod tests {
     #[test]
     fn clear_empties_arie_and_the_tracker_atomically() {
         let (mut rt, h) = fake();
-        assert_eq!(rt.set_source_rate(32_000), HLX_AUDIO_OK);
-        assert_eq!(rt.submit(&[0i16; 528 * 2], 528 * 4), HLX_AUDIO_OK);
+        assert_eq!(rt.set_source_rate(32_000), R64_AUDIO_OK);
+        assert_eq!(rt.submit(&[0i16; 528 * 2], 528 * 4), R64_AUDIO_OK);
         assert!(rt.current_length() > 0);
 
-        assert_eq!(rt.clear(), HLX_AUDIO_OK);
+        assert_eq!(rt.clear(), R64_AUDIO_OK);
         assert_eq!(rt.current_length(), 0);
         assert_eq!(player(&h, 0).lock().unwrap().clears, 1);
     }
@@ -994,7 +994,7 @@ mod tests {
     #[test]
     fn clear_without_a_player_is_unavailable() {
         let (mut rt, _h) = fake();
-        assert_eq!(rt.clear(), HLX_AUDIO_UNAVAILABLE);
+        assert_eq!(rt.clear(), R64_AUDIO_UNAVAILABLE);
     }
 
     #[test]
@@ -1006,15 +1006,15 @@ mod tests {
     #[test]
     fn invalid_rate_zero_is_rejected() {
         let (mut rt, h) = fake();
-        assert_eq!(rt.set_source_rate(0), HLX_AUDIO_INVALID_ARGUMENT);
+        assert_eq!(rt.set_source_rate(0), R64_AUDIO_INVALID_ARGUMENT);
         assert_eq!(created(&h), 0);
     }
 
     #[test]
     fn teardown_is_idempotent_and_detaches_the_player() {
         let (mut rt, h) = fake();
-        assert_eq!(rt.set_source_rate(32_000), HLX_AUDIO_OK);
-        assert_eq!(rt.submit(&[0i16; 528 * 2], 528 * 4), HLX_AUDIO_OK);
+        assert_eq!(rt.set_source_rate(32_000), R64_AUDIO_OK);
+        assert_eq!(rt.submit(&[0i16; 528 * 2], 528 * 4), R64_AUDIO_OK);
 
         rt.teardown();
         assert_eq!(dropped(&h), 1);
@@ -1023,8 +1023,8 @@ mod tests {
 
         // Post-teardown operations are unavailable / zero.
         assert_eq!(rt.current_length(), 0);
-        assert_eq!(rt.submit(&[0i16; 8 * 2], 8 * 4), HLX_AUDIO_UNAVAILABLE);
-        assert_eq!(rt.clear(), HLX_AUDIO_UNAVAILABLE);
+        assert_eq!(rt.submit(&[0i16; 8 * 2], 8 * 4), R64_AUDIO_UNAVAILABLE);
+        assert_eq!(rt.clear(), R64_AUDIO_UNAVAILABLE);
     }
 
     #[test]
@@ -1036,7 +1036,7 @@ mod tests {
         let mut rt = AudioRuntime::new(Box::new(FakeFactory {
             inner: Arc::clone(&inner),
         }));
-        assert_eq!(rt.set_source_rate(32_000), HLX_AUDIO_OK);
+        assert_eq!(rt.set_source_rate(32_000), R64_AUDIO_OK);
 
         let runtime = Arc::new(Mutex::new(rt));
         let mut handles = Vec::new();
@@ -1063,6 +1063,6 @@ mod tests {
         // After teardown the runtime is consistently unavailable.
         let mut guard = runtime.lock().unwrap();
         assert_eq!(guard.current_length(), 0);
-        assert_eq!(guard.submit(&[0i16; 8 * 2], 8 * 4), HLX_AUDIO_UNAVAILABLE);
+        assert_eq!(guard.submit(&[0i16; 8 * 2], 8 * 4), R64_AUDIO_UNAVAILABLE);
     }
 }

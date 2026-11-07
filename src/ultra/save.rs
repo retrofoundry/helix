@@ -15,7 +15,7 @@ struct SaveFile {
 }
 
 fn save_path(name: &str) -> PathBuf {
-    if let Ok(p) = std::env::var("HELIX_SAVE_PATH") {
+    if let Ok(p) = std::env::var("REALITY64_SAVE_PATH") {
         return PathBuf::from(p);
     }
     let dir = if cfg!(target_os = "macos") {
@@ -35,7 +35,7 @@ fn save_path(name: &str) -> PathBuf {
             })
     };
     dir.unwrap_or_else(std::env::temp_dir)
-        .join("helix")
+        .join("reality64")
         .join(name)
 }
 
@@ -76,7 +76,7 @@ fn eeprom() -> &'static Mutex<SaveFile> {
 }
 
 /// Flush the in-memory store to disk. No-op if the EEPROM backend was never lazily
-/// initialized (no prior HLXEeprom{Probe,Read,Write} call touched it).
+/// initialized (no prior R64Eeprom{Probe,Read,Write} call touched it).
 /// Called by ultra/mod.rs::teardown on graceful shutdown.
 pub fn flush() {
     if let Some(m) = EEPROM.get() {
@@ -86,16 +86,16 @@ pub fn flush() {
     }
 }
 
-// MARK: - C API (FFI — called by helix/cpp/libultra/os_eeprom.c)
+// MARK: - C API (FFI — called by reality64/cpp/libultra/os_eeprom.c)
 
 #[no_mangle]
-pub extern "C" fn HLXEepromProbe() -> i32 {
+pub extern "C" fn R64EepromProbe() -> i32 {
     let _ = eeprom(); // force lazy load so a subsequent flush() has state
     1 // 4K EEPROM always present in this backend
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn HLXEepromRead(addr: u8, buf: *mut u8, n: i32) -> i32 {
+pub unsafe extern "C" fn R64EepromRead(addr: u8, buf: *mut u8, n: i32) -> i32 {
     if buf.is_null() || n < 0 {
         return -1;
     }
@@ -110,7 +110,7 @@ pub unsafe extern "C" fn HLXEepromRead(addr: u8, buf: *mut u8, n: i32) -> i32 {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn HLXEepromWrite(addr: u8, buf: *const u8, n: i32) -> i32 {
+pub unsafe extern "C" fn R64EepromWrite(addr: u8, buf: *const u8, n: i32) -> i32 {
     if buf.is_null() || n < 0 {
         return -1;
     }
@@ -147,7 +147,7 @@ const OS_READ: i32 = 0; // OSIoMesg direction: SRAM -> RDRAM (OS_WRITE = 1 is RD
 /// # Safety
 /// `dram` must be valid for `size` bytes; `mb`/`ret_queue` are opaque guest pointers.
 #[no_mangle]
-pub unsafe extern "C" fn HLXSramDma(
+pub unsafe extern "C" fn R64SramDma(
     mb: *mut std::os::raw::c_void,
     dev_addr: u32,
     dram: *mut std::os::raw::c_void,
@@ -181,17 +181,17 @@ mod tests {
 
     #[test]
     fn eeprom_roundtrips_persists_and_bounds_check() {
-        let tmp = std::env::temp_dir().join(format!("helix_eeprom_{}.bin", std::process::id()));
+        let tmp = std::env::temp_dir().join(format!("reality64_eeprom_{}.bin", std::process::id()));
         let _ = std::fs::remove_file(&tmp);
-        std::env::set_var("HELIX_SAVE_PATH", &tmp);
+        std::env::set_var("REALITY64_SAVE_PATH", &tmp);
 
-        assert_eq!(HLXEepromProbe(), 1);
+        assert_eq!(R64EepromProbe(), 1);
 
         let src = [0xAB_u8; 32];
         let mut dst = [0u8; 32];
         unsafe {
-            assert_eq!(HLXEepromWrite(2, src.as_ptr(), 32), 0); // block 2 -> byte offset 16
-            assert_eq!(HLXEepromRead(2, dst.as_mut_ptr(), 32), 0);
+            assert_eq!(R64EepromWrite(2, src.as_ptr(), 32), 0); // block 2 -> byte offset 16
+            assert_eq!(R64EepromRead(2, dst.as_mut_ptr(), 32), 0);
         }
         assert_eq!(dst, src);
 
@@ -203,11 +203,11 @@ mod tests {
         // Bounds: last block (63*8=504, +8=512) is valid; block 64 overruns.
         let mut b = [0u8; 8];
         unsafe {
-            assert_eq!(HLXEepromRead(63, b.as_mut_ptr(), 8), 0);
-            assert_eq!(HLXEepromRead(64, b.as_mut_ptr(), 8), -1);
-            assert_eq!(HLXEepromWrite(64, src.as_ptr(), 8), -1);
-            assert_eq!(HLXEepromRead(0, std::ptr::null_mut(), 8), -1);
-            assert_eq!(HLXEepromWrite(0, src.as_ptr(), -1), -1);
+            assert_eq!(R64EepromRead(63, b.as_mut_ptr(), 8), 0);
+            assert_eq!(R64EepromRead(64, b.as_mut_ptr(), 8), -1);
+            assert_eq!(R64EepromWrite(64, src.as_ptr(), 8), -1);
+            assert_eq!(R64EepromRead(0, std::ptr::null_mut(), 8), -1);
+            assert_eq!(R64EepromWrite(0, src.as_ptr(), -1), -1);
         }
 
         let _ = std::fs::remove_file(&tmp);
@@ -215,7 +215,7 @@ mod tests {
 
     #[test]
     fn save_file_reloads_persisted_store_and_zero_fills_short_files() {
-        let tmp = std::env::temp_dir().join(format!("helix_sram_{}.bin", std::process::id()));
+        let tmp = std::env::temp_dir().join(format!("reality64_sram_{}.bin", std::process::id()));
         std::fs::write(&tmp, [0xCD_u8; 4]).unwrap();
 
         let mut file = SaveFile::load(tmp.clone(), SRAM_SIZE);

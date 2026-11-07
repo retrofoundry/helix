@@ -1,6 +1,6 @@
-# Helix
+# reality64
 
-Helix is a Rust library for running N64 software on PC and other systems. It provides a faithful libultra runtime alongside a modern renderer, audio, and input, so a decompilation runs on its original threading and `main.c` with minimal change.
+reality64 is a Rust library for running N64 software on PC and other systems. It provides a faithful libultra runtime alongside a modern renderer, audio, and input, so a decompilation runs on its original threading and `main.c` with minimal change.
 
 ## Features Provided
 
@@ -14,11 +14,11 @@ Helix is a Rust library for running N64 software on PC and other systems. It pro
 - [x] Speech Synthesis (speech)
 - [x] TCP Stream (network)
 
-For details on each of the features provided please see our [documentation](https://retrofoundry.github.io/helix/dev/).
+For details on each of the features provided please see our [documentation](https://retrofoundry.github.io/reality64/dev/).
 
 ## How to setup?
 
-For setup and more in-depth information please see our [documentation](https://retrofoundry.github.io/helix/dev/).
+For setup and more in-depth information please see our [documentation](https://retrofoundry.github.io/reality64/dev/).
 
 For display-list fixtures and continuous recordings, see [ultragfx capture](docs/capture.md).
 

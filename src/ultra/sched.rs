@@ -514,7 +514,7 @@ mod tests {
         // With the peer parked this thread is the sole runnable choice; each osYieldThread lands
         // in reschedule_yield's condvar wait. It must resume and hand off once the peer is woken.
         while !RY_PEER_RAN.load(Ordering::SeqCst) {
-            crate::ultra::thread::HLXThreadYield();
+            crate::ultra::thread::R64ThreadYield();
         }
         RY_CALLER_DONE.store(true, Ordering::SeqCst);
     }
@@ -546,7 +546,7 @@ mod tests {
         let mut ps = [0u8; 128];
         let pt = ps.as_mut_ptr() as *mut std::os::raw::c_void;
         let peer_key = pt as usize;
-        crate::ultra::thread::HLXThreadCreate(
+        crate::ultra::thread::R64ThreadCreate(
             pt,
             200,
             ry_peer,
@@ -554,7 +554,7 @@ mod tests {
             std::ptr::null_mut(),
             100,
         );
-        crate::ultra::thread::HLXThreadStart(pt);
+        crate::ultra::thread::R64ThreadStart(pt);
 
         // Gate on the peer being GENUINELY parked in recv(BLOCK) before proceeding: only then is
         // the later send() guaranteed to hit a waiting receiver and invoke `wake` (else send could
@@ -574,7 +574,7 @@ mod tests {
         let mut cs = [0u8; 128];
         let ct = cs.as_mut_ptr() as *mut std::os::raw::c_void;
         let caller_key = ct as usize;
-        crate::ultra::thread::HLXThreadCreate(
+        crate::ultra::thread::R64ThreadCreate(
             ct,
             201,
             ry_caller,
@@ -582,7 +582,7 @@ mod tests {
             std::ptr::null_mut(),
             10,
         );
-        crate::ultra::thread::HLXThreadStart(ct);
+        crate::ultra::thread::R64ThreadStart(ct);
 
         // Wait until the caller has entered the sole-wait before sending, so the send actually
         // exercises wake-driven release (not the caller taking the peer-ready arm on a first yield).

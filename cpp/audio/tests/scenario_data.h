@@ -1,5 +1,5 @@
-#ifndef HLX_SCENARIO_DATA_H
-#define HLX_SCENARIO_DATA_H
+#ifndef R64_SCENARIO_DATA_H
+#define R64_SCENARIO_DATA_H
 #include <ultra64.h>
 #include <string.h>
 // Declares fixed, deterministic scenario inputs/state. All DMEM offsets/counts

@@ -1,5 +1,5 @@
-#ifndef HELIX_LIB_NETWORK_H
-#define HELIX_LIB_NETWORK_H
+#ifndef REALITY64_LIB_NETWORK_H
+#define REALITY64_LIB_NETWORK_H
 
 #include <stdint.h>
 
@@ -19,4 +19,4 @@ void TCPSendMessage(void* stream, const char* data);
 }
 #endif
 
-#endif /* HELIX_LIB_NETWORK_H */
+#endif /* REALITY64_LIB_NETWORK_H */

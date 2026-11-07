@@ -45,7 +45,7 @@ fn lookup(key: usize) -> Arc<Mutex<Queue>> {
         .lock()
         .unwrap()
         .get(&key)
-        .expect("HLXMesg*: queue used before HLXMesgQueueCreate")
+        .expect("R64Mesg*: queue used before R64MesgQueueCreate")
         .clone()
 }
 
@@ -160,17 +160,17 @@ pub(crate) fn recv(key: usize, flag: i32) -> (i32, usize) {
 }
 
 #[no_mangle]
-pub extern "C" fn HLXMesgQueueCreate(mq: *mut c_void, _msgbuf: *mut *mut c_void, count: i32) {
+pub extern "C" fn R64MesgQueueCreate(mq: *mut c_void, _msgbuf: *mut *mut c_void, count: i32) {
     create(mq as usize, count);
 }
 
 #[no_mangle]
-pub extern "C" fn HLXMesgSend(mq: *mut c_void, msg: *mut c_void, flag: i32) -> i32 {
+pub extern "C" fn R64MesgSend(mq: *mut c_void, msg: *mut c_void, flag: i32) -> i32 {
     send(mq as usize, msg as usize, flag)
 }
 
 #[no_mangle]
-pub extern "C" fn HLXMesgRecv(mq: *mut c_void, msg_out: *mut *mut c_void, flag: i32) -> i32 {
+pub extern "C" fn R64MesgRecv(mq: *mut c_void, msg_out: *mut *mut c_void, flag: i32) -> i32 {
     let (ret, m) = recv(mq as usize, flag);
     if ret == 0 && !msg_out.is_null() {
         unsafe { *msg_out = m as *mut c_void };
@@ -209,7 +209,7 @@ mod tests {
 
         let mut tstore = [0u8; 128];
         let t = tstore.as_mut_ptr() as *mut std::os::raw::c_void;
-        crate::ultra::thread::HLXThreadCreate(
+        crate::ultra::thread::R64ThreadCreate(
             t,
             5,
             t2_waiter,
@@ -217,7 +217,7 @@ mod tests {
             std::ptr::null_mut(),
             10,
         );
-        crate::ultra::thread::HLXThreadStart(t);
+        crate::ultra::thread::R64ThreadStart(t);
 
         // Race: send immediately, before/around the waiter reaching park_self.
         send(key, 0x77, 0);
@@ -266,7 +266,7 @@ mod tests {
         let mut tstore = [0u8; 128];
         let t = tstore.as_mut_ptr() as *mut std::os::raw::c_void;
         let sender_key = t as usize;
-        crate::ultra::thread::HLXThreadCreate(
+        crate::ultra::thread::R64ThreadCreate(
             t,
             5,
             bs_sender,
@@ -274,7 +274,7 @@ mod tests {
             ptr::null_mut(),
             10,
         );
-        crate::ultra::thread::HLXThreadStart(t);
+        crate::ultra::thread::R64ThreadStart(t);
 
         // Deterministically wait until the sender has actually PARKED in the full+BLOCK branch
         // (set_blocked) before freeing a slot — otherwise it could take the non-full fast path
@@ -374,7 +374,7 @@ mod tests {
         // Start the high-priority target first so it parks in recv(BLOCK)...
         let mut tstore = [0u8; 128];
         let tt = tstore.as_mut_ptr() as *mut std::os::raw::c_void;
-        crate::ultra::thread::HLXThreadCreate(
+        crate::ultra::thread::R64ThreadCreate(
             tt,
             6,
             f3_target,
@@ -382,12 +382,12 @@ mod tests {
             std::ptr::null_mut(),
             100,
         );
-        crate::ultra::thread::HLXThreadStart(tt);
+        crate::ultra::thread::R64ThreadStart(tt);
 
         // ...then the low-priority waker (the token holder that performs the send).
         let mut wstore = [0u8; 128];
         let ww = wstore.as_mut_ptr() as *mut std::os::raw::c_void;
-        crate::ultra::thread::HLXThreadCreate(
+        crate::ultra::thread::R64ThreadCreate(
             ww,
             7,
             f3_waker,
@@ -395,7 +395,7 @@ mod tests {
             std::ptr::null_mut(),
             10,
         );
-        crate::ultra::thread::HLXThreadStart(ww);
+        crate::ultra::thread::R64ThreadStart(ww);
 
         for _ in 0..400 {
             if F3_TARGET_DONE.load(Ordering::SeqCst) {
@@ -533,10 +533,10 @@ mod tests {
         let mut backing = [0u8; 64];
         let mq = backing.as_mut_ptr() as *mut std::os::raw::c_void;
         let mut msgbuf: [*mut std::os::raw::c_void; 1] = [ptr::null_mut()];
-        HLXMesgQueueCreate(mq, msgbuf.as_mut_ptr(), 1);
-        assert_eq!(HLXMesgSend(mq, 0x1234 as *mut _, 0), 0);
+        R64MesgQueueCreate(mq, msgbuf.as_mut_ptr(), 1);
+        assert_eq!(R64MesgSend(mq, 0x1234 as *mut _, 0), 0);
         let mut out: *mut std::os::raw::c_void = ptr::null_mut();
-        assert_eq!(HLXMesgRecv(mq, &mut out as *mut _, 0), 0);
+        assert_eq!(R64MesgRecv(mq, &mut out as *mut _, 0), 0);
         assert_eq!(out as usize, 0x1234);
     }
 
@@ -552,22 +552,22 @@ mod tests {
     fn ring_is_fifo_and_caps_at_count_without_overflow() {
         let mq = fake_queue();
         let mut buf = [std::ptr::null_mut::<c_void>(); 16];
-        unsafe { HLXMesgQueueCreate(mq, buf.as_mut_ptr(), 16) };
+        unsafe { R64MesgQueueCreate(mq, buf.as_mut_ptr(), 16) };
         for i in 1..=16usize {
             assert_eq!(
-                unsafe { HLXMesgSend(mq, i as *mut c_void, 0) },
+                unsafe { R64MesgSend(mq, i as *mut c_void, 0) },
                 0,
                 "slot {i}"
             );
         }
-        assert_eq!(unsafe { HLXMesgSend(mq, 99usize as *mut c_void, 0) }, -1);
+        assert_eq!(unsafe { R64MesgSend(mq, 99usize as *mut c_void, 0) }, -1);
         for i in 1..=16usize {
             let mut out: *mut c_void = std::ptr::null_mut();
-            assert_eq!(unsafe { HLXMesgRecv(mq, &mut out, 0) }, 0);
+            assert_eq!(unsafe { R64MesgRecv(mq, &mut out, 0) }, 0);
             assert_eq!(out as usize, i);
         }
         let mut out: *mut c_void = std::ptr::null_mut();
-        assert_eq!(unsafe { HLXMesgRecv(mq, &mut out, 0) }, -1);
+        assert_eq!(unsafe { R64MesgRecv(mq, &mut out, 0) }, -1);
     }
 
     #[test]
@@ -578,15 +578,15 @@ mod tests {
         const MESG_DP: usize = 3;
         let mq = fake_queue();
         let mut buf = [std::ptr::null_mut::<c_void>(); 16];
-        unsafe { HLXMesgQueueCreate(mq, buf.as_mut_ptr(), 16) };
+        unsafe { R64MesgQueueCreate(mq, buf.as_mut_ptr(), 16) };
         for _ in 0..3 {
-            assert_eq!(unsafe { HLXMesgSend(mq, MESG_VI as *mut c_void, 0) }, 0);
+            assert_eq!(unsafe { R64MesgSend(mq, MESG_VI as *mut c_void, 0) }, 0);
         }
-        assert_eq!(unsafe { HLXMesgSend(mq, MESG_SP as *mut c_void, 0) }, 0);
-        assert_eq!(unsafe { HLXMesgSend(mq, MESG_DP as *mut c_void, 0) }, 0);
+        assert_eq!(unsafe { R64MesgSend(mq, MESG_SP as *mut c_void, 0) }, 0);
+        assert_eq!(unsafe { R64MesgSend(mq, MESG_DP as *mut c_void, 0) }, 0);
         for expected in [MESG_VI, MESG_VI, MESG_VI, MESG_SP, MESG_DP] {
             let mut out: *mut c_void = std::ptr::null_mut();
-            assert_eq!(unsafe { HLXMesgRecv(mq, &mut out, 0) }, 0);
+            assert_eq!(unsafe { R64MesgRecv(mq, &mut out, 0) }, 0);
             assert_eq!(out as usize, expected);
         }
     }

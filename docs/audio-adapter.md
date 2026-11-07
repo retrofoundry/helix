@@ -1,8 +1,8 @@
-# Helix audio: the libultra AI adapter over Arie
+# reality64 audio: the libultra AI adapter over Arie
 
 This document defines the boundary between **Arie** (a general host audio library)
-and **helix** (a general libultra runtime for N64 PC ports), and the contract the
-helix AI adapter presents to a guest decomp (SM64 today; OOT/MM as future targets).
+and **reality64** (a general libultra runtime for N64 PC ports), and the contract the
+reality64 AI adapter presents to a guest decomp (SM64 today; OOT/MM as future targets).
 
 ## Layering — who owns what
 
@@ -11,7 +11,7 @@ guest decomp (sm64 / oot / …)              libultra AI API: osAiSetFrequency,
    │  osAiSetNextBuffer / osAiGetLength /    osAiSetNextBuffer, osAiGetLength,
    │  osAiGetStatus / osAiSetFrequency       osAiGetStatus  (unchanged guest code)
    ▼
-helix libultra AI shim  ── cpp/libultra/os_ai.c  +  src/audio.rs (AudioRuntime)
+reality64 libultra AI shim  ── cpp/libultra/os_ai.c  +  src/audio.rs (AudioRuntime)
    │  N64 AI semantics and host feeding policy live here
    ▼  (Arie's Rust API only — never its C ABI)
 Arie 0.3  ── a general push/queue host-audio library
@@ -22,29 +22,29 @@ Arie 0.3  ── a general push/queue host-audio library
 **Arie stays general.** Its job is only: accept interleaved PCM at some source
 rate, resample to the device, play it smoothly, and report queue depth /
 starvation. An emulator for a different console reuses Arie unchanged and writes
-its own thin adapter. Helix's only Arie-side change is a near-prime resampler fix
+its own thin adapter. reality64's only Arie-side change is a near-prime resampler fix
 (`resample_ratio_terms`), which is itself a generality improvement — arbitrary
 source rates (the N64 AI realizes near-prime rates like 32006 Hz) now resample.
 
-**Helix owns the N64 feeding policy.** The AI's clock realization, the DMA
+**reality64 owns the N64 feeding policy.** The AI's clock realization, the DMA
 validation, and — crucially — the *buffering policy* that keeps Arie fed all live
-in the helix shim, parameterized only by the guest's realized rate and one knob
+in the reality64 shim, parameterized only by the guest's realized rate and one knob
 (`AI_TARGET_DEPTH_MS`). No game-specific constant appears in `os_ai.c` / `audio.rs`.
 
-## The C boundary — six `HLXAudio*` calls
+## The C boundary — six `R64Audio*` calls
 
 `os_ai.c` is the only caller of the six `extern "C"` entry points in `audio.rs`;
 each locks one process-global `Mutex<AudioRuntime>` (panic-contained via
 `catch_unwind`) and defers to a private method. Only fixed-width scalars cross;
 no Arie type or header leaks into C (`internal.h` never includes `<arie/arie.h>`).
 
-| libultra call        | helix extern             | behavior |
+| libultra call        | reality64 extern             | behavior |
 |----------------------|--------------------------|----------|
-| `osAiSetFrequency`   | `HLXAudioSetSourceRate`  | realize rate (divisor rule + TV family), install/replace the Arie player; propagate install failure as `-1` |
-| `osAiSetNextBuffer`  | `HLXAudioSubmit`         | validate the DMA, **free-push** into Arie |
-| `osAiGetLength`      | `HLXAudioCurrentLength`  | **faithful** current-DMA-remaining bytes |
-| `osAiGetStatus`      | `HLXAudioStatus`         | `AI_STATUS_FIFO_FULL` / `AI_STATUS_DMA_BUSY` |
-| (teardown)           | `HLXAudioClear` / `HLXAudioTeardown` | reset / drop the player |
+| `osAiSetFrequency`   | `R64AudioSetSourceRate`  | realize rate (divisor rule + TV family), install/replace the Arie player; propagate install failure as `-1` |
+| `osAiSetNextBuffer`  | `R64AudioSubmit`         | validate the DMA, **free-push** into Arie |
+| `osAiGetLength`      | `R64AudioCurrentLength`  | **faithful** current-DMA-remaining bytes |
+| `osAiGetStatus`      | `R64AudioStatus`         | `AI_STATUS_FIFO_FULL` / `AI_STATUS_DMA_BUSY` |
+| (teardown)           | `R64AudioClear` / `R64AudioTeardown` | reset / drop the player |
 
 ## The feeding policy (why it is shaped this way)
 
@@ -56,7 +56,7 @@ underruns. Three design choices reconcile this without lying to the guest:
 
 1. **Free-push submit.** `osAiSetNextBuffer` pushes straight into Arie; Arie's own
    software queue is the buffer and its `QueueFull` is the *only* backpressure.
-   Helix keeps **no admission FIFO** of its own. The earlier hardware-faithful
+   reality64 keeps **no admission FIFO** of its own. The earlier hardware-faithful
    2-deep FIFO wedged permanently on any starve: Arie's `retired` position froze,
    the FIFO filled, and no fresh audio could be admitted to un-starve it. The
    non-gating tracker (below) exists purely for reporting and never gates.
@@ -72,7 +72,7 @@ underruns. Three design choices reconcile this without lying to the guest:
 
 ## Two host-functional deviations
 
-Where strict hardware fidelity would break host playback, helix chooses
+Where strict hardware fidelity would break host playback, reality64 chooses
 host-functional behavior and documents it:
 
 - **`osAiGetLength` is conservative, ~one resampler block late.** Arie retires a
@@ -127,7 +127,7 @@ or raising Arie's chunk cap; until then this is a documented limitation of the
 ## Validation
 
 Correctness of the tracker, free-push, faithful length, `osAiGetStatus`, and
-queue sizing is unit-tested (helix `cargo test --lib audio`, ctest `helix_os_ai`).
+queue sizing is unit-tested (reality64 `cargo test --lib audio`, ctest `reality64_os_ai`).
 A deterministic-ish sim of the real Arie pipeline (`arie` `pipeline.rs`,
 `run_faithful_sim`) is a **rough sanity check, not proof** — it is non-deterministic
 (worker thread + timing) and single-phase. The **authoritative gate is the in-game

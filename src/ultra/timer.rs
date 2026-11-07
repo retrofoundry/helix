@@ -34,19 +34,19 @@ fn now_cycles() -> u64 {
 }
 
 #[no_mangle]
-pub extern "C" fn HLXGetTime() -> u64 {
+pub extern "C" fn R64GetTime() -> u64 {
     now_cycles()
 }
 
 #[no_mangle]
-pub extern "C" fn HLXGetCount() -> u32 {
+pub extern "C" fn R64GetCount() -> u32 {
     // osGetCount is the low 32 bits of the same scaled clock.
     now_cycles() as u32
 }
 
 #[no_mangle]
-pub extern "C" fn HLXSetTime(t: u64) {
-    // Re-bias so the next HLXGetTime returns ~t (osSetTime semantics).
+pub extern "C" fn R64SetTime(t: u64) {
+    // Re-bias so the next R64GetTime returns ~t (osSetTime semantics).
     let nanos = epoch().elapsed().as_nanos();
     let elapsed = cycles_from_nanos(nanos, OS_CPU_COUNTER);
     TIME_OFFSET.store(t.wrapping_sub(elapsed), Ordering::Relaxed);
@@ -107,7 +107,7 @@ fn countdown_loop() {
 /// osSetTimer: post `msg` to `mq` after `countdown` COUNT cycles (`interval` when `countdown` is 0),
 /// then every `interval` cycles unless it is 0. Setting an armed timer re-arms it.
 #[no_mangle]
-pub extern "C" fn HLXSetTimer(
+pub extern "C" fn R64SetTimer(
     timer: *mut c_void,
     countdown: u64,
     interval: u64,
@@ -116,7 +116,7 @@ pub extern "C" fn HLXSetTimer(
 ) -> i32 {
     TIMER_THREAD.call_once(|| {
         std::thread::Builder::new()
-            .name("helix-timer".into())
+            .name("reality64-timer".into())
             .spawn(countdown_loop)
             .expect("spawn timer thread");
     });
@@ -139,7 +139,7 @@ pub extern "C" fn HLXSetTimer(
 /// osStopTimer: disarm `timer`, returning -1 if it was not armed. Its message is never posted after
 /// this returns.
 #[no_mangle]
-pub extern "C" fn HLXStopTimer(timer: *mut c_void) -> i32 {
+pub extern "C" fn R64StopTimer(timer: *mut c_void) -> i32 {
     let mut armed = ARMED.lock().unwrap();
     let before = armed.len();
     armed.retain(|c| c.timer != timer as usize);
@@ -180,19 +180,19 @@ mod tests {
         let (timer, mq) = (key(0), key(1));
         crate::ultra::mesg::create(mq as usize, 4);
         let start = Instant::now();
-        assert_eq!(HLXSetTimer(timer, cycles(100), 0, mq, 7 as *mut c_void), 0);
+        assert_eq!(R64SetTimer(timer, cycles(100), 0, mq, 7 as *mut c_void), 0);
         assert_eq!(drain(mq, 1, Duration::from_millis(20)), []);
         assert_eq!(drain(mq, 2, Duration::from_millis(1000)), [7]);
         assert!(start.elapsed() >= Duration::from_millis(100));
-        assert_eq!(HLXStopTimer(timer), -1);
+        assert_eq!(R64StopTimer(timer), -1);
     }
 
     #[test]
     fn stopped_timer_never_posts() {
         let (timer, mq) = (key(2), key(3));
         crate::ultra::mesg::create(mq as usize, 4);
-        HLXSetTimer(timer, cycles(200), 0, mq, 9 as *mut c_void);
-        assert_eq!(HLXStopTimer(timer), 0);
+        R64SetTimer(timer, cycles(200), 0, mq, 9 as *mut c_void);
+        assert_eq!(R64StopTimer(timer), 0);
         assert_eq!(drain(mq, 1, Duration::from_millis(400)), []);
     }
 
@@ -200,9 +200,9 @@ mod tests {
     fn interval_repeats_and_zero_countdown_starts_at_interval() {
         let (timer, mq) = (key(4), key(5));
         crate::ultra::mesg::create(mq as usize, 16);
-        HLXSetTimer(timer, 0, cycles(10), mq, 3 as *mut c_void);
+        R64SetTimer(timer, 0, cycles(10), mq, 3 as *mut c_void);
         let got = drain(mq, 3, Duration::from_millis(2000));
-        assert_eq!(HLXStopTimer(timer), 0);
+        assert_eq!(R64StopTimer(timer), 0);
         assert_eq!(got, [3, 3, 3]);
     }
 
@@ -210,14 +210,14 @@ mod tests {
     fn rearming_replaces_the_previous_countdown() {
         let (timer, mq) = (key(6), key(7));
         crate::ultra::mesg::create(mq as usize, 4);
-        HLXSetTimer(
+        R64SetTimer(
             timer,
             cycles(200),
             0,
             mq,
             std::ptr::without_provenance_mut(1),
         );
-        HLXSetTimer(
+        R64SetTimer(
             timer,
             cycles(250),
             0,
@@ -301,10 +301,10 @@ mod tests {
 
     #[test]
     fn set_time_then_get_time_is_monotonic_from_base() {
-        HLXSetTime(1_000_000);
-        let a = HLXGetTime();
+        R64SetTime(1_000_000);
+        let a = R64GetTime();
         assert!(a >= 1_000_000, "got {a}");
-        let b = HLXGetTime();
+        let b = R64GetTime();
         assert!(b >= a, "time went backwards: {a} -> {b}");
     }
 }

@@ -1,5 +1,5 @@
-#ifndef HELIX_LIBULTRA_OS_VI_H
-#define HELIX_LIBULTRA_OS_VI_H
+#ifndef REALITY64_LIBULTRA_OS_VI_H
+#define REALITY64_LIBULTRA_OS_VI_H
 
 // OSViMode's layout must match the guest's byte-for-byte: the guest computes
 // &osViModeTable[mode] and the shim recovers the index via sizeof(OSViMode) (os_vi.c).

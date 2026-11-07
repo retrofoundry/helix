@@ -9,7 +9,7 @@ pub(crate) fn ranges() -> Vec<Range<u64>> {
 
 /// Registers live guest memory for checked display-list reads and write-back until process exit.
 #[no_mangle]
-pub extern "C" fn HLXRegisterGuestMemory(start: *mut libc::c_void, size: usize) {
+pub extern "C" fn R64RegisterGuestMemory(start: *mut libc::c_void, size: usize) {
     register(&mut RANGES.lock().unwrap(), start as u64, size as u64);
 }
 

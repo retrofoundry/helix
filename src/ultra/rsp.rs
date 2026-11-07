@@ -2,7 +2,7 @@ use std::os::raw::c_void;
 use std::sync::OnceLock;
 
 #[repr(C)]
-pub struct HLXRspBinding {
+pub struct R64RspBinding {
     pub ucode: *const c_void,
     pub handler: u32,
 }
@@ -40,7 +40,7 @@ pub(crate) fn graphics_bindings() -> &'static [(u64, ultragfx::Microcode)] {
         .map_or(&[], |registry| &registry.graphics_bindings)
 }
 
-fn register(registry: &OnceLock<Registry>, bindings: &[HLXRspBinding]) -> Result<(), ()> {
+fn register(registry: &OnceLock<Registry>, bindings: &[R64RspBinding]) -> Result<(), ()> {
     if registry.get().is_some() {
         return Err(());
     }
@@ -78,7 +78,7 @@ fn register(registry: &OnceLock<Registry>, bindings: &[HLXRspBinding]) -> Result
 }
 
 #[no_mangle]
-pub extern "C" fn HLXRspRegister(bindings: *const HLXRspBinding, count: usize) -> i32 {
+pub extern "C" fn R64RspRegister(bindings: *const R64RspBinding, count: usize) -> i32 {
     let bindings = if count == 0 {
         &[]
     } else if bindings.is_null() {
@@ -90,7 +90,7 @@ pub extern "C" fn HLXRspRegister(bindings: *const HLXRspBinding, count: usize) -
         Ok(()) => 0,
         Err(()) => {
             log::error!(
-                "HLXRspRegister rejected {count} bindings: null or duplicate ucode, unknown handler, \
+                "R64RspRegister rejected {count} bindings: null or duplicate ucode, unknown handler, \
                  or a second call"
             );
             -1
@@ -102,8 +102,8 @@ pub extern "C" fn HLXRspRegister(bindings: *const HLXRspBinding, count: usize) -
 mod tests {
     use super::*;
 
-    fn binding(ucode: usize, handler: u32) -> HLXRspBinding {
-        HLXRspBinding {
+    fn binding(ucode: usize, handler: u32) -> R64RspBinding {
+        R64RspBinding {
             ucode: ucode as *const c_void,
             handler,
         }

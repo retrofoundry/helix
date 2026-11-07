@@ -1,7 +1,7 @@
 #include <libultra/ultra64.h>
-#include <helix/runtime.h>
+#include <reality64/runtime.h>
 
-/* Runtime is already bootstrapped by HLXRuntimeInit() in host_main.c. */
+/* Runtime is already bootstrapped by R64RuntimeInit() in host_main.c. */
 void osInitialize(void) {
 }
 
@@ -9,26 +9,26 @@ void osCreateThread(OSThread *thread, OSId id, void (*entry)(void *), void *arg,
                     UNUSED void *sp, OSPri pri) {
     thread->id = id;
     thread->priority = pri;
-    HLXThreadCreate(thread, id, entry, arg, sp, pri);
+    R64ThreadCreate(thread, id, entry, arg, sp, pri);
 }
 
 void osStartThread(OSThread *thread) {
-    HLXThreadStart(thread);
+    R64ThreadStart(thread);
 }
 
 void osSetThreadPri(OSThread *thread, OSPri pri) {
     if (thread != NULL) {
         thread->priority = pri;
     }
-    HLXThreadSetPri(thread, pri);
+    R64ThreadSetPri(thread, pri);
 }
 
 void osStopThread(OSThread *thread) {
-    HLXThreadStop(thread);
+    R64ThreadStop(thread);
 }
 
 void osDestroyThread(OSThread *thread) {
-    HLXThreadStop(thread);
+    R64ThreadStop(thread);
 }
 
 // libultra treats NULL as the current thread; this shim returns 0 for that case.
@@ -41,7 +41,7 @@ OSPri osGetThreadPri(OSThread *thread) {
 }
 
 void osYieldThread(void) {
-    HLXThreadYield();
+    R64ThreadYield();
 }
 
 /* TLB + cache are meaningless on the native-pointer runtime. */
