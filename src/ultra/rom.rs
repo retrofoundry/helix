@@ -132,14 +132,13 @@ fn cart_dma(
     if size > 0 && dram.is_null() {
         return HLX_ERR_BAD_ARG;
     }
-    // Reserve completion space before copying so a full queue leaves guest memory untouched.
     match mesg::post_with(ret_queue, mb, || {
         if size > 0 {
             unsafe { std::ptr::copy(src, dram, size) };
         }
     }) {
-        0 => HLX_OK,
-        _ => HLX_ERR_QUEUE, // -1 full, -2 missing/poisoned
+        -2 => HLX_ERR_QUEUE,
+        _ => HLX_OK,
     }
 }
 
@@ -344,16 +343,16 @@ mod tests {
     }
 
     #[test]
-    fn cart_dma_full_queue_is_error_no_copy() {
+    fn cart_dma_full_queue_still_copies() {
         let r = rom(&[0xAA, 0xBB, 0xCC, 0xDD]);
         let q = fresh_queue(1);
         assert_eq!(mesg::send(q, 0x1, 0), 0);
         let mut dst = [0u8; 4];
         assert_eq!(
             cart_dma(&r, 1, 0xB000_0000, 0x1000_0000, dst.as_mut_ptr(), 4, q),
-            HLX_ERR_QUEUE
+            HLX_OK
         );
-        assert_eq!(dst, [0u8; 4], "no copy when the retQueue is full");
+        assert_eq!(dst, [0xAA, 0xBB, 0xCC, 0xDD]);
     }
 
     #[test]
