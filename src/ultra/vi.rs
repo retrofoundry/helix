@@ -25,7 +25,7 @@ const TV_TYPE_PAL: u32 = 0;
 const TV_TYPE_NTSC: u32 = 1;
 const TV_TYPE_MPAL: u32 = 2;
 
-/// Stable family codes returned by [`HLXViGetTvFamily`] for C consumers (the audio AI
+/// Stable family codes returned by [`R64ViGetTvFamily`] for C consumers (the audio AI
 /// frequency path). NTSC and MPAL share 60 Hz but differ in DAC clock, so the family —
 /// not the bare refresh rate — is the shared currency.
 pub const TV_FAMILY_NTSC: u32 = 0;
@@ -52,7 +52,7 @@ const CLOCK_SPIN_MARGIN: Duration = Duration::from_micros(1000);
 type TickFn = Arc<dyn Fn() + Send + Sync + 'static>;
 
 /// Refresh families, keyed by TV type or VI mode index. Both `refresh_hz` (Rust VI) and
-/// `HLXViGetTvFamily` (C audio AI) derive from this single source.
+/// `R64ViGetTvFamily` (C audio AI) derive from this single source.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum TvFamily {
     Ntsc,
@@ -89,7 +89,7 @@ pub enum ViClockError {
     TickOverflow,
 }
 
-/// Registered VI retrace target (from osViSetEvent -> HLXViSetEvent).
+/// Registered VI retrace target (from osViSetEvent -> R64ViSetEvent).
 /// Pointers stored as usize so the struct is Send onto the clock thread.
 struct ViEvent {
     mq: usize,      // OSMesgQueue*
@@ -206,7 +206,7 @@ impl ClockHandle {
 fn spawn_clock(hz: u32, on_tick: TickFn) -> ClockHandle {
     let (stop_tx, stop_rx) = mpsc::channel::<()>();
     let join = thread::Builder::new()
-        .name("helix-vi-retrace".into())
+        .name("reality64-vi-retrace".into())
         // The no-op pre-post hook captures nothing, so `stop_rx` stays the thread's only
         // channel endpoint: a dropped `ClockHandle` still disconnects it and ends the loop.
         .spawn(move || clock_loop(hz, on_tick, stop_rx, || {}))
@@ -303,7 +303,7 @@ fn resolve_refresh_hz() -> Result<u32, ViClockError> {
 fn post_retrace() {
     // Decrement the divisor countdown and (on the boundary) send, all while HOLDING the
     // VI_EVENT lock. Folding `remaining` into the event closes the M1c race: a concurrent
-    // HLXViSetEvent that swaps mq/msg and reseeds the countdown can no longer interleave
+    // R64ViSetEvent that swaps mq/msg and reseeds the countdown can no longer interleave
     // between the countdown update and the send, so a post can never target a stale queue
     // nor spend the new event's divisor. The send is NOBLOCK and never re-enters VI, so
     // holding the lock across it is safe.
@@ -323,7 +323,7 @@ fn post_retrace() {
 }
 
 #[no_mangle]
-pub extern "C" fn HLXViSetEvent(mq: *mut c_void, msg: *mut c_void, retrace: u32) {
+pub extern "C" fn R64ViSetEvent(mq: *mut c_void, msg: *mut c_void, retrace: u32) {
     let period = retrace.max(1);
     {
         let mut guard = VI_EVENT.lock().unwrap();
@@ -351,12 +351,12 @@ pub extern "C" fn HLXViSetEvent(mq: *mut c_void, msg: *mut c_void, retrace: u32)
 /// clears the override so the rate falls back to `osTvType`. Re-paces a running clock only
 /// when the resolved refresh rate actually changes (a same-rate mode change is a no-op).
 #[no_mangle]
-pub extern "C" fn HLXViSetModeIndex(index: u32) {
+pub extern "C" fn R64ViSetModeIndex(index: u32) {
     ACTIVE_VI_MODE_INDEX.store(index, Ordering::Release);
     #[cfg(not(test))]
     {
         // Only re-pace an already-running clock; if `osViSetMode` precedes `osViSetEvent`
-        // (the sm64 order), just record the index and let HLXViSetEvent start it.
+        // (the sm64 order), just record the index and let R64ViSetEvent start it.
         if let Ok(hz) = resolve_refresh_hz() {
             let mut guard = CLOCK.lock().unwrap();
             if guard.is_some() {
@@ -370,14 +370,14 @@ pub extern "C" fn HLXViSetModeIndex(index: u32) {
 /// Family code for `os_tv_type` (`TV_FAMILY_*`; `TV_FAMILY_UNKNOWN` when unmapped). Exported
 /// so the audio AI frequency path resolves TV timing from the exact same mapping as VI.
 #[no_mangle]
-pub extern "C" fn HLXViGetTvFamily(os_tv_type: u32) -> u32 {
+pub extern "C" fn R64ViGetTvFamily(os_tv_type: u32) -> u32 {
     family_from_tv_type(os_tv_type)
         .map(TvFamily::code)
         .unwrap_or(TV_FAMILY_UNKNOWN)
 }
 
 #[no_mangle]
-pub extern "C" fn HLXViSwapBuffer(fb: *mut c_void) {
+pub extern "C" fn R64ViSwapBuffer(fb: *mut c_void) {
     crate::gamepad::script::on_swap();
     super::rcp::send_render_control(super::rcp::RenderMsg::Scanout { address: fb as u64 });
 }
@@ -513,12 +513,12 @@ mod tests {
 
     #[test]
     fn tv_family_export_matches_refresh_mapping() {
-        // HLXViGetTvFamily and refresh_hz must be the ONE shared TV source consumed by
+        // R64ViGetTvFamily and refresh_hz must be the ONE shared TV source consumed by
         // both VI and the audio AI frequency path.
-        assert_eq!(HLXViGetTvFamily(TV_TYPE_NTSC), TV_FAMILY_NTSC);
-        assert_eq!(HLXViGetTvFamily(TV_TYPE_PAL), TV_FAMILY_PAL);
-        assert_eq!(HLXViGetTvFamily(TV_TYPE_MPAL), TV_FAMILY_MPAL);
-        assert_eq!(HLXViGetTvFamily(99), TV_FAMILY_UNKNOWN);
+        assert_eq!(R64ViGetTvFamily(TV_TYPE_NTSC), TV_FAMILY_NTSC);
+        assert_eq!(R64ViGetTvFamily(TV_TYPE_PAL), TV_FAMILY_PAL);
+        assert_eq!(R64ViGetTvFamily(TV_TYPE_MPAL), TV_FAMILY_MPAL);
+        assert_eq!(R64ViGetTvFamily(99), TV_FAMILY_UNKNOWN);
     }
 
     // ---- Stoppable / recreatable clock ------------------------------------------------
@@ -603,15 +603,15 @@ mod tests {
 
     // Drive post_retrace() `calls` times against a queue registered with divisor
     // `n`, draining after each call; return the 1-based call numbers on which a
-    // MESG_VI_VBLANK actually landed. (HLXViSetEvent does not spawn the clock under
+    // MESG_VI_VBLANK actually landed. (R64ViSetEvent does not spawn the clock under
     // cfg(test), so the only posts are the ones this loop makes — fully deterministic.)
     fn posts_on_calls(n: u32, calls: u32) -> Vec<u32> {
         let mut backing = [0u8; 64];
         let mq = backing.as_mut_ptr() as *mut c_void;
         let mut msgbuf: [*mut c_void; 4] = [std::ptr::null_mut(); 4];
-        mesg::HLXMesgQueueCreate(mq, msgbuf.as_mut_ptr(), 4);
+        mesg::R64MesgQueueCreate(mq, msgbuf.as_mut_ptr(), 4);
         // Register the VI target: post value 0x66, divisor n.
-        HLXViSetEvent(mq, 0x66 as *mut c_void, n);
+        R64ViSetEvent(mq, 0x66 as *mut c_void, n);
 
         let mut landed = Vec::new();
         for call in 1..=calls {
@@ -639,14 +639,14 @@ mod tests {
         // so replacing the event reseeds the divisor and posts route to the CURRENT queue.
         // This exercises the decrement + replace + send-under-lock ordering. It does NOT
         // reproduce the concurrency race itself — that needed a specific interleave between
-        // post_retrace's send and a concurrent HLXViSetEvent, now impossible because both
+        // post_retrace's send and a concurrent R64ViSetEvent, now impossible because both
         // run under the one VI_EVENT lock.
         let _g = vi_event_guard();
 
         let mut a = [0u8; 64];
         let mqa = a.as_mut_ptr() as *mut c_void;
-        mesg::HLXMesgQueueCreate(mqa, std::ptr::null_mut(), 4);
-        HLXViSetEvent(mqa, 0xAA as *mut c_void, 3);
+        mesg::R64MesgQueueCreate(mqa, std::ptr::null_mut(), 4);
+        R64ViSetEvent(mqa, 0xAA as *mut c_void, 3);
 
         // Two ticks into A's divisor of 3: countdown 3 -> 2 -> 1, nothing posted yet.
         post_retrace();
@@ -660,8 +660,8 @@ mod tests {
         // Replace with queue B, divisor 2 — reseeds the countdown to B's period.
         let mut b = [0u8; 64];
         let mqb = b.as_mut_ptr() as *mut c_void;
-        mesg::HLXMesgQueueCreate(mqb, std::ptr::null_mut(), 4);
-        HLXViSetEvent(mqb, 0xBB as *mut c_void, 2);
+        mesg::R64MesgQueueCreate(mqb, std::ptr::null_mut(), 4);
+        R64ViSetEvent(mqb, 0xBB as *mut c_void, 2);
 
         // B's divisor is honored from a FRESH countdown of 2: tick 1 silent, tick 2 posts.
         post_retrace();

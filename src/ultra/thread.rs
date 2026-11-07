@@ -39,7 +39,7 @@ fn current_id() -> Option<usize> {
 }
 
 #[no_mangle]
-pub extern "C" fn HLXThreadCreate(
+pub extern "C" fn R64ThreadCreate(
     t: *mut c_void,
     _id: i32,
     entry: Entry,
@@ -60,13 +60,13 @@ pub extern "C" fn HLXThreadCreate(
 }
 
 #[no_mangle]
-pub extern "C" fn HLXThreadStart(t: *mut c_void) {
+pub extern "C" fn R64ThreadStart(t: *mut c_void) {
     let key = t as usize;
     let (entry, arg) = {
         let mut reg = registry().lock().unwrap();
         let rec = reg
             .get_mut(&key)
-            .expect("HLXThreadStart: OSThread was never created");
+            .expect("R64ThreadStart: OSThread was never created");
         if rec.started {
             return;
         }
@@ -96,10 +96,10 @@ pub extern "C" fn HLXThreadStart(t: *mut c_void) {
 }
 
 #[no_mangle]
-pub extern "C" fn HLXThreadSetPri(t: *mut c_void, pri: i32) {
+pub extern "C" fn R64ThreadSetPri(t: *mut c_void, pri: i32) {
     // NULL target == the calling (self) thread.
     let key = if t.is_null() {
-        current_id().expect("HLXThreadSetPri(NULL): called from a non-guest thread")
+        current_id().expect("R64ThreadSetPri(NULL): called from a non-guest thread")
     } else {
         t as usize
     };
@@ -109,13 +109,13 @@ pub extern "C" fn HLXThreadSetPri(t: *mut c_void, pri: i32) {
 }
 
 #[no_mangle]
-pub extern "C" fn HLXThreadYield() {
+pub extern "C" fn R64ThreadYield() {
     // osYieldThread: cooperative reschedule point (see Scheduler::reschedule_yield).
     scheduler().reschedule_yield(current_id());
 }
 
 #[no_mangle]
-pub extern "C" fn HLXThreadStop(t: *mut c_void) {
+pub extern "C" fn R64ThreadStop(t: *mut c_void) {
     let key = t as usize;
     scheduler().set_pri(key, 0);
     scheduler().mark_ready(key); // keep it known; pri-0 filter keeps it off-CPU

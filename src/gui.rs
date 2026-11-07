@@ -108,7 +108,7 @@ impl<'a> Gui<'a> {
     ) {
         match event {
             WindowEvent::CloseRequested => {
-                // Request graceful shutdown only; HLXRunEventLoop's pump loop observes it, wakes
+                // Request graceful shutdown only; R64RunEventLoop's pump loop observes it, wakes
                 // the render thread with RenderMsg::Shutdown, joins it, then runs ultra::teardown()
                 // (flushes EEPROM). No event_loop.exit() here — shutdown is centralized there.
                 crate::ultra::request_shutdown();
@@ -175,10 +175,10 @@ impl<'a> Gui<'a> {
     }
 
     /// Main-thread-only: pump the (`!Send`) gamepad manager and publish a `Send + Sync` snapshot
-    /// for the libultra runtime's thread5 to read via `HLXControllerInit`/`HLXControllerRead`.
+    /// for the libultra runtime's thread5 to read via `R64ControllerInit`/`R64ControllerRead`.
     /// The manager NEVER leaves this thread; only the plain snapshot crosses threads. Called each
-    /// frame from `HLXRunEventLoop` (after `pump`, which drains winit keyboard input into the
-    /// manager) and once during `HLXRuntimeInit` to seed the snapshot before threads start.
+    /// frame from `R64RunEventLoop` (after `pump`, which drains winit keyboard input into the
+    /// manager) and once during `R64RuntimeInit` to seed the snapshot before threads start.
     pub fn sample_gamepads_into_snapshot(&mut self) {
         if let Some(manager) = self.gamepad_manager.as_mut() {
             let snapshot = manager.sample_snapshot();

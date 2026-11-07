@@ -6,28 +6,28 @@ use std::sync::{Mutex, OnceLock};
 
 use crate::ultra::mesg;
 
-// HlxStatus — mirror of the C `int32_t` constants (include/helix/internal.h).
-pub const HLX_OK: i32 = 0;
-pub const HLX_ERR_NO_ROM: i32 = -1;
-pub const HLX_ERR_RANGE: i32 = -2;
-pub const HLX_ERR_UNSUPPORTED_DEVICE: i32 = -3;
-pub const HLX_ERR_BAD_ARG: i32 = -4;
-pub const HLX_ERR_QUEUE: i32 = -5;
-pub const HLX_ERR_BAD_IMAGE: i32 = -6;
-pub const HLX_ERR_INTERNAL: i32 = -7;
+// R64Status — mirror of the C `int32_t` constants (include/reality64/internal.h).
+pub const R64_OK: i32 = 0;
+pub const R64_ERR_NO_ROM: i32 = -1;
+pub const R64_ERR_RANGE: i32 = -2;
+pub const R64_ERR_UNSUPPORTED_DEVICE: i32 = -3;
+pub const R64_ERR_BAD_ARG: i32 = -4;
+pub const R64_ERR_QUEUE: i32 = -5;
+pub const R64_ERR_BAD_IMAGE: i32 = -6;
+pub const R64_ERR_INTERNAL: i32 = -7;
 
-// HlxDevKind values in include/helix/internal.h.
-pub const HLX_DEV_CART: i32 = 0;
-pub const HLX_DEV_DRIVE: i32 = 1;
-pub const HLX_DEV_SRAM: i32 = 2;
-pub const HLX_DEV_DEBUG: i32 = 3;
+// R64DevKind values in include/reality64/internal.h.
+pub const R64_DEV_CART: i32 = 0;
+pub const R64_DEV_DRIVE: i32 = 1;
+pub const R64_DEV_SRAM: i32 = 2;
+pub const R64_DEV_DEBUG: i32 = 3;
 
 const OS_READ: i32 = 0;
 const ROM_BASE: u32 = 0x1000_0000;
 const PHYS_MASK: u32 = 0x1FFF_FFFF;
 
 // Container format v1: a 48-byte fixed little-endian header, then the VROM payload.
-const MAGIC: [u8; 8] = *b"HLXNROM\0";
+const MAGIC: [u8; 8] = *b"R64NROM\0";
 const HEADER_LEN: usize = 48;
 const FORMAT_VERSION: u32 = 1;
 const MAX_PAYLOAD_BYTES: usize = 64 * 1024 * 1024; // cart images are <= 64 MiB
@@ -45,10 +45,10 @@ impl Rom {
     /// Validates the container header and copies its declared host-endian payload.
     pub fn from_container(bytes: &[u8]) -> Result<Rom, i32> {
         if bytes.len() < HEADER_LEN || bytes.len() > MAX_CONTAINER_BYTES {
-            return Err(HLX_ERR_BAD_IMAGE);
+            return Err(R64_ERR_BAD_IMAGE);
         }
         if bytes[0..8] != MAGIC {
-            return Err(HLX_ERR_BAD_IMAGE);
+            return Err(R64_ERR_BAD_IMAGE);
         }
         let u32at = |o: usize| u32::from_le_bytes(bytes[o..o + 4].try_into().unwrap());
         let u64at = |o: usize| u64::from_le_bytes(bytes[o..o + 8].try_into().unwrap());
@@ -71,17 +71,17 @@ impl Rom {
             || guest_abi_id != EXPECTED_ABI_ID
             || !digest_zero
         {
-            return Err(HLX_ERR_BAD_IMAGE);
+            return Err(R64_ERR_BAD_IMAGE);
         }
 
-        let po: usize = payload_offset.try_into().map_err(|_| HLX_ERR_BAD_IMAGE)?;
-        let vl: usize = vrom_len.try_into().map_err(|_| HLX_ERR_BAD_IMAGE)?;
+        let po: usize = payload_offset.try_into().map_err(|_| R64_ERR_BAD_IMAGE)?;
+        let vl: usize = vrom_len.try_into().map_err(|_| R64_ERR_BAD_IMAGE)?;
         if po < HEADER_LEN || vl > MAX_PAYLOAD_BYTES {
-            return Err(HLX_ERR_BAD_IMAGE);
+            return Err(R64_ERR_BAD_IMAGE);
         }
-        let end = po.checked_add(vl).ok_or(HLX_ERR_BAD_IMAGE)?;
+        let end = po.checked_add(vl).ok_or(R64_ERR_BAD_IMAGE)?;
         if end > bytes.len() {
-            return Err(HLX_ERR_BAD_IMAGE);
+            return Err(R64_ERR_BAD_IMAGE);
         }
         Ok(Rom {
             payload: bytes[po..end].to_vec(),
@@ -90,8 +90,8 @@ impl Rom {
 
     fn slice(&self, vrom: u32, size: usize) -> Result<&[u8], i32> {
         let start = vrom as usize;
-        let end = start.checked_add(size).ok_or(HLX_ERR_RANGE)?;
-        self.payload.get(start..end).ok_or(HLX_ERR_RANGE)
+        let end = start.checked_add(size).ok_or(R64_ERR_RANGE)?;
+        self.payload.get(start..end).ok_or(R64_ERR_RANGE)
     }
 }
 
@@ -109,7 +109,7 @@ fn rom_slot_reset() {
 
 fn cart_vrom(base: u32, dev_addr: u32) -> Result<u32, i32> {
     let phys = (base | dev_addr) & PHYS_MASK;
-    phys.checked_sub(ROM_BASE).ok_or(HLX_ERR_RANGE)
+    phys.checked_sub(ROM_BASE).ok_or(R64_ERR_RANGE)
 }
 
 fn cart_dma(
@@ -130,15 +130,15 @@ fn cart_dma(
         Err(e) => return e,
     };
     if size > 0 && dram.is_null() {
-        return HLX_ERR_BAD_ARG;
+        return R64_ERR_BAD_ARG;
     }
     match mesg::post_with(ret_queue, mb, || {
         if size > 0 {
             unsafe { std::ptr::copy(src, dram, size) };
         }
     }) {
-        -2 => HLX_ERR_QUEUE,
-        _ => HLX_OK,
+        -2 => R64_ERR_QUEUE,
+        _ => R64_OK,
     }
 }
 
@@ -148,9 +148,9 @@ fn cart_read_io(rom: &Rom, base: u32, dev_addr: u32) -> Result<u32, i32> {
     Ok(u32::from_ne_bytes(b))
 }
 
-/// Cart DMA: unsupported devices post no completion; panics return HLX_ERR_INTERNAL.
+/// Cart DMA: unsupported devices post no completion; panics return R64_ERR_INTERNAL.
 #[no_mangle]
-pub extern "C" fn HLXEPiDma(
+pub extern "C" fn R64EPiDma(
     mb: *mut c_void,
     kind: i32,
     base: u32,
@@ -161,21 +161,21 @@ pub extern "C" fn HLXEPiDma(
     ret_queue: *mut c_void,
 ) -> i32 {
     catch_unwind(AssertUnwindSafe(|| {
-        if kind != HLX_DEV_CART {
-            return HLX_ERR_UNSUPPORTED_DEVICE;
+        if kind != R64_DEV_CART {
+            return R64_ERR_UNSUPPORTED_DEVICE;
         }
         if mb.is_null() || ret_queue.is_null() {
-            return HLX_ERR_BAD_ARG;
+            return R64_ERR_BAD_ARG;
         }
         if dir != OS_READ {
-            return HLX_ERR_UNSUPPORTED_DEVICE; // cart is read-only
+            return R64_ERR_UNSUPPORTED_DEVICE; // cart is read-only
         }
         if size > isize::MAX as usize {
-            return HLX_ERR_RANGE;
+            return R64_ERR_RANGE;
         }
         let slot = match rom_slot().lock() {
             Ok(g) => g,
-            Err(_) => return HLX_ERR_INTERNAL,
+            Err(_) => return R64_ERR_INTERNAL,
         };
         match slot.as_ref() {
             Some(rom) => cart_dma(
@@ -187,49 +187,49 @@ pub extern "C" fn HLXEPiDma(
                 size,
                 ret_queue as usize,
             ),
-            None => HLX_ERR_NO_ROM,
+            None => R64_ERR_NO_ROM,
         }
     }))
-    .unwrap_or(HLX_ERR_INTERNAL)
+    .unwrap_or(R64_ERR_INTERNAL)
 }
 
 /// `osEPiReadIo` cart path. `*out` is zeroed before any early return. Cart only. Panic-safe.
 #[no_mangle]
-pub extern "C" fn HLXEPiReadIo(kind: i32, base: u32, dev_addr: u32, out: *mut u32) -> i32 {
+pub extern "C" fn R64EPiReadIo(kind: i32, base: u32, dev_addr: u32, out: *mut u32) -> i32 {
     catch_unwind(AssertUnwindSafe(|| {
         if out.is_null() {
-            return HLX_ERR_BAD_ARG;
+            return R64_ERR_BAD_ARG;
         }
         unsafe { *out = 0 };
-        if kind != HLX_DEV_CART {
-            return HLX_ERR_UNSUPPORTED_DEVICE;
+        if kind != R64_DEV_CART {
+            return R64_ERR_UNSUPPORTED_DEVICE;
         }
         let slot = match rom_slot().lock() {
             Ok(g) => g,
-            Err(_) => return HLX_ERR_INTERNAL,
+            Err(_) => return R64_ERR_INTERNAL,
         };
         let rom = match slot.as_ref() {
             Some(r) => r,
-            None => return HLX_ERR_NO_ROM,
+            None => return R64_ERR_NO_ROM,
         };
         match cart_read_io(rom, base, dev_addr) {
             Ok(v) => {
                 unsafe { *out = v };
-                HLX_OK
+                R64_OK
             }
             Err(e) => e,
         }
     }))
-    .unwrap_or(HLX_ERR_INTERNAL)
+    .unwrap_or(R64_ERR_INTERNAL)
 }
 
 /// Install a validated native cart image once, before any guest DMA. Copies the payload (caller
 /// keeps the buffer). Duplicate load is an error. Panic-safe.
 #[no_mangle]
-pub extern "C" fn HLXRomLoad(ptr: *const u8, len: usize) -> i32 {
+pub extern "C" fn R64RomLoad(ptr: *const u8, len: usize) -> i32 {
     catch_unwind(AssertUnwindSafe(|| {
         if ptr.is_null() || len == 0 || len > MAX_CONTAINER_BYTES {
-            return HLX_ERR_BAD_ARG;
+            return R64_ERR_BAD_ARG;
         }
         let bytes = unsafe { std::slice::from_raw_parts(ptr, len) };
         let rom = match Rom::from_container(bytes) {
@@ -238,15 +238,15 @@ pub extern "C" fn HLXRomLoad(ptr: *const u8, len: usize) -> i32 {
         };
         let mut slot = match rom_slot().lock() {
             Ok(g) => g,
-            Err(_) => return HLX_ERR_INTERNAL,
+            Err(_) => return R64_ERR_INTERNAL,
         };
         if slot.is_some() {
-            return HLX_ERR_BAD_ARG;
+            return R64_ERR_BAD_ARG;
         }
         *slot = Some(rom);
-        HLX_OK
+        R64_OK
     }))
-    .unwrap_or(HLX_ERR_INTERNAL)
+    .unwrap_or(R64_ERR_INTERNAL)
 }
 
 #[cfg(test)]
@@ -257,7 +257,7 @@ mod tests {
 
     fn container(payload: &[u8]) -> Vec<u8> {
         let mut v = Vec::new();
-        v.extend_from_slice(&MAGIC);
+        v.extend_from_slice(b"R64NROM\0");
         v.extend_from_slice(&FORMAT_VERSION.to_le_bytes());
         v.extend_from_slice(&(HEADER_LEN as u32).to_le_bytes());
         v.extend_from_slice(&(HEADER_LEN as u64).to_le_bytes()); // payload_offset
@@ -280,7 +280,7 @@ mod tests {
         let backing = Box::leak(Box::new([0u8; 64])).as_mut_ptr() as *mut std::os::raw::c_void;
         let slots: &'static mut [*mut std::os::raw::c_void] =
             Box::leak(vec![ptr::null_mut::<std::os::raw::c_void>(); cap].into_boxed_slice());
-        mesg::HLXMesgQueueCreate(backing, slots.as_mut_ptr(), cap as i32);
+        mesg::R64MesgQueueCreate(backing, slots.as_mut_ptr(), cap as i32);
         backing as usize
     }
 
@@ -296,20 +296,20 @@ mod tests {
         assert!(Rom::from_container(&container(&[1, 2, 3, 4])).is_ok());
         assert_eq!(
             Rom::from_container(&[0x80, 0x37, 0x12, 0x40, 0, 0, 0, 0, 0, 0]).unwrap_err(),
-            HLX_ERR_BAD_IMAGE
+            R64_ERR_BAD_IMAGE
         );
         // bad version
         let mut c = container(&[1, 2, 3, 4]);
         c[8] = 2;
-        assert_eq!(Rom::from_container(&c).unwrap_err(), HLX_ERR_BAD_IMAGE);
+        assert_eq!(Rom::from_container(&c).unwrap_err(), R64_ERR_BAD_IMAGE);
         // payload_offset + vrom_len past end
         let mut c = container(&[1, 2, 3, 4]);
         c[24] = 0xFF; // vrom_len huge
-        assert_eq!(Rom::from_container(&c).unwrap_err(), HLX_ERR_BAD_IMAGE);
+        assert_eq!(Rom::from_container(&c).unwrap_err(), R64_ERR_BAD_IMAGE);
         // nonzero flags
         let mut c = container(&[1, 2, 3, 4]);
         c[38] = 1;
-        assert_eq!(Rom::from_container(&c).unwrap_err(), HLX_ERR_BAD_IMAGE);
+        assert_eq!(Rom::from_container(&c).unwrap_err(), R64_ERR_BAD_IMAGE);
     }
 
     #[test]
@@ -319,7 +319,7 @@ mod tests {
         let mb = 0x1234usize;
         let mut dst = [0u8; 4];
         let rc = cart_dma(&r, mb, 0xB000_0000, 0x1000_0004, dst.as_mut_ptr(), 4, q);
-        assert_eq!(rc, HLX_OK);
+        assert_eq!(rc, R64_OK);
         assert_eq!(dst, [0xAA, 0xBB, 0xCC, 0xDD]);
         let (ret, m) = mesg::recv(q, 0);
         assert_eq!(ret, 0);
@@ -333,12 +333,12 @@ mod tests {
         let mut dst = [9u8; 8];
         assert_eq!(
             cart_dma(&r, 1, 0xB000_0000, 0x1000_0000, dst.as_mut_ptr(), 8, q),
-            HLX_ERR_RANGE
+            R64_ERR_RANGE
         );
         assert_eq!(dst, [9u8; 8], "no copy on out-of-range");
         assert_eq!(
             cart_dma(&r, 1, 0, 0x0000_0000, dst.as_mut_ptr(), 4, q),
-            HLX_ERR_RANGE
+            R64_ERR_RANGE
         );
     }
 
@@ -350,7 +350,7 @@ mod tests {
         let mut dst = [0u8; 4];
         assert_eq!(
             cart_dma(&r, 1, 0xB000_0000, 0x1000_0000, dst.as_mut_ptr(), 4, q),
-            HLX_OK
+            R64_OK
         );
         assert_eq!(dst, [0xAA, 0xBB, 0xCC, 0xDD]);
     }
@@ -364,7 +364,7 @@ mod tests {
         assert_eq!(w1.to_ne_bytes(), [0x78, 0x56, 0x34, 0x12]);
         assert_eq!(
             cart_read_io(&r, 0xB000_0000, 0x1000_0008).unwrap_err(),
-            HLX_ERR_RANGE
+            R64_ERR_RANGE
         );
     }
 
@@ -372,15 +372,15 @@ mod tests {
     fn epi_non_cart_kind_is_unsupported_and_zeroes_out() {
         let mut out: u32 = 0xDEAD_BEEF;
         assert_eq!(
-            HLXEPiReadIo(HLX_DEV_DRIVE, 0xB000_0000, 0x1000_0000, &mut out),
-            HLX_ERR_UNSUPPORTED_DEVICE
+            R64EPiReadIo(R64_DEV_DRIVE, 0xB000_0000, 0x1000_0000, &mut out),
+            R64_ERR_UNSUPPORTED_DEVICE
         );
         assert_eq!(out, 0);
         let q = fresh_queue(1);
         assert_eq!(
-            HLXEPiDma(
+            R64EPiDma(
                 1 as *mut _,
-                HLX_DEV_DRIVE,
+                R64_DEV_DRIVE,
                 0xB000_0000,
                 0x1000_0000,
                 ptr::null_mut(),
@@ -388,7 +388,7 @@ mod tests {
                 0,
                 q as *mut _
             ),
-            HLX_ERR_UNSUPPORTED_DEVICE
+            R64_ERR_UNSUPPORTED_DEVICE
         );
         assert_eq!(
             mesg::recv(q, 0).0,
@@ -400,8 +400,8 @@ mod tests {
     #[test]
     fn epi_readio_null_out_is_bad_arg() {
         assert_eq!(
-            HLXEPiReadIo(HLX_DEV_CART, 0xB000_0000, 0x1000_0000, ptr::null_mut()),
-            HLX_ERR_BAD_ARG
+            R64EPiReadIo(R64_DEV_CART, 0xB000_0000, 0x1000_0000, ptr::null_mut()),
+            R64_ERR_BAD_ARG
         );
     }
 
@@ -411,42 +411,42 @@ mod tests {
         c[0] ^= 0xFF;
         assert_eq!(
             Rom::from_container(&c).unwrap_err(),
-            HLX_ERR_BAD_IMAGE,
+            R64_ERR_BAD_IMAGE,
             "bad magic (full header)"
         );
         let mut c = container(&[1, 2, 3, 4]);
         c[32] = 1;
         assert_eq!(
             Rom::from_container(&c).unwrap_err(),
-            HLX_ERR_BAD_IMAGE,
+            R64_ERR_BAD_IMAGE,
             "wrong ABI id"
         );
         let mut c = container(&[1, 2, 3, 4]);
         c[36] = 1;
         assert_eq!(
             Rom::from_container(&c).unwrap_err(),
-            HLX_ERR_BAD_IMAGE,
+            R64_ERR_BAD_IMAGE,
             "non-LE"
         );
         let mut c = container(&[1, 2, 3, 4]);
         c[37] = EXPECTED_PTR_WIDTH ^ 0x04;
         assert_eq!(
             Rom::from_container(&c).unwrap_err(),
-            HLX_ERR_BAD_IMAGE,
+            R64_ERR_BAD_IMAGE,
             "wrong ptr width"
         );
         let mut c = container(&[1, 2, 3, 4]);
         c[40] = 1;
         assert_eq!(
             Rom::from_container(&c).unwrap_err(),
-            HLX_ERR_BAD_IMAGE,
+            R64_ERR_BAD_IMAGE,
             "nonzero digest"
         );
         let mut c = container(&[1, 2, 3, 4]);
         c[16] = 8; // po = 8 < HEADER_LEN
         assert_eq!(
             Rom::from_container(&c).unwrap_err(),
-            HLX_ERR_BAD_IMAGE,
+            R64_ERR_BAD_IMAGE,
             "payload_offset < header"
         );
     }
@@ -457,11 +457,11 @@ mod tests {
         let q = fresh_queue(1);
         assert_eq!(
             cart_dma(&r, 1, 0, 0x0000_0000, ptr::null_mut(), 0, q),
-            HLX_ERR_RANGE
+            R64_ERR_RANGE
         );
         assert_eq!(
             cart_dma(&r, 1, 0xB000_0000, 0x1000_0005, ptr::null_mut(), 0, q),
-            HLX_ERR_RANGE
+            R64_ERR_RANGE
         );
         assert_eq!(
             mesg::recv(q, 0).0,
@@ -470,7 +470,7 @@ mod tests {
         );
         assert_eq!(
             cart_dma(&r, 0x55, 0xB000_0000, 0x1000_0000, ptr::null_mut(), 0, q),
-            HLX_OK
+            R64_OK
         );
         assert_eq!(mesg::recv(q, 0), (0, 0x55));
     }
@@ -481,22 +481,22 @@ mod tests {
         rom_slot_reset();
         let mut out: u32 = 0xDEAD_BEEF;
         assert_eq!(
-            HLXEPiReadIo(HLX_DEV_CART, 0xB000_0000, 0x1000_0000, &mut out),
-            HLX_ERR_NO_ROM
+            R64EPiReadIo(R64_DEV_CART, 0xB000_0000, 0x1000_0000, &mut out),
+            R64_ERR_NO_ROM
         );
         assert_eq!(out, 0);
 
         let c = container(&[0, 0, 0, 0, 0xAA, 0xBB, 0xCC, 0xDD]);
-        assert_eq!(HLXRomLoad(c.as_ptr(), c.len()), HLX_OK);
+        assert_eq!(R64RomLoad(c.as_ptr(), c.len()), R64_OK);
         assert_eq!(
-            HLXRomLoad(c.as_ptr(), c.len()),
-            HLX_ERR_BAD_ARG,
+            R64RomLoad(c.as_ptr(), c.len()),
+            R64_ERR_BAD_ARG,
             "duplicate load is rejected"
         );
 
         assert_eq!(
-            HLXEPiReadIo(HLX_DEV_CART, 0xB000_0000, 0x1000_0004, &mut out),
-            HLX_OK
+            R64EPiReadIo(R64_DEV_CART, 0xB000_0000, 0x1000_0004, &mut out),
+            R64_OK
         );
         assert_eq!(out.to_ne_bytes(), [0xAA, 0xBB, 0xCC, 0xDD]);
 
@@ -504,9 +504,9 @@ mod tests {
         let mb = fresh_mb();
         let mut dst = [0u8; 4];
         assert_eq!(
-            HLXEPiDma(
+            R64EPiDma(
                 mb as *mut c_void,
-                HLX_DEV_CART,
+                R64_DEV_CART,
                 0xB000_0000,
                 0x1000_0004,
                 dst.as_mut_ptr() as *mut c_void,
@@ -514,15 +514,15 @@ mod tests {
                 OS_READ,
                 q as *mut c_void,
             ),
-            HLX_OK
+            R64_OK
         );
         assert_eq!(dst, [0xAA, 0xBB, 0xCC, 0xDD]);
         assert_eq!(mesg::recv(q, 0), (0, mb));
 
         assert_eq!(
-            HLXEPiDma(
+            R64EPiDma(
                 mb as *mut c_void,
-                HLX_DEV_CART,
+                R64_DEV_CART,
                 0xB000_0000,
                 0x1000_0004,
                 dst.as_mut_ptr() as *mut c_void,
@@ -530,7 +530,7 @@ mod tests {
                 OS_READ + 1,
                 q as *mut c_void,
             ),
-            HLX_ERR_UNSUPPORTED_DEVICE
+            R64_ERR_UNSUPPORTED_DEVICE
         );
         assert_eq!(
             mesg::recv(q, 0).0,

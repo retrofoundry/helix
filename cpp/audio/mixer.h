@@ -1,5 +1,5 @@
-#ifndef HELIX_AUDIO_MIXER_H
-#define HELIX_AUDIO_MIXER_H
+#ifndef REALITY64_AUDIO_MIXER_H
+#define REALITY64_AUDIO_MIXER_H
 
 #include <stdbool.h>
 #include <stdint.h>

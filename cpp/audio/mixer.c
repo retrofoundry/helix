@@ -1186,6 +1186,6 @@ void aUnknown25Impl(uint8_t f, uint16_t count, uint16_t out_addr, uint16_t in_ad
 
 // Test-support hook (M3 golden gate): zero the shared mixer state so each dispatch
 // path runs from an identical clean slate. Not referenced by the runtime.
-void hlx_mixer_reset_state(void) {
+void r64_mixer_reset_state(void) {
     memset(&rspa, 0, sizeof(rspa));
 }

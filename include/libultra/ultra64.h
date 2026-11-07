@@ -1,5 +1,5 @@
-#ifndef HELIX_LIBULTRA_ULTRA64_H
-#define HELIX_LIBULTRA_ULTRA64_H
+#ifndef REALITY64_LIBULTRA_ULTRA64_H
+#define REALITY64_LIBULTRA_ULTRA64_H
 
 // Use <libultra/ultra64.h> to avoid colliding with a guest's own <ultra64.h>.
 

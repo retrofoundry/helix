@@ -1,7 +1,7 @@
 # Features
 
 ## GUI
-Helix provides a GUI library for creating windows and rendering graphics. The GUI library is currently a work in progress and is not yet complete. 
+reality64 provides a GUI library for creating windows and rendering graphics. The GUI library is currently a work in progress and is not yet complete.
 
 __[ImGui](https://github.com/ocornut/imgui) / [imgui-rs](https://github.com/imgui-rs/imgui-rs) is used for drawing, if you're working on a C/C++ project, you'll need to include the ImGui headers to your project:__
 
@@ -18,14 +18,14 @@ The following API is provided:
 /**
  * Can be used to get the display's aspect ratio
 **/
-float HLXDisplayGetAspectRatio();
+float R64DisplayGetAspectRatio();
 ```
 
 ## Audio
-Helix provides functionality for audio playback.
+reality64 provides functionality for audio playback.
 
 ## Speech
-Helix provides an API for text-to-speech (TTS):
+reality64 provides an API for text-to-speech (TTS):
 
 ```cpp
 /**

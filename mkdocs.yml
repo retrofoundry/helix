@@ -1,9 +1,9 @@
-site_name: Helix Documentation
-repo_name: helix
-repo_url: https://github.com/dcvz/helix
+site_name: reality64 Documentation
+repo_name: reality64
+repo_url: https://github.com/retrofoundry/reality64
 site_description: "A library to facilitate porting your N64 software."
 site_author: dcvz
-site_url: https://dcvz.github.io/helix/
+site_url: https://retrofoundry.github.io/reality64/
 remote_branch: gh-pages
 edit_uri: edit/main/docs/
 
@@ -65,7 +65,7 @@ extra:
   # type is the name of the FontAwesome icon without the fa- prefix.
   social:
     - icon: fontawesome/brands/github-alt
-      link: https://github.com/dcvz/helix
+      link: https://github.com/retrofoundry/reality64
     - icon: fontawesome/brands/twitter
       link: https://twitter.com/dcvz
   version:

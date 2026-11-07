@@ -1,5 +1,5 @@
-#ifndef HELIX_LIBULTRA_ABI_H
-#define HELIX_LIBULTRA_ABI_H
+#ifndef REALITY64_LIBULTRA_ABI_H
+#define REALITY64_LIBULTRA_ABI_H
 
 // Audio commands carry native-width buffer pointers to avoid truncating guest addresses.
 

@@ -1,10 +1,12 @@
 [package]
-name = "helix"
+name = "reality64"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/retrofoundry/reality64"
+homepage = "https://retrofoundry.github.io/reality64/"
 
 [lib]
-name = "helix"
+name = "reality64"
 crate-type = ["lib", "staticlib"]
 
 [features]

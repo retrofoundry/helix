@@ -1,7 +1,7 @@
-//! `HELIX_INPUT_RECORD` and `HELIX_INPUT_REPLAY` select files keyed by `osViSwapBuffer` count.
+//! `REALITY64_INPUT_RECORD` and `REALITY64_INPUT_REPLAY` select files keyed by `osViSwapBuffer` count.
 //! Input is latched per frame so record and replay use the same sampling boundary.
 //!
-//! File format: a `helix-input 1 <controller bits>` header, then one `<frame> <buttons hex> <x> <y>`
+//! File format: a `reality64-input 1 <controller bits>` header, then one `<frame> <buttons hex> <x> <y>`
 //! line per frame on which the state changed, then `end <frame>`, the last frame recorded. Without
 //! an `end` line, replay ends at the last change.
 
@@ -10,7 +10,7 @@ use std::sync::Mutex;
 
 use crate::gamepad::snapshot::GamepadSnapshot;
 
-const HEADER: &str = "helix-input 1";
+const HEADER: &str = "reality64-input 1";
 
 /// A recorded state change: from `frame` on, the pad reads `button`, `stick_x`, `stick_y`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -34,7 +34,7 @@ pub fn parse(text: &str) -> Result<Recording, String> {
         .next()
         .and_then(|header| header.strip_prefix(HEADER))
         .and_then(|bits| bits.trim().parse().ok())
-        .ok_or("missing `helix-input 1 <bits>` header")?;
+        .ok_or("missing `reality64-input 1 <bits>` header")?;
     let mut lines: Vec<_> = lines.filter(|line| !line.trim().is_empty()).collect();
     let end = match lines.last().and_then(|line| line.strip_prefix("end ")) {
         Some(frame) => {
@@ -189,7 +189,7 @@ struct Script {
 static SCRIPT: Mutex<Option<Script>> = Mutex::new(None);
 
 fn replay_from_env() -> Option<Replay> {
-    let path = std::env::var_os("HELIX_INPUT_REPLAY")?;
+    let path = std::env::var_os("REALITY64_INPUT_REPLAY")?;
     match std::fs::read_to_string(&path)
         .map_err(|e| e.to_string())
         .and_then(|text| parse(&text))
@@ -213,7 +213,7 @@ fn replay_from_env() -> Option<Replay> {
 }
 
 fn record_from_env() -> Option<Record> {
-    let path = std::env::var_os("HELIX_INPUT_RECORD")?;
+    let path = std::env::var_os("REALITY64_INPUT_RECORD")?;
     match std::fs::File::create(&path) {
         Ok(file) => {
             log::warn!("input record: {}", std::path::Path::new(&path).display());
@@ -344,7 +344,7 @@ mod tests {
 
     #[test]
     fn record_latches_per_frame_and_writes_only_changes() {
-        let path = std::env::temp_dir().join(format!("helix_input_{}.txt", std::process::id()));
+        let path = std::env::temp_dir().join(format!("reality64_input_{}.txt", std::process::id()));
         let mut script = Script {
             replay: None,
             record: Some(Record::new(std::fs::File::create(&path).unwrap())),
@@ -411,7 +411,8 @@ mod tests {
 
     #[test]
     fn replay_then_record_extends_the_route() {
-        let path = std::env::temp_dir().join(format!("helix_input_ext_{}.txt", std::process::id()));
+        let path =
+            std::env::temp_dir().join(format!("reality64_input_ext_{}.txt", std::process::id()));
         let recording = parse(&format!("{HEADER} 1\n0 0000 0 0\n2 8000 0 0\n")).unwrap();
         let mut script = Script {
             replay: Some(recording.into()),
@@ -455,7 +456,7 @@ mod tests {
     #[test]
     fn frame_zero_is_latched_once() {
         let path =
-            std::env::temp_dir().join(format!("helix_input_zero_{}.txt", std::process::id()));
+            std::env::temp_dir().join(format!("reality64_input_zero_{}.txt", std::process::id()));
         let record = Record::new(std::fs::File::create(&path).unwrap());
         let script = Script::new(None, Some(record), pad(0, 0, 0));
         assert_eq!(script.read(pad(0x8000, 0, 0)).button, 0);

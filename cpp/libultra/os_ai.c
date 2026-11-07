@@ -1,16 +1,16 @@
 #include <libultra/ultra64.h>
-#include <helix/internal.h>
+#include <reality64/internal.h>
 
-// libultra Audio Interface (AI) shim over the Helix-owned HLXAudio* boundary.
+// libultra Audio Interface (AI) shim over the reality64-owned R64Audio* boundary.
 //
 // This file holds no descriptor or occupancy model: the Arie player, source
 // rate, in-flight-DMA tracker, and current-length/status accounting all live
-// behind one Rust mutex (helix/src/audio.rs). The helix side is a non-gating
+// behind one Rust mutex (reality64/src/audio.rs). The reality64 side is a non-gating
 // tracker over a free-push submit — Arie's own software queue is the sole
 // backpressure. This shim only (1) realizes the guest AI DAC frequency with the
 // libultra divisor rule, mapping osTvType -> AI clock through the same TV-family
-// source VI uses (HLXViGetTvFamily), and (2) applies N64 v2 argument validation
-// before free-pushing a buffer across the HLXAudio boundary. Guest AI lengths
+// source VI uses (R64ViGetTvFamily), and (2) applies N64 v2 argument validation
+// before free-pushing a buffer across the R64Audio boundary. Guest AI lengths
 // are bytes; a stereo s16 frame is 4 bytes.
 
 // Maximum N64 v2 AI DMA length: 18-bit length register with the bottom 3 bits
@@ -24,7 +24,7 @@
 // (there is no real RCP here) and does not compute the unused bitrate divisor.
 // Returns 0 and writes *out_realized on success, or -1 if the requested rate is
 // zero or too high for this clock (divisor < 0x84).
-s32 HLXAiRealizeFrequency(u32 requested, s32 vi_clock, u32 *out_realized) {
+s32 R64AiRealizeFrequency(u32 requested, s32 vi_clock, u32 *out_realized) {
     if (requested == 0) {
         return -1; // avoid div-by-zero; a zero rate is not realizable
     }
@@ -41,10 +41,10 @@ s32 HLXAiRealizeFrequency(u32 requested, s32 vi_clock, u32 *out_realized) {
 }
 
 s32 osAiSetFrequency(u32 frequency) {
-    // TV/mode -> AI clock, shared with the VI retrace clock: HLXViGetTvFamily
+    // TV/mode -> AI clock, shared with the VI retrace clock: R64ViGetTvFamily
     // maps osTvType to NTSC=0 / PAL=1 / MPAL=2 (u32::MAX unknown).
     s32 clock;
-    switch (HLXViGetTvFamily(osTvType)) {
+    switch (R64ViGetTvFamily(osTvType)) {
         case 0: clock = VI_NTSC_CLOCK; break;
         case 1: clock = VI_PAL_CLOCK;  break;
         case 2: clock = VI_MPAL_CLOCK; break;
@@ -52,15 +52,15 @@ s32 osAiSetFrequency(u32 frequency) {
     }
 
     u32 realized;
-    if (HLXAiRealizeFrequency(frequency, clock, &realized) != 0) {
+    if (R64AiRealizeFrequency(frequency, clock, &realized) != 0) {
         return -1;
     }
 
     // Installs/replaces the player for this realized source rate (a same-rate
     // call is a no-op inside the runtime). Propagate an install failure as a
     // guest -1 rather than reporting a rate the runtime never accepted.
-    HLXAudioResult r = HLXAudioSetSourceRate(realized);
-    if (r != HLX_AUDIO_OK) {
+    R64AudioResult r = R64AudioSetSourceRate(realized);
+    if (r != R64_AUDIO_OK) {
         return -1;
     }
     return (s32) realized;
@@ -88,28 +88,28 @@ s32 osAiSetNextBuffer(void *buf, u32 size) {
     // Opportunistic reap, free-push to Arie, and record the DMA span only on a
     // complete receipt. No host-side capacity gate — Arie's software queue is the
     // sole backpressure. Anything but OK is a guest -1.
-    return (HLXAudioSubmit(buf, size) == HLX_AUDIO_OK) ? 0 : -1;
+    return (R64AudioSubmit(buf, size) == R64_AUDIO_OK) ? 0 : -1;
 }
 
 u32 osAiGetLength(void) {
     // Remaining guest DMA bytes of the current in-flight DMA, straight from the
     // tracker. No host-occupancy approximation and no 32000/60 safety subtraction:
     // length comes solely from Arie's retired-source position.
-    return HLXAudioCurrentLength();
+    return R64AudioCurrentLength();
 }
 
 u32 osAiGetStatus(void) {
-    // Map Helix's internal AI status bits onto the guest N64 AI_STATUS_* register
+    // Map reality64's internal AI status bits onto the guest N64 AI_STATUS_* register
     // bits (PR/rcp.h). FIFO_FULL reflects total host occupancy versus the AI
     // target depth (see audio.rs): a status-paced guest submits while
     // !AI_STATUS_FIFO_FULL, so target-depth FIFO_FULL is what lets the deep host
     // buffer fill. DMA_BUSY means an accepted DMA has not yet retired.
-    u32 h = HLXAudioStatus();
+    u32 h = R64AudioStatus();
     u32 out = 0;
-    if (h & HLX_AI_FIFO_FULL) {
+    if (h & R64_AI_FIFO_FULL) {
         out |= AI_STATUS_FIFO_FULL;
     }
-    if (h & HLX_AI_DMA_BUSY) {
+    if (h & R64_AI_DMA_BUSY) {
         out |= AI_STATUS_DMA_BUSY;
     }
     return out;

@@ -1,9 +1,9 @@
 # ultragfx capture
 
-Set capture variables before launching the game. Helix must be built against an
+Set capture variables before launching the game. reality64 must be built against an
 ultragfx revision with `CaptureSequence` and the native capture API. The dependency
 enables ultragfx's `capture` feature. A statically linked game must be relinked after
-rebuilding Helix.
+rebuilding reality64.
 
 Captures use the `.ugfxcap` extension and ultragfx's `UGFXCAP\0` magic. Use the
 matching ultragfx replay tool; captures with the old magic are not compatible.
@@ -31,7 +31,7 @@ ULTRAGFX_CAPTURE_DIR=/tmp/sm64-frames \
 ULTRAGFX_CAPTURE_FRAMES=120,240,360, \
 ULTRAGFX_CAPTURE_REVISION="$(git rev-parse HEAD)" \
 ULTRAGFX_CAPTURE_SYMBOLS='live sm64 graphics tasks' \
-RUST_LOG=helix::render=info \
+RUST_LOG=reality64::render=info \
 ./build-cmake/sm64-us
 ```
 
@@ -54,13 +54,13 @@ ULTRAGFX_CAPTURE_WARMUP_FRAMES=120 \
 ULTRAGFX_CAPTURE_PRESENTATIONS=121,180,240, \
 ULTRAGFX_CAPTURE_REVISION="$(git rev-parse HEAD)" \
 ULTRAGFX_CAPTURE_SYMBOLS='startup through selected gameplay route' \
-RUST_LOG=helix::render=info \
+RUST_LOG=reality64::render=info \
 ./build-cmake/sm64-us
 ```
 
 The sequence resets the renderer before the first task and records every frame
 through serial 240. It retains frames 1–120 as warm-up and selects 121, 180, and
-240 for replay images. Serials are never cropped or renumbered. Each Helix graphics
+240 for replay images. Serials are never cropped or renumbered. Each reality64 graphics
 task is one frame. The dither seed is 0 and depth reset policy is `Never`.
 
 After serial 240 is presented, `CaptureSequence::finish` validates the recording,
@@ -72,7 +72,7 @@ file uses the version-two sequence container, not a standalone frame payload.
 Sequence startup also logs `capture sequence context initialization #1` with the
 process ID. A second sequence context in the same process logs its attempt number
 and fails before creating a renderer or recording. It cannot restart at serial 1
-and compete for the same output. Helix's current GUI starts one render context;
+and compete for the same output. reality64's current GUI starts one render context;
 resuming an existing window does not recreate it. Restart the process for another
 sequence, even after the first finishes.
 
@@ -83,7 +83,7 @@ deferred until recording finishes to keep one extent and avoid invalidating the
 sequence. Avoid resizing or minimizing during a recording: a surface presentation
 failure stops capture and attempts to save the earlier completed prefix.
 
-Without a capture output variable, Helix retains the normal renderer operations
+Without a capture output variable, reality64 retains the normal renderer operations
 and presentation error handling and installs no signal handler.
 
 ## Ending a run early
@@ -91,7 +91,7 @@ and presentation error handling and installs no signal handler.
 Sequence mode attempts to install a `ctrlc` handler with termination support once
 per process, including when installation fails. Success logs
 `capture shutdown handler installed`. With that handler, Ctrl-C, SIGTERM
-(`kill -TERM <game-pid>`), SIGHUP, and normal window close reach Helix's shutdown
+(`kill -TERM <game-pid>`), SIGHUP, and normal window close reach reality64's shutdown
 path, which joins the render thread after it finishes and writes completed frames.
 Allow shutdown to finish; a second forced kill can interrupt serialization.
 Failure logs `capture shutdown handler unavailable` and warns that a killed run
@@ -99,7 +99,7 @@ will not save an unfinished capture. Recording continues: endpoint and normal
 window-close saves remain enabled. The sequence-start message alone does not
 promise signal save. `ctrlc::try_set_handler` also rejects existing native signal
 handlers and ignored signals, so its "already registered" error does not prove
-Helix initialized twice. Existing signal dispositions are not deliberately
+reality64 initialized twice. Existing signal dispositions are not deliberately
 overwritten.
 
 For a prefix ending at serial N, requested presentations greater than N are

@@ -1,5 +1,5 @@
-#ifndef HELIX_LIB_GUI_H
-#define HELIX_LIB_GUI_H
+#ifndef REALITY64_LIB_GUI_H
+#define REALITY64_LIB_GUI_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -10,10 +10,10 @@
 extern "C" {
 #endif
 
-float HLXDisplayGetAspectRatio();
+float R64DisplayGetAspectRatio();
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* HELIX_LIB_GUI_H */
+#endif /* REALITY64_LIB_GUI_H */

@@ -11,14 +11,14 @@ use crate::ultra::rsp::{self, Handler};
 
 #[cfg(not(test))]
 extern "C" {
-    fn hlx_acmd_process(list: *const c_void, num_cmds: i32);
+    fn r64_acmd_process(list: *const c_void, num_cmds: i32);
 }
 
 // `cargo test` builds the Rust lib without the C audio interpreter (cpp/audio/acmd.c is compiled by the
 // consumer's CMake), so stand in for its symbol — otherwise the MSVC linker rejects the undefined
 // external, and no test exercises the interpreter anyway.
 #[cfg(test)]
-unsafe fn hlx_acmd_process(_list: *const c_void, _num_cmds: i32) {}
+unsafe fn r64_acmd_process(_list: *const c_void, _num_cmds: i32) {}
 
 const M_GFXTASK: u32 = 1;
 
@@ -145,7 +145,7 @@ pub(crate) fn send_render_control(msg: RenderMsg) {
 
 /// osSpTaskStartGo: run the registered microcode handler, then post completion.
 #[no_mangle]
-pub extern "C" fn HLXSpTaskStartGo(task: *mut c_void) {
+pub extern "C" fn R64SpTaskStartGo(task: *mut c_void) {
     if task.is_null() {
         return;
     }
@@ -166,7 +166,7 @@ pub extern "C" fn HLXSpTaskStartGo(task: *mut c_void) {
             // (pointers embedded in the list). data_size is in bytes; sizeof(Acmd)=16.
             let t = unsafe { &*(task as *const OSTaskT) };
             let num_cmds = (t.data_size / 16) as i32;
-            unsafe { hlx_acmd_process(t.data_ptr as *const c_void, num_cmds) };
+            unsafe { r64_acmd_process(t.data_ptr as *const c_void, num_cmds) };
             event::post(OS_EVENT_SP);
         }
         Handler::JpegNjpgdsp => {
@@ -183,15 +183,15 @@ pub extern "C" fn HLXSpTaskStartGo(task: *mut c_void) {
 
 /// osSpTaskYielded → 0: the cooperative one-DL-per-frame consume is never actually interrupted.
 #[no_mangle]
-pub extern "C" fn HLXSpTaskYielded(_task: *mut c_void) -> i32 {
+pub extern "C" fn R64SpTaskYielded(_task: *mut c_void) -> i32 {
     0
 }
 
 /// Direct entry for tests/tools. `_out` is unused (A_SAVEBUFF targets are embedded
 /// in the list as native pointers); `nsamples` is interpreted as the Acmd count.
 #[no_mangle]
-pub extern "C" fn HLXAudioProcessCommandList(alist: *mut c_void, _out: *mut i16, nsamples: i32) {
-    unsafe { hlx_acmd_process(alist, nsamples) }
+pub extern "C" fn R64AudioProcessCommandList(alist: *mut c_void, _out: *mut i16, nsamples: i32) {
+    unsafe { r64_acmd_process(alist, nsamples) }
 }
 
 #[cfg(test)]
@@ -229,18 +229,18 @@ mod tests {
             }
             tx_ready.send(()).unwrap();
         });
-        let binding = rsp::HLXRspBinding {
+        let binding = rsp::R64RspBinding {
             ucode: 0x1_1234_5678 as *const c_void,
             handler: 4,
         };
-        assert_eq!(rsp::HLXRspRegister(&binding, 1), 0);
+        assert_eq!(rsp::R64RspRegister(&binding, 1), 0);
         let mut task = OSTaskT {
             type_: 99,
             data_ptr: 0xDEAD_BEEF as *mut u64,
             ucode: 0x9234_5678 as *mut u64,
             ..unsafe { std::mem::zeroed() }
         };
-        HLXSpTaskStartGo(&mut task as *mut OSTaskT as *mut c_void);
+        R64SpTaskStartGo(&mut task as *mut OSTaskT as *mut c_void);
         rx_ready.recv().unwrap();
         consumer.join().unwrap();
         assert!(

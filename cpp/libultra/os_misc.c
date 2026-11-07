@@ -1,9 +1,9 @@
 #include <libultra/ultra64.h>
-#include <helix/internal.h>
+#include <reality64/internal.h>
 
-// Helix owns scheduling, PI and SP; the low-level libultra entry points are inert link stubs.
+// reality64 owns scheduling, PI and SP; the low-level libultra entry points are inert link stubs.
 
-typedef u32 OSIntMask; // libultra interrupt mask; helix has no hardware interrupts
+typedef u32 OSIntMask; // libultra interrupt mask; reality64 has no hardware interrupts
 
 u32 osMemSize = 0x00800000; // 8 MiB (expansion pak); the guest sizes its heap from this
 u32 osResetType = 0;        // cold boot, never pre-NMI

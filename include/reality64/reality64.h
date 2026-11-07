@@ -1,9 +1,9 @@
-#ifndef HELIX_LIB
-#define HELIX_LIB
+#ifndef REALITY64_LIB
+#define REALITY64_LIB
 
 #include "speech.h"
 #include "audio.h"
 #include "network.h"
 #include "gui.h"
 
-#endif /* HELIX_LIB */
+#endif /* REALITY64_LIB */

@@ -4,7 +4,7 @@
 //! The [`GamepadManager`](crate::gamepad::manager::GamepadManager) is gilrs-backed and therefore
 //! `!Send`; it is owned and pumped EXCLUSIVELY on the winit main thread. Each frame the main thread
 //! samples it (`GamepadManager::sample_snapshot`) and `publish`es a plain-data snapshot here. The
-//! game's thread5 reads it through the `HLXControllerInit`/`HLXControllerRead` FFI. Because the
+//! game's thread5 reads it through the `R64ControllerInit`/`R64ControllerRead` FFI. Because the
 //! snapshot is plain `Copy` data behind a `Mutex`, this is sound: the `!Send` manager is never
 //! touched off the main thread — the snapshot is the only shared state.
 
@@ -42,12 +42,12 @@ pub fn load() -> GamepadSnapshot {
     *SNAPSHOT.lock().unwrap()
 }
 
-// MARK: - C API (thread5, runtime path only — guarded by HLXRuntimeActive in os_cont.c)
+// MARK: - C API (thread5, runtime path only — guarded by R64RuntimeActive in os_cont.c)
 
 /// Runtime replacement for `GamepadManagerInit` on thread5: report the controller-bits from the
 /// latest snapshot WITHOUT touching the `!Send` manager. `bits` is `&gControllerBits`.
 #[no_mangle]
-pub extern "C" fn HLXControllerInit(bits: *mut u8) -> i32 {
+pub extern "C" fn R64ControllerInit(bits: *mut u8) -> i32 {
     if !bits.is_null() {
         unsafe { *bits = crate::gamepad::script::read().bits };
     }
@@ -56,7 +56,7 @@ pub extern "C" fn HLXControllerInit(bits: *mut u8) -> i32 {
 
 /// Runtime replacement for `GamepadManagerGetReadData` on thread5: copy the latest snapshot pad.
 #[no_mangle]
-pub extern "C" fn HLXControllerRead(pad: *mut OSControllerPad) {
+pub extern "C" fn R64ControllerRead(pad: *mut OSControllerPad) {
     if pad.is_null() {
         return;
     }
@@ -102,10 +102,10 @@ mod tests {
             ..Default::default()
         });
         let mut bits: u8 = 0xFF;
-        assert_eq!(HLXControllerInit(&mut bits), 0);
+        assert_eq!(R64ControllerInit(&mut bits), 0);
         assert_eq!(bits, 1);
         // Null pointer must not crash.
-        assert_eq!(HLXControllerInit(std::ptr::null_mut()), 0);
+        assert_eq!(R64ControllerInit(std::ptr::null_mut()), 0);
     }
 
     #[test]
@@ -124,12 +124,12 @@ mod tests {
             stick_y: 0,
             errno: 0,
         };
-        HLXControllerRead(&mut pad);
+        R64ControllerRead(&mut pad);
         assert_eq!(pad.button, 0x1000);
         assert_eq!(pad.stick_x, 10);
         assert_eq!(pad.stick_y, -20);
         assert_eq!(pad.errno, 3);
         // Null pointer must not crash.
-        HLXControllerRead(std::ptr::null_mut());
+        R64ControllerRead(std::ptr::null_mut());
     }
 }

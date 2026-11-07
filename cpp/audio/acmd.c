@@ -3,7 +3,7 @@
 #include "mixer.h"
 #include "acmd.h"
 
-void hlx_acmd_process(const void *list, int32_t num_cmds) {
+void r64_acmd_process(const void *list, int32_t num_cmds) {
     const Acmd *a = (const Acmd *)list;
     for (int32_t i = 0; i < num_cmds; i++, a++) {
         uintptr_t w0 = a->words.w0;

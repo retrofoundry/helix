@@ -19,7 +19,7 @@ fn table() -> &'static Mutex<[Option<(usize, usize)>; NUM_EVENTS]> {
 }
 
 #[no_mangle]
-pub extern "C" fn HLXEventSetMesg(event: i32, mq: *mut c_void, msg: *mut c_void) {
+pub extern "C" fn R64EventSetMesg(event: i32, mq: *mut c_void, msg: *mut c_void) {
     let idx = event as usize;
     if idx >= NUM_EVENTS {
         return;
@@ -29,7 +29,7 @@ pub extern "C" fn HLXEventSetMesg(event: i32, mq: *mut c_void, msg: *mut c_void)
 
 /// Post the message registered for `event` to its queue (tail order, NOBLOCK).
 /// Rust callers (SP/DP completion, AI) use this directly; the FFI
-/// `HLXEventPost` is a thin wrapper.
+/// `R64EventPost` is a thin wrapper.
 pub fn post(event: i32) {
     let idx = event as usize;
     let entry = if idx < NUM_EVENTS {
@@ -44,7 +44,7 @@ pub fn post(event: i32) {
 }
 
 #[no_mangle]
-pub extern "C" fn HLXEventPost(event: i32) {
+pub extern "C" fn R64EventPost(event: i32) {
     post(event);
 }
 
@@ -77,9 +77,9 @@ mod tests {
         let mut backing = [0u8; 64];
         let mq = backing.as_mut_ptr() as *mut std::os::raw::c_void;
         let mut msgbuf: [*mut std::os::raw::c_void; 1] = [ptr::null_mut()];
-        mesg::HLXMesgQueueCreate(mq, msgbuf.as_mut_ptr(), 1);
-        HLXEventSetMesg(OS_EVENT_SI, mq, 0x5150 as *mut _);
-        HLXEventPost(OS_EVENT_SI);
+        mesg::R64MesgQueueCreate(mq, msgbuf.as_mut_ptr(), 1);
+        R64EventSetMesg(OS_EVENT_SI, mq, 0x5150 as *mut _);
+        R64EventPost(OS_EVENT_SI);
         let (ret, m) = mesg::recv(mq as usize, 0);
         assert_eq!(ret, 0);
         assert_eq!(m, 0x5150);
@@ -87,7 +87,7 @@ mod tests {
 
     #[test]
     fn post_unregistered_event_is_noop() {
-        HLXEventPost(6); // OS_EVENT_AI, never registered -> must not panic
+        R64EventPost(6); // OS_EVENT_AI, never registered -> must not panic
     }
 
     static SI_QKEY: AtomicUsize = AtomicUsize::new(0);
@@ -103,22 +103,22 @@ mod tests {
     #[test]
     fn si_post_unblocks_waiter() {
         // Hold the shared OS_EVENT_SI slot for the whole test: guarantees our registration
-        // below is the one HLXEventPost(OS_EVENT_SI) reads, so the wake is delivered to OUR
+        // below is the one R64EventPost(OS_EVENT_SI) reads, so the wake is delivered to OUR
         // queue and not misrouted to a concurrently-running SI test's queue.
         let _guard = lock_si_slot();
 
         let mut backing = [0u8; 64];
         let mq = backing.as_mut_ptr() as *mut std::os::raw::c_void;
         let mut msgbuf: [*mut std::os::raw::c_void; 1] = [ptr::null_mut()];
-        mesg::HLXMesgQueueCreate(mq, msgbuf.as_mut_ptr(), 1);
+        mesg::R64MesgQueueCreate(mq, msgbuf.as_mut_ptr(), 1);
         SI_QKEY.store(mq as usize, Ordering::SeqCst);
         SI_GOT.store(false, Ordering::SeqCst);
-        HLXEventSetMesg(OS_EVENT_SI, mq, ptr::null_mut()); // main.c:117 registers NULL msg
+        R64EventSetMesg(OS_EVENT_SI, mq, ptr::null_mut()); // main.c:117 registers NULL msg
 
         let mut tstore = [0u8; 128];
         let t = tstore.as_mut_ptr() as *mut std::os::raw::c_void;
         let tid = t as usize;
-        crate::ultra::thread::HLXThreadCreate(
+        crate::ultra::thread::R64ThreadCreate(
             t,
             5,
             si_waiter,
@@ -126,7 +126,7 @@ mod tests {
             ptr::null_mut(),
             10,
         );
-        crate::ultra::thread::HLXThreadStart(t);
+        crate::ultra::thread::R64ThreadStart(t);
 
         // Deterministically confirm the guest actually PARKED in recv(BLOCK) on the SI queue
         // before we post — modeled on mesg::tests' F3 poll-until-state technique instead of a
@@ -157,7 +157,7 @@ mod tests {
             "waiter unblocked before OS_EVENT_SI was posted"
         );
 
-        HLXEventPost(OS_EVENT_SI); // os_cont.c posts this after sampling
+        R64EventPost(OS_EVENT_SI); // os_cont.c posts this after sampling
 
         // Bounded wait for the woken guest to be OS-scheduled out of park_self, pop the
         // message, and record it. The same generous ceiling absorbs pure OS-scheduling latency

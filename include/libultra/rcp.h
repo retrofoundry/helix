@@ -1,5 +1,5 @@
-#ifndef HELIX_LIBULTRA_RCP_H
-#define HELIX_LIBULTRA_RCP_H
+#ifndef REALITY64_LIBULTRA_RCP_H
+#define REALITY64_LIBULTRA_RCP_H
 
 
 // VI DAC source clocks in Hz, used to derive the AI frequency.

@@ -5,7 +5,7 @@
 #include "acmd.h"
 #include "scenario_data.h"
 
-void hlx_mixer_reset_state(void);  // test hook in mixer.c: zero the shared rspa
+void r64_mixer_reset_state(void);  // test hook in mixer.c: zero the shared rspa
 
 // Baked golden reference: the exact PCM the (now-retired) inline mixer produced for this
 // scenario, frozen after the gate proved interpreter == inline mixer byte-for-byte.
@@ -45,8 +45,8 @@ int main(void) {
         Acmd *cmd = list;
         #include "scenario.inc"
         int32_t n = (int32_t)(cmd - list);
-        hlx_mixer_reset_state();
-        hlx_acmd_process(list, n);
+        r64_mixer_reset_state();
+        r64_acmd_process(list, n);
         if (memcmp(GOLDEN_REF, neu, GOLDEN_PCM_BYTES) != 0) {
             for (size_t i = 0; i < GOLDEN_PCM_BYTES / sizeof(int16_t); i++)
                 if (GOLDEN_REF[i] != neu[i]) { printf("GOLDEN MISMATCH at [%zu]: ref=%d new=%d\n", i, GOLDEN_REF[i], neu[i]); break; }

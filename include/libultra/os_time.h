@@ -1,5 +1,5 @@
-#ifndef HELIX_LIBULTRA_OS_TIME_H
-#define HELIX_LIBULTRA_OS_TIME_H
+#ifndef REALITY64_LIBULTRA_OS_TIME_H
+#define REALITY64_LIBULTRA_OS_TIME_H
 
 
 #include <libultra/ultratypes.h>

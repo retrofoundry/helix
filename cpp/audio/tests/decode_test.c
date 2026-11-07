@@ -12,7 +12,7 @@ int main(void) {
     aClearBuffer(cmd++, 0x40, 0x20);
     aSetBuffer(cmd++, 0, 0, 0x40, 0x20);
     aSaveBuffer(cmd++, dst);
-    hlx_acmd_process(list, (int32_t)(cmd - list));
+    r64_acmd_process(list, (int32_t)(cmd - list));
     for (int i = 0; i < 16; i++) {
         if (dst[i] != 0) { printf("DECODE FAIL at %d = %d\n", i, dst[i]); return 1; }
     }

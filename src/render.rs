@@ -54,9 +54,9 @@ pub fn aspect_ratio() -> f32 {
     f32::from_bits(ASPECT_BITS.load(Ordering::Relaxed))
 }
 
-/// C-facing aspect getter (cpp/helix.c calls this). Replaces the dead `_gui`-based path.
+/// C-facing aspect getter (cpp/reality64.c calls this). Replaces the dead `_gui`-based path.
 #[no_mangle]
-pub extern "C" fn HLXAspectRatio() -> f32 {
+pub extern "C" fn R64AspectRatio() -> f32 {
     aspect_ratio()
 }
 
@@ -71,9 +71,9 @@ fn warn_id_drift(what: &str, id: u32) {
     }
 }
 
-/// Guest vertex/matrix layout (fixed N64 s16 vs float), declared via `HLXRenderSetDataFormat`;
+/// Guest vertex/matrix layout (fixed N64 s16 vs float), declared via `R64RenderSetDataFormat`;
 /// ultragfx treats it as orthogonal to the microcode, so `consume_dl` applies it before each frame.
-/// 0 = Fixed (ultragfx's default), 1 = Float — kept in sync with `HLXDataFormat` in runtime.h.
+/// 0 = Fixed (ultragfx's default), 1 = Float — kept in sync with `R64DataFormat` in runtime.h.
 static DATA_FORMAT: AtomicU32 = AtomicU32::new(0);
 
 fn data_format() -> ultragfx::DataFormat {
@@ -89,13 +89,13 @@ fn data_format() -> ultragfx::DataFormat {
 
 /// C-facing data-format selector: the guest declares its build's vertex layout before the first gfx task.
 #[no_mangle]
-pub extern "C" fn HLXRenderSetDataFormat(format: u32) {
+pub extern "C" fn R64RenderSetDataFormat(format: u32) {
     DATA_FORMAT.store(format, Ordering::Relaxed);
 }
 
 pub(crate) const SURFACE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 
-/// The surface config helix pins, matching ultragfx `Renderer::new` for `Some(Bgra8Unorm)`. `with_device`
+/// The surface config reality64 pins, matching ultragfx `Renderer::new` for `Some(Bgra8Unorm)`. `with_device`
 /// does not configure the surface, so the render thread calls `surface.configure` with this first.
 pub(crate) fn surface_config(width: u32, height: u32) -> wgpu::SurfaceConfiguration {
     wgpu::SurfaceConfiguration {
@@ -131,7 +131,7 @@ impl RenderContext {
     /// device setup verbatim (`with_device` adopts a caller-made device and does not configure the
     /// surface — spec §6). Panics here are caught by `spawn` (fatal-on-panic).
     pub fn from_handoff(h: SurfaceHandoff) -> RenderContext {
-        let selection = capture::Selection::from_env().expect("helix capture configuration");
+        let selection = capture::Selection::from_env().expect("reality64 capture configuration");
         if let Some(selection) = &selection {
             selection.install_shutdown_handler();
         }
@@ -146,7 +146,7 @@ impl RenderContext {
             force_fallback_adapter: false,
             compatible_surface: Some(&surface),
         }))
-        .expect("helix render: request_adapter");
+        .expect("reality64 render: request_adapter");
 
         let required_features = adapter.features()
             & (wgpu::Features::DUAL_SOURCE_BLENDING | wgpu::Features::DEPTH_CLIP_CONTROL);
@@ -158,7 +158,7 @@ impl RenderContext {
             experimental_features: wgpu::ExperimentalFeatures::disabled(),
             trace: wgpu::Trace::Off,
         }))
-        .expect("helix render: request_device");
+        .expect("reality64 render: request_device");
 
         let config = surface_config(width, height);
         surface.configure(&device, &config);
@@ -188,7 +188,7 @@ impl RenderContext {
                 None,
                 Some(
                     capture::SequenceRecording::begin(&mut renderer, selection)
-                        .expect("helix capture: begin sequence"),
+                        .expect("reality64 capture: begin sequence"),
                 ),
             ),
             None => (None, None),
@@ -424,7 +424,7 @@ impl RenderHandle {
 pub fn spawn(handoff: SurfaceHandoff) -> RenderHandle {
     let rx = take_render_receiver();
     let join = std::thread::Builder::new()
-        .name("helix-render".into())
+        .name("reality64-render".into())
         .spawn(move || {
             let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 let mut ctx = RenderContext::from_handoff(handoff);
@@ -433,11 +433,11 @@ pub fn spawn(handoff: SurfaceHandoff) -> RenderHandle {
                 ctx.finish_capture("shutdown");
             }));
             if outcome.is_err() {
-                log::error!("helix render thread failed; shutting down");
+                log::error!("reality64 render thread failed; shutting down");
                 crate::ultra::request_shutdown();
             }
         })
-        .expect("spawn helix render thread");
+        .expect("spawn reality64 render thread");
     RenderHandle { join: Some(join) }
 }
 

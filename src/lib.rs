@@ -30,7 +30,7 @@ pub fn init() {
 // MARK: - C API
 
 #[no_mangle]
-pub extern "C" fn HelixInit() {
+pub extern "C" fn reality64Init() {
     init();
 }
 
