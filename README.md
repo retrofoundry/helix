@@ -4,7 +4,7 @@ reality64 is a Rust library for running N64 software on PC and other systems. It
 
 ## Features Provided
 
-- [x] Libultra runtime (ultra) — real threads, message queues + events, a 60 Hz VI clock, an RCP task engine (graphics → ultragfx, audio → an HLE Acmd interpreter), PI/DMA, timers, and EEPROM save, all over native pointers
+- [x] Libultra runtime (ultra) — real threads, message queues + events, a 60 Hz VI clock, an RCP task engine (graphics → ultragfx, audio → the Rust classic US aspMain handler), PI/DMA, timers, and EEPROM save, all over native pointers
 - [x] Window Management (gui)
 - [x] N64 RDP command processing and rendering via [ultragfx](https://github.com/retrofoundry/ultragfx) on wgpu (gui)
 - [x] Input Handling (gamepad)

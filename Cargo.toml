@@ -33,6 +33,7 @@ arie = "0.3.0"
 # Pinned: ultragfx may change its API between commits; bump this deliberately and fix up the render path with it.
 ultragfx = { git = "https://github.com/retrofoundry/ultragfx", rev = "df60805", default-features = false, features = ["capture"] }
 rustc-hash = "1.1.0"
+sha2 = "0.10"
 
 # For local development, uncomment to build against local checkouts of ultragfx and
 # arie instead of the git/published crates.
@@ -44,3 +45,9 @@ rustc-hash = "1.1.0"
 
 [profile.dev.package."*"]
 opt-level = 3
+
+[profile.dev.package.reality64]
+opt-level = 1
+
+[dev-dependencies]
+serde_json = "1"
